@@ -920,35 +920,42 @@ export default function App() {
 
         {/* ── SIDEBAR ── */}
         <aside className={`sidebar ${sidebarOpen ? "open":""}`}>
-          <div style={{ padding:"20px 16px 14px", borderBottom:"1px solid var(--border)" }}>
-            <div style={{ display:"flex",alignItems:"center",gap:12 }}>
-              <div style={{ width:40,height:40,borderRadius:13,background:"var(--grad-main)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,boxShadow:"0 4px 16px rgba(167,139,250,0.45)",flexShrink:0 }}>💑</div>
+          {/* Logo */}
+          <div style={{ padding:"22px 18px 16px", borderBottom:"1px solid var(--border)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ width:42, height:42, borderRadius:13, background:"var(--grad-main)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, boxShadow:"0 4px 18px rgba(167,139,250,0.5)", flexShrink:0 }}>💑</div>
               <div>
-                <div className="glow-text" style={{ fontFamily:"'Fraunces',serif",fontSize:21,fontWeight:700,lineHeight:1 }}>DuoBudget</div>
-                <div style={{ fontSize:9,color:"var(--text3)",letterSpacing:1.2,textTransform:"uppercase",marginTop:2 }}>Finance à deux</div>
+                <div className="glow-text" style={{ fontFamily:"'Fraunces',serif", fontSize:22, fontWeight:700, lineHeight:1 }}>DuoBudget</div>
+                <div style={{ fontSize:9, color:"var(--text3)", letterSpacing:1.4, textTransform:"uppercase", marginTop:3 }}>Finance à deux</div>
               </div>
             </div>
           </div>
 
-          <div style={{ padding:"7px 12px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:8 }}>
-            <div className={`sync-dot ${syncStatus}`} />
-            <span style={{ fontSize:11,color:syncColor[syncStatus],fontWeight:600 }}>{syncLabel[syncStatus]}</span>
-          </div>
-
-          <div style={{ padding:"10px 10px 4px" }}>
-            <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:10,color:"var(--text)",padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%" }}>
+          {/* Month selector */}
+          <div style={{ padding:"12px 14px", borderBottom:"1px solid var(--border)" }}>
+            <div style={{ fontSize:10, color:"var(--text3)", textTransform:"uppercase", letterSpacing:1, fontWeight:700, marginBottom:6 }}>Période</div>
+            <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ background:"rgba(167,139,250,0.08)", border:"1px solid rgba(167,139,250,0.22)", borderRadius:10, color:"var(--text)", padding:"8px 12px", fontSize:12, fontWeight:700, cursor:"pointer", width:"100%" }}>
               {allMonths.map(k => <option key={k} value={k}>{monthLabel(k)}</option>)}
             </select>
           </div>
 
-          <nav style={{ flex:1,paddingTop:4,overflowY:"auto" }}>
+          {/* Sync status */}
+          <div style={{ padding:"8px 14px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:7 }}>
+            <div className={`sync-dot ${syncStatus}`}/>
+            <span style={{ fontSize:11, color:syncColor[syncStatus], fontWeight:700 }}>{syncLabel[syncStatus]}</span>
+          </div>
+
+          {/* Nav */}
+          <nav style={{ flex:1, paddingTop:8, overflowY:"auto" }}>
             <div className="nav-section-label">Navigation</div>
             {navItems.slice(0,5).map(n => (
               <div key={n.id} className={`nav-item ${page===n.id?"active":""}`} onClick={() => navigate(n.id)}>
-                <span className="nav-icon">{n.icon}</span>
-                <span>{n.label}</span>
+                <div style={{ width:30, height:30, borderRadius:9, background: page===n.id ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0, transition:"all .2s" }}>
+                  {n.icon}
+                </div>
+                <span style={{ flex:1 }}>{n.label}</span>
                 {n.badge > 0 && (
-                  <span className="nav-badge" style={{ background: overdueBills > 0 ? "rgba(248,113,113,0.25)" : undefined, color: overdueBills > 0 ? "var(--red)" : undefined }}>
+                  <span className="nav-badge" style={{ background:overdueBills>0?"rgba(248,113,113,0.2)":undefined, color:overdueBills>0?"var(--red)":undefined }}>
                     {overdueBills > 0 ? "⚠️ " : ""}{n.badge}
                   </span>
                 )}
@@ -956,23 +963,33 @@ export default function App() {
             ))}
             <div className="nav-section-label" style={{ marginTop:10 }}>Système</div>
             <div className={`nav-item ${page==="settings"?"active":""}`} onClick={() => navigate("settings")}>
-              <span className="nav-icon">⚙️</span><span>Réglages</span>
+              <div style={{ width:30, height:30, borderRadius:9, background: page==="settings" ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>⚙️</div>
+              <span>Réglages</span>
             </div>
           </nav>
 
-          <div style={{ padding:"10px",borderTop:"1px solid var(--border)" }}>
-            <div style={{ display:"flex",gap:5,marginBottom:8 }}>
+          {/* Profiles + logout */}
+          <div style={{ padding:"12px 14px", borderTop:"1px solid var(--border)" }}>
+            <div style={{ display:"flex", gap:7, marginBottom:10 }}>
               {data.profiles.filter(p => p.id !== "common").map(p => (
-                <div key={p.id} style={{ flex:1,textAlign:"center",padding:"8px 4px",borderRadius:10,background:`${p.color}12`,border:`1px solid ${p.color}25` }}>
-                  <div style={{ fontSize:22,marginBottom:2 }}>{p.avatar}</div>
-                  <div style={{ fontSize:10,fontWeight:700,color:p.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{p.name}</div>
+                <div key={p.id} style={{ flex:1, display:"flex", alignItems:"center", gap:7, padding:"9px 10px", borderRadius:11, background:`${p.color}0e`, border:`1px solid ${p.color}28` }}>
+                  <span style={{ fontSize:18 }}>{p.avatar}</span>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:p.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
+                    <div style={{ fontSize:9.5, color:"var(--text3)" }}>
+                      {fmt((mdata(selMonth).incomes[p.id]||0))}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
-            <button onClick={() => signOut(auth)} style={{ width:"100%",background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:10,color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:600,padding:"8px",fontFamily:"'Outfit',sans-serif",transition:"all .2s" }}>
+            <button onClick={() => signOut(auth)} style={{ width:"100%", background:"rgba(248,113,113,0.07)", border:"1px solid rgba(248,113,113,0.18)", borderRadius:10, color:"var(--red)", cursor:"pointer", fontSize:12, fontWeight:700, padding:"9px", fontFamily:"'Outfit',sans-serif", transition:"all .2s", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}
+              onMouseEnter={e => e.currentTarget.style.background="rgba(248,113,113,0.14)"}
+              onMouseLeave={e => e.currentTarget.style.background="rgba(248,113,113,0.07)"}>
               🚪 Déconnexion
             </button>
           </div>
+        </aside>
         </aside>
 
         {/* ── MAIN ── */}
@@ -1082,15 +1099,31 @@ function ProfileSetup({ label, emoji, color, value, onChange }) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  SMART TIMESTAMP  (lisible : "Aujourd'hui à 22:55:13")
+// ═══════════════════════════════════════════════════════════
+function smartDate(iso) {
+  if (!iso) return "—";
+  const d   = new Date(iso);
+  const now = new Date();
+  const hms = pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0)  return "Aujourd'hui à " + hms;
+  if (diffDays === 1)  return "Hier à " + hms;
+  if (diffDays === 2)  return "Avant-hier à " + hms;
+  return d.toLocaleDateString("fr-FR",{ day:"2-digit", month:"short",
+    year: d.getFullYear()!==now.getFullYear()?"numeric":undefined }) + " à " + hms;
+}
+
+// ═══════════════════════════════════════════════════════════
 //  DASHBOARD RECENT TRANSACTIONS (with search)
 // ═══════════════════════════════════════════════════════════
-function DashboardRecentTx({ transactions, catMap, profMap, setModal, selMonth }) {
-  const [search, setSearch] = useState("");
+function DashboardRecentTx({ transactions, catMap, profMap }) {
+  const [search, setSearch]   = useState("");
   const [expanded, setExpanded] = useState(false);
 
   const filtered = useMemo(() => {
     const sorted = [...transactions].sort((a,b) => new Date(b.timestamp)-new Date(a.timestamp));
-    if (!search.trim()) return expanded ? sorted : sorted.slice(0,6);
+    if (!search.trim()) return expanded ? sorted : sorted.slice(0,5);
     const q = search.toLowerCase();
     return sorted.filter(tx =>
       tx.label.toLowerCase().includes(q) ||
@@ -1099,70 +1132,96 @@ function DashboardRecentTx({ transactions, catMap, profMap, setModal, selMonth }
     );
   }, [transactions, search, expanded, catMap, profMap]);
 
-  const fmtFull = iso => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear()+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
-  };
-
   return (
     <>
-      <div style={{ fontWeight:700, fontSize:15, marginBottom:12, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <span style={{ display:"flex", alignItems:"center", gap:6 }}><span>🕐</span> Dernières transactions</span>
-        {transactions.length > 0 && <span style={{ fontSize:12, color:"var(--text3)" }}>{transactions.length} au total</span>}
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:36, height:36, borderRadius:11, background:"rgba(167,139,250,0.12)", border:"1px solid rgba(167,139,250,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>🕐</div>
+          <div>
+            <div style={{ fontWeight:800, fontSize:15 }}>Dernières transactions</div>
+            <div style={{ fontSize:11, color:"var(--text3)", marginTop:1 }}>{transactions.length} ce mois</div>
+          </div>
+        </div>
+        {transactions.length > 0 && (
+          <div style={{ fontFamily:"'Fraunces',serif", fontSize:17, fontWeight:800, color:"var(--red)" }}>
+            -{fmt(transactions.reduce((s,t)=>s+t.amount,0))}
+          </div>
+        )}
       </div>
 
+      {/* Search */}
       {transactions.length > 0 && (
-        <div style={{ position:"relative", marginBottom:12 }}>
-          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, pointerEvents:"none", opacity:.45 }}>🔍</span>
-          <input
-            value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher dans les transactions…"
-            style={{ paddingLeft:34, background:"rgba(255,255,255,0.04)", border:"1px solid var(--border)", borderRadius:10, fontSize:12, padding:"8px 12px 8px 34px" }}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"var(--text3)", fontSize:16 }}>×</button>
-          )}
+        <div style={{ position:"relative", marginBottom:14 }}>
+          <span style={{ position:"absolute", left:13, top:"50%", transform:"translateY(-50%)", fontSize:13, pointerEvents:"none", opacity:.4 }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Filtrer les transactions…"
+            style={{ paddingLeft:36, background:"rgba(255,255,255,0.04)", border:"1px solid var(--border)", borderRadius:11, fontSize:12.5, padding:"9px 13px 9px 36px" }}/>
+          {search && <button onClick={() => setSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"var(--text3)", fontSize:17, lineHeight:1 }}>×</button>}
         </div>
       )}
 
+      {/* Rows */}
       {transactions.length === 0 ? (
-        <div className="empty-state"><div className="empty-icon">💸</div>Aucune transaction</div>
-      ) : filtered.length === 0 ? (
-        <div style={{ padding:"24px", textAlign:"center", color:"var(--text3)", fontSize:13 }}>
-          Aucun résultat pour « {search} »
+        <div className="empty-state" style={{ padding:"32px 16px" }}>
+          <div className="empty-icon">💸</div>
+          <div style={{ fontSize:14, fontWeight:700 }}>Aucune transaction ce mois</div>
         </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding:"20px", textAlign:"center", color:"var(--text3)", fontSize:13 }}>Aucun résultat pour « {search} »</div>
       ) : (
-        <>
+        <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
           {filtered.map(tx => {
-            const cat  = catMap[tx.categoryId]  || { icon:"❓", color:"#888", name:"?" };
-            const prof = profMap[tx.profileId]  || { avatar:"❓", name:"?" };
+            const cat  = catMap[tx.categoryId]  || { icon:"❓", color:"#888", name:"Autre" };
+            const prof = profMap[tx.profileId]  || { avatar:"❓", name:"?", color:"#888" };
             return (
-              <div key={tx.id} className="tx-row">
-                <div className="chip-icon" style={{ width:42, height:42, background:`${cat.color}18`, border:`1px solid ${cat.color}22`, fontSize:20 }}>{cat.icon}</div>
+              <div key={tx.id} style={{
+                display:"flex", alignItems:"center", gap:14, padding:"13px 14px",
+                borderRadius:14, background:"rgba(255,255,255,0.025)",
+                border:"1px solid rgba(255,255,255,0.06)", transition:"all .15s",
+              }}
+                onMouseEnter={e=>{ e.currentTarget.style.background="rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor="rgba(255,255,255,0.1)"; }}
+                onMouseLeave={e=>{ e.currentTarget.style.background="rgba(255,255,255,0.025)"; e.currentTarget.style.borderColor="rgba(255,255,255,0.06)"; }}>
+
+                {/* Icon + profile badge */}
+                <div style={{ width:48, height:48, borderRadius:14, flexShrink:0, background:`${cat.color}14`, border:`1.5px solid ${cat.color}28`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:23, position:"relative" }}>
+                  {cat.icon}
+                  <div style={{ position:"absolute", bottom:-3, right:-3, width:18, height:18, borderRadius:"50%", background:prof.color||"#444", border:"2px solid #0e0c1e", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9 }}>{prof.avatar}</div>
+                </div>
+
+                {/* Info */}
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:14, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{tx.label}</div>
-                  <div style={{ fontSize:11, color:"var(--text3)", display:"flex", gap:6, flexWrap:"wrap", marginTop:2 }}>
-                    <span>{prof.avatar} {prof.name}</span>
-                    <span style={{ color:cat.color }}>· {cat.name}</span>
-                    <span style={{ fontFamily:"monospace", letterSpacing:.2 }}>· {fmtFull(tx.timestamp)}</span>
+                  <div style={{ fontWeight:700, fontSize:15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginBottom:5 }}>{tx.label}</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:7, flexWrap:"wrap" }}>
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:3, background:`${cat.color}12`, border:`1px solid ${cat.color}22`, borderRadius:20, padding:"2px 9px", fontSize:11, fontWeight:700, color:cat.color }}>
+                      {cat.icon} {cat.name}
+                    </span>
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:4, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"2px 9px", fontSize:11, fontWeight:600, color:"var(--text3)" }}>
+                      🕐 {smartDate(tx.timestamp)}
+                    </span>
                   </div>
                 </div>
-                {tx.auto && <span className="auto-badge">🤖</span>}
-                <div style={{ fontWeight:800, fontSize:14, color:"var(--red)", flexShrink:0 }}>-{fmt(tx.amount)}</div>
+
+                {/* Amount */}
+                <div style={{ textAlign:"right", flexShrink:0 }}>
+                  <div style={{ fontFamily:"'Fraunces',serif", fontWeight:800, fontSize:18, color:"var(--red)" }}>
+                    -{fmt(tx.amount)}
+                  </div>
+                  {tx.auto && <div style={{ fontSize:9.5, color:"var(--purple)", fontWeight:800, marginTop:2, letterSpacing:.5 }}>AUTO</div>}
+                </div>
               </div>
             );
           })}
-          {!search && transactions.length > 6 && (
+          {!search && transactions.length > 5 && (
             <button onClick={() => setExpanded(e => !e)} style={{
-              width:"100%", marginTop:10, background:"rgba(255,255,255,0.03)", border:"1px solid var(--border)",
-              borderRadius:10, color:"var(--text3)", cursor:"pointer", fontSize:12, fontWeight:700,
-              padding:"9px", fontFamily:"'Outfit',sans-serif", transition:"all .2s",
+              width:"100%", marginTop:4, background:"rgba(255,255,255,0.025)", border:"1px solid var(--border)",
+              borderRadius:11, color:"var(--text3)", cursor:"pointer", fontSize:12, fontWeight:700,
+              padding:"10px", fontFamily:"'Outfit',sans-serif", transition:"all .2s",
             }}>
-              {expanded ? "▲ Réduire" : `▼ Voir toutes les ${transactions.length} transactions`}
+              {expanded ? "▲ Réduire" : `▼ Voir les ${transactions.length-5} autres transactions`}
             </button>
           )}
-        </>
+        </div>
       )}
     </>
   );
@@ -1174,158 +1233,195 @@ function DashboardRecentTx({ transactions, catMap, profMap, setModal, selMonth }
 function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
   const md = mdata(selMonth);
   const { incomes, transactions } = md;
-
-  const totalIncome = useMemo(() => (incomes.p1||0)+(incomes.p2||0)+(incomes.common||0), [incomes]);
-  const totalExp    = useMemo(() => transactions.reduce((s,t) => s+t.amount, 0), [transactions]);
-  const balance     = totalIncome - totalExp;
-  const pct         = totalIncome > 0 ? Math.min(100, (totalExp/totalIncome)*100) : 0;
+  const [balanceView, setBalanceView] = useState("global");
 
   const catMap  = useMemo(() => Object.fromEntries(data.categories.map(c=>[c.id,c])), [data.categories]);
   const profMap = useMemo(() => Object.fromEntries(data.profiles.map(p=>[p.id,p])), [data.profiles]);
 
+  const totalIncome = useMemo(() => (incomes.p1||0)+(incomes.p2||0)+(incomes.common||0), [incomes]);
+  const totalExp    = useMemo(() => transactions.reduce((s,t) => s+t.amount, 0), [transactions]);
+
+  const viewData = useMemo(() => {
+    if (balanceView === "global") return { inc:totalIncome, exp:totalExp, label:"Global — tous les comptes", color:null };
+    const prof = data.profiles.find(p => p.id === balanceView);
+    const inc  = incomes[balanceView] || 0;
+    const exp  = transactions.filter(t => t.profileId===balanceView).reduce((s,t)=>s+t.amount,0);
+    return { inc, exp, label:prof?`${prof.avatar} ${prof.name}`:balanceView, color:prof?.color||null };
+  }, [balanceView, totalIncome, totalExp, incomes, transactions, data.profiles]);
+
+  const balance = viewData.inc - viewData.exp;
+  const pct     = viewData.inc > 0 ? Math.min(100,(viewData.exp/viewData.inc)*100) : 0;
+  const isPos   = balance >= 0;
+
   const catTotals = useMemo(() => {
     const m = {};
-    transactions.forEach(t => { m[t.categoryId] = (m[t.categoryId]||0) + t.amount; });
+    transactions.forEach(t => { m[t.categoryId]=(m[t.categoryId]||0)+t.amount; });
     return m;
   }, [transactions]);
-
   const topCats = useMemo(() => Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,6), [catTotals]);
   const pieData = useMemo(() => topCats.map(([cid,val]) => ({
-    name:(catMap[cid]?.icon||"")+" "+(catMap[cid]?.name||cid),
-    value:val, color:catMap[cid]?.color||"#888"
+    name:(catMap[cid]?.icon||"")+" "+(catMap[cid]?.name||cid), value:val, color:catMap[cid]?.color||"#888"
   })), [topCats,catMap]);
 
-  const isPos = balance >= 0;
-  const unpaid = data.bills.filter(b => !b.paid?.[selMonth]);
-  const paid   = data.bills.filter(b =>  b.paid?.[selMonth]);
+  const unpaid  = useMemo(() => data.bills.filter(b => !b.paid?.[selMonth]).sort((a,b)=>{ if(!a.dueDate)return 1; if(!b.dueDate)return -1; return new Date(a.dueDate)-new Date(b.dueDate); }), [data.bills,selMonth]);
+  const paid    = useMemo(() => data.bills.filter(b =>  b.paid?.[selMonth]), [data.bills,selMonth]);
+  const overdue = useMemo(() => unpaid.filter(b => b.dueDate && new Date(b.dueDate) < new Date()), [unpaid]);
 
-  // Prévision fin de mois
-  const today = new Date();
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+  const today       = new Date();
+  const daysInMonth = new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
   const dayOfMonth  = today.getDate();
-  const projectedExp = dayOfMonth > 0 ? (totalExp / dayOfMonth) * daysInMonth : 0;
-  const isCurMonth = selMonth === curMonthKey();
-
-  // Alerte budget
-  const showBudgetAlert = pct >= 80 && totalIncome > 0;
-  const showOverdueAlert = data.bills.some(b => b.dueDate && new Date(b.dueDate) < new Date() && !b.paid?.[selMonth]);
+  const projectedExp = dayOfMonth > 0 ? (totalExp/dayOfMonth)*daysInMonth : 0;
+  const isCurMonth  = selMonth === curMonthKey();
 
   const CT = ({ active, payload }) => {
-    if (!active || !payload?.length) return null;
+    if (!active||!payload?.length) return null;
     const d = payload[0];
     return <div className="rc-tooltip"><div style={{ fontWeight:700 }}>{d.name}</div><div style={{ color:d.payload.color }}>{fmt(d.value)}</div></div>;
   };
 
+  const fmtDue = iso => {
+    if (!iso) return null;
+    const d    = new Date(iso);
+    const diff = Math.ceil((d - new Date()) / 86400000);
+    const lbl  = d.toLocaleDateString("fr-FR",{ day:"numeric", month:"short" });
+    if (diff < 0)  return { text:`${lbl} · En retard`,  color:"var(--red)" };
+    if (diff === 0) return { text:"Échéance aujourd'hui", color:"var(--red)" };
+    if (diff <= 3) return { text:`${lbl} · dans ${diff}j`, color:"var(--orange)" };
+    if (diff <= 7) return { text:`${lbl} · dans ${diff}j`, color:"var(--yellow)" };
+    return { text:lbl, color:"var(--text3)" };
+  };
+
   return (
     <div className="fade-up">
-      {/* Alertes */}
-      {showBudgetAlert && (
-        <div className={`alert-banner ${pct >= 100 ? "alert-danger" : "alert-warning"}`}>
-          {pct >= 100 ? "🔴" : "⚠️"}
-          <span>{pct >= 100 ? "Budget dépassé ! Dépenses supérieures aux revenus." : `Budget utilisé à ${Math.round(pct)}% — attention aux dépenses`}</span>
+      {/* Alerts */}
+      {pct >= 80 && viewData.inc > 0 && (
+        <div className={`alert-banner ${pct>=100?"alert-danger":"alert-warning"}`} style={{ marginBottom:14 }}>
+          {pct>=100?"🔴":"⚠️"}
+          <span>{pct>=100?"Budget dépassé !":`Budget utilisé à ${Math.round(pct)}% — restez vigilant`}</span>
         </div>
       )}
-      {showOverdueAlert && (
-        <div className="alert-banner alert-danger">
-          ⏰ <span>Des factures sont en retard de paiement !</span>
-          <button onClick={() => {}} style={{ marginLeft:"auto",background:"none",border:"1px solid var(--red)",borderRadius:8,color:"var(--red)",padding:"3px 10px",cursor:"pointer",fontSize:12,fontWeight:700 }}>Voir</button>
+      {overdue.length > 0 && (
+        <div className="alert-banner alert-danger" style={{ marginBottom:14 }}>
+          ⏰ <span>{overdue.length} facture{overdue.length>1?"s":""} en retard de paiement !</span>
         </div>
       )}
 
-      {/* Profil cards */}
-      <div style={{ display:"flex",gap:14,marginBottom:22 }}>
+      {/* ── PROFILE CARDS (cliquables → filtre balance) ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:20 }}>
         {data.profiles.map((p,i) => {
-          const inc   = incomes[p.id] || 0;
-          const spent = transactions.filter(t => t.profileId===p.id).reduce((s,t)=>s+t.amount,0);
+          const inc     = incomes[p.id] || 0;
+          const spent   = transactions.filter(t=>t.profileId===p.id).reduce((s,t)=>s+t.amount,0);
+          const sel     = balanceView === p.id;
           return (
-            <div key={p.id} className={`card glass-hover stagger-${i+1} fade-up`}
-              style={{ flex:1,display:"flex",alignItems:"center",gap:14,position:"relative",cursor:"default",padding:"16px 18px" }}>
-              <div style={{ position:"absolute",top:12,right:12,width:7,height:7,borderRadius:"50%",background:p.color,boxShadow:`0 0 8px ${p.color}` }} className="pulse-dot"/>
-              <div style={{ width:52,height:52,borderRadius:15,background:`${p.color}18`,border:`1px solid ${p.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0 }}
-                className="float-icon">{p.avatar}</div>
-              <div style={{ flex:1,minWidth:0 }}>
-                <div style={{ fontWeight:700,fontSize:15 }}>{p.name}</div>
-                <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5 }}>
-                  {p.id==="common" ? "Commun" : "Revenu"}
+            <div key={p.id} onClick={() => setBalanceView(sel?"global":p.id)}
+              style={{
+                padding:"15px 16px", borderRadius:15, cursor:"pointer",
+                background: sel ? `${p.color}12` : "var(--glass)",
+                border:`1.5px solid ${sel?p.color+"50":"var(--border)"}`,
+                boxShadow: sel ? `0 0 20px ${p.color}18` : "none",
+                transition:"all .2s", position:"relative",
+              }}>
+              <div style={{ position:"absolute", top:10, right:10, width:6, height:6, borderRadius:"50%", background:p.color, boxShadow:`0 0 7px ${p.color}` }}/>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                <div style={{ width:38, height:38, borderRadius:11, background:`${p.color}18`, border:`1px solid ${p.color}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>{p.avatar}</div>
+                <div>
+                  <div style={{ fontWeight:800, fontSize:13 }}>{p.name}</div>
+                  <div style={{ fontSize:9.5, color:"var(--text3)", textTransform:"uppercase", letterSpacing:.5 }}>{p.id==="common"?"Commun":"Revenu"}</div>
                 </div>
-                <div className="stat-num" style={{ fontSize:19,fontWeight:800,color:inc>0?"var(--green)":"var(--text3)",marginTop:3 }}>
-                  {inc>0?`+${fmt(inc)}`:"—"}
-                </div>
-                {p.id!=="common" && inc>0 && <div style={{ fontSize:11,color:"var(--text3)" }}>dép. {fmt(spent)}</div>}
               </div>
-              <button onClick={() => setModal({ type:"editIncome",profileId:p.id,selMonth })} className="btn-icon" style={{ position:"absolute",bottom:10,right:10,fontSize:13 }}>✏️</button>
+              <div style={{ fontFamily:"'Fraunces',serif", fontSize:20, fontWeight:800, color:inc>0?"var(--green)":"var(--text3)" }}>
+                {inc>0?`+${fmt(inc)}`:"—"}
+              </div>
+              {p.id!=="common" && spent>0 && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>dép. {fmt(spent)}</div>}
+              {sel && <div style={{ position:"absolute", bottom:7, right:8, fontSize:9, color:p.color, fontWeight:800, letterSpacing:.6, textTransform:"uppercase" }}>Vue active ✓</div>}
+              <button onClick={e=>{ e.stopPropagation(); setModal({ type:"editIncome",profileId:p.id,selMonth }); }}
+                style={{ position:"absolute", bottom:8, right: sel ? 68 : 8, width:24, height:24, borderRadius:7, border:"1px solid var(--border)", background:"rgba(255,255,255,0.05)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, transition:"all .15s" }}>✏️</button>
             </div>
           );
         })}
       </div>
 
       <div className="content-grid">
-        <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
-          {/* Balance card */}
-          <div className="card" style={{ position:"relative",overflow:"hidden",borderColor:isPos?"rgba(74,222,128,0.2)":"rgba(248,113,113,0.2)" }}>
-            <div style={{ position:"absolute",inset:0,background:isPos?"radial-gradient(ellipse 80% 60% at 50% -20%,rgba(74,222,128,0.08),transparent)":"radial-gradient(ellipse 80% 60% at 50% -20%,rgba(248,113,113,0.08),transparent)",pointerEvents:"none" }}/>
-            <div style={{ fontSize:12,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.5,textAlign:"center",marginBottom:12 }}>
-              Reste à vivre — {monthLabel(selMonth)}
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* ── BALANCE CARD ── */}
+          <div className="card" style={{ position:"relative", overflow:"hidden", borderColor:isPos?"rgba(74,222,128,0.2)":"rgba(248,113,113,0.2)" }}>
+            <div style={{ position:"absolute", inset:0, background:isPos?"radial-gradient(ellipse 80% 60% at 50% -20%,rgba(74,222,128,0.07),transparent)":"radial-gradient(ellipse 80% 60% at 50% -20%,rgba(248,113,113,0.07),transparent)", pointerEvents:"none" }}/>
+
+            {/* Tab selector */}
+            <div style={{ display:"flex", gap:3, marginBottom:18, background:"rgba(255,255,255,0.04)", borderRadius:10, padding:3 }}>
+              {[{ id:"global", label:"🌐 Global", color:null }, ...data.profiles.map(p=>({ id:p.id, label:`${p.avatar} ${p.name}`, color:p.color }))].map(v => (
+                <button key={v.id} onClick={() => setBalanceView(v.id)} style={{
+                  flex:1, padding:"7px 4px", borderRadius:8, border: balanceView===v.id ? `1px solid ${v.color?v.color+"45":"rgba(255,255,255,0.15)"}` : "1px solid transparent",
+                  cursor:"pointer", background: balanceView===v.id ? (v.color?`${v.color}18`:"rgba(255,255,255,0.1)") : "transparent",
+                  color: balanceView===v.id ? (v.color||"var(--text)") : "var(--text3)",
+                  fontFamily:"'Outfit',sans-serif", fontWeight:700, fontSize:11,
+                  transition:"all .2s", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+                }}>{v.label}</button>
+              ))}
             </div>
-            <div className="stat-num" style={{ fontSize:64,textAlign:"center",color:isPos?"var(--green)":"var(--red)",textShadow:`0 0 40px ${isPos?"rgba(74,222,128,0.3)":"rgba(248,113,113,0.3)"}`,marginBottom:20,lineHeight:1 }}>
+
+            <div style={{ fontSize:11, color:"var(--text3)", textTransform:"uppercase", letterSpacing:1.5, textAlign:"center", marginBottom:10 }}>
+              Reste à vivre · {viewData.label}
+            </div>
+            <div className="stat-num" style={{ fontSize:58, textAlign:"center", color:isPos?"var(--green)":"var(--red)", textShadow:`0 0 40px ${isPos?"rgba(74,222,128,0.25)":"rgba(248,113,113,0.25)"}`, marginBottom:20, lineHeight:1 }}>
               {fmt(balance)}
             </div>
-            <div style={{ display:"flex",justifyContent:"center",gap:32,marginBottom:16 }}>
+            <div style={{ display:"flex", justifyContent:"center", gap:28, marginBottom:16 }}>
               <div style={{ textAlign:"center" }}>
-                <div style={{ fontSize:11,color:"var(--text3)",marginBottom:4 }}>💵 Revenus</div>
-                <div style={{ fontSize:20,fontWeight:800,color:"var(--green)" }}>+{fmt(totalIncome)}</div>
+                <div style={{ fontSize:10, color:"var(--text3)", marginBottom:4, textTransform:"uppercase", letterSpacing:.5 }}>💵 Revenus</div>
+                <div style={{ fontSize:18, fontWeight:800, color:"var(--green)" }}>+{fmt(viewData.inc)}</div>
               </div>
-              <div style={{ width:1,background:"var(--border)" }}/>
+              <div style={{ width:1, background:"var(--border)" }}/>
               <div style={{ textAlign:"center" }}>
-                <div style={{ fontSize:11,color:"var(--text3)",marginBottom:4 }}>💸 Dépenses</div>
-                <div style={{ fontSize:20,fontWeight:800,color:"var(--red)" }}>-{fmt(totalExp)}</div>
+                <div style={{ fontSize:10, color:"var(--text3)", marginBottom:4, textTransform:"uppercase", letterSpacing:.5 }}>💸 Dépenses</div>
+                <div style={{ fontSize:18, fontWeight:800, color:"var(--red)" }}>-{fmt(viewData.exp)}</div>
               </div>
             </div>
-            {totalIncome>0 && (
+            {viewData.inc > 0 && (
               <>
-                <div style={{ display:"flex",justifyContent:"space-between",fontSize:13,color:"var(--text3)",marginBottom:6 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:"var(--text3)", marginBottom:7 }}>
                   <span>Budget utilisé</span>
-                  <span style={{ fontWeight:700,color:pct>80?"var(--red)":pct>60?"var(--orange)":"var(--green)" }}>{Math.round(pct)}%</span>
+                  <span style={{ fontWeight:800, color:pct>80?"var(--red)":pct>60?"var(--orange)":"var(--green)" }}>{Math.round(pct)}%</span>
                 </div>
-                <div className="progress-track" style={{ height:10 }}>
-                  <div className="progress-fill" style={{ width:`${pct}%`,background:pct>80?"var(--grad-red)":pct>60?"linear-gradient(90deg,var(--yellow),var(--orange))":"var(--grad-green)" }}/>
+                <div className="progress-track" style={{ height:8 }}>
+                  <div className="progress-fill" style={{ width:`${pct}%`, background:pct>80?"var(--grad-red)":pct>60?"linear-gradient(90deg,var(--yellow),var(--orange))":"var(--grad-green)" }}/>
                 </div>
               </>
             )}
-            {/* Prévision fin de mois */}
             {isCurMonth && totalIncome > 0 && dayOfMonth < daysInMonth && (
-              <div style={{ marginTop:14,padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:10,border:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                <span style={{ fontSize:12,color:"var(--text3)" }}>📅 Projection fin de mois</span>
-                <span style={{ fontSize:13,fontWeight:700,color:projectedExp>totalIncome?"var(--red)":"var(--orange)" }}>
-                  -{fmt(projectedExp)}
-                </span>
+              <div style={{ marginTop:14, padding:"10px 14px", background:"rgba(255,255,255,0.03)", borderRadius:10, border:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontSize:12, color:"var(--text3)" }}>📅 Projection fin de mois</span>
+                <span style={{ fontSize:13, fontWeight:700, color:projectedExp>totalIncome?"var(--red)":"var(--orange)" }}>-{fmt(projectedExp)}</span>
               </div>
             )}
           </div>
 
-          {/* Category breakdown */}
+          {/* ── CATEGORY BREAKDOWN ── */}
           <div className="card">
-            <div style={{ fontWeight:700,fontSize:15,marginBottom:16,display:"flex",alignItems:"center",gap:7 }}>
-              <span>📊</span> Répartition des dépenses
+            <div style={{ fontWeight:800, fontSize:14, marginBottom:16, display:"flex", alignItems:"center", gap:9 }}>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(251,146,60,0.1)", border:"1px solid rgba(251,146,60,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>📊</div>
+              Répartition des dépenses
             </div>
             {topCats.length === 0
               ? <div className="empty-state"><div className="empty-icon">📊</div>Aucune dépense ce mois</div>
               : (
-                <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px 24px" }}>
+                <div style={{ display:"flex", flexDirection:"column", gap:11 }}>
                   {topCats.map(([cid,amt]) => {
-                    const cat = catMap[cid] || { icon:"❓",name:cid,color:"#888" };
-                    const p = totalExp > 0 ? (amt/totalExp)*100 : 0;
+                    const cat = catMap[cid] || { icon:"❓", name:cid, color:"#888" };
+                    const p   = totalExp > 0 ? (amt/totalExp)*100 : 0;
                     return (
                       <div key={cid}>
-                        <div style={{ display:"flex",justifyContent:"space-between",marginBottom:5,fontSize:13 }}>
-                          <span style={{ display:"flex",alignItems:"center",gap:6,overflow:"hidden" }}>
-                            <span>{cat.icon}</span>
-                            <span style={{ overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{cat.name}</span>
-                          </span>
-                          <span style={{ fontWeight:700,flexShrink:0,marginLeft:8 }}>{fmt(amt)}</span>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                            <div style={{ width:26, height:26, borderRadius:8, background:`${cat.color}15`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>{cat.icon}</div>
+                            <span style={{ fontSize:13, fontWeight:600 }}>{cat.name}</span>
+                            <span style={{ fontSize:10, color:"var(--text3)", background:"rgba(255,255,255,0.05)", borderRadius:20, padding:"1px 7px" }}>{Math.round(p)}%</span>
+                          </div>
+                          <span style={{ fontWeight:800, fontSize:13 }}>{fmt(amt)}</span>
                         </div>
-                        <div className="progress-track" style={{ height:6 }}>
-                          <div className="progress-fill" style={{ width:`${p}%`,background:cat.color }}/>
+                        <div className="progress-track" style={{ height:5 }}>
+                          <div className="progress-fill" style={{ width:`${p}%`, background:cat.color }}/>
                         </div>
                       </div>
                     );
@@ -1335,29 +1431,34 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
             }
           </div>
 
-          {/* Recent transactions */}
+          {/* ── RECENT TRANSACTIONS ── */}
           <div className="card">
-            <DashboardRecentTx transactions={transactions} catMap={catMap} profMap={profMap} setModal={setModal} selMonth={selMonth} />
+            <DashboardRecentTx transactions={transactions} catMap={catMap} profMap={profMap} />
           </div>
         </div>
 
-        {/* Right column */}
-        <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
+        {/* ── RIGHT COLUMN ── */}
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+
+          {/* Pie chart */}
           {pieData.length > 0 && (
             <div className="card">
-              <div style={{ fontWeight:700,fontSize:15,marginBottom:12 }}>🥧 Vue circulaire</div>
-              <ResponsiveContainer width="100%" height={200}>
+              <div style={{ fontWeight:800, fontSize:14, marginBottom:12, display:"flex", alignItems:"center", gap:9 }}>
+                <div style={{ width:32, height:32, borderRadius:10, background:"rgba(251,146,60,0.1)", border:"1px solid rgba(251,146,60,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🥧</div>
+                Vue circulaire
+              </div>
+              <ResponsiveContainer width="100%" height={185}>
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={88} paddingAngle={2} dataKey="value">
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
                     {pieData.map((e,i) => <Cell key={i} fill={e.color} stroke="transparent"/>)}
                   </Pie>
                   <Tooltip content={<CT/>}/>
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display:"flex",flexWrap:"wrap",gap:7,marginTop:6 }}>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:4 }}>
                 {pieData.slice(0,6).map((d,i) => (
-                  <div key={i} style={{ display:"flex",alignItems:"center",gap:5,fontSize:12 }}>
-                    <div style={{ width:9,height:9,borderRadius:2,background:d.color }}/>
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:5, fontSize:11 }}>
+                    <div style={{ width:8, height:8, borderRadius:2, background:d.color, flexShrink:0 }}/>
                     <span style={{ color:"var(--text3)" }}>{d.name}</span>
                   </div>
                 ))}
@@ -1365,56 +1466,90 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
             </div>
           )}
 
-          {/* Bills widget */}
+          {/* ── BILLS WIDGET ── */}
           <div className="card">
-            <div style={{ fontWeight:700,fontSize:15,marginBottom:14,display:"flex",alignItems:"center",gap:7 }}>
-              <span>📋</span> Factures — {monthLabel(selMonth)}
+            <div style={{ fontWeight:800, fontSize:14, marginBottom:14, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                <div style={{ width:32, height:32, borderRadius:10, background:"rgba(167,139,250,0.1)", border:"1px solid rgba(167,139,250,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>📋</div>
+                Factures
+              </div>
+              <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600 }}>{monthLabel(selMonth)}</span>
             </div>
-            {data.bills.length === 0
-              ? <div className="empty-state"><div className="empty-icon">📋</div>Aucune facture</div>
-              : (
-                <>
-                  <div style={{ display:"flex",gap:10,marginBottom:14 }}>
-                    {[
-                      { v:paid.length, l:"Payées", bg:"rgba(74,222,128,0.08)", c:"var(--green)" },
-                      { v:unpaid.length, l:"En attente", bg:"rgba(251,191,36,0.08)", c:"var(--yellow)" },
-                      { v:fmt(unpaid.reduce((s,b)=>s+(b.amount||0),0)), l:"Restant", bg:"rgba(248,113,113,0.08)", c:"var(--red)" }
-                    ].map(s => (
-                      <div key={s.l} style={{ flex:1,textAlign:"center",background:s.bg,borderRadius:12,padding:"12px 6px" }}>
-                        <div className="stat-num" style={{ fontSize:typeof s.v==="number"?26:16,color:s.c,marginBottom:3 }}>{s.v}</div>
-                        <div style={{ fontSize:11,color:"var(--text3)" }}>{s.l}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="progress-track" style={{ height:8,marginBottom:12 }}>
-                    <div className="progress-fill" style={{ width:`${data.bills.length?(paid.length/data.bills.length)*100:0}%`,background:"var(--grad-green)" }}/>
-                  </div>
-                  {unpaid.slice(0,3).map(b => (
-                    <div key={b.id} className="tx-row" style={{ padding:"8px 10px",marginBottom:4 }}>
-                      <span style={{ fontSize:20 }}>{b.icon||"📋"}</span>
-                      <span style={{ flex:1,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{b.name}</span>
-                      {b.amount>0 && <span style={{ color:"var(--orange)",fontWeight:700,fontSize:13 }}>-{fmt(b.amount)}</span>}
+
+            {data.bills.length === 0 ? (
+              <div className="empty-state" style={{ padding:"18px 0" }}><div className="empty-icon">📋</div>Aucune facture</div>
+            ) : (
+              <>
+                {/* Summary */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:7, marginBottom:12 }}>
+                  {[
+                    { v:paid.length,    l:"Payées",     c:"var(--green)",  bg:"rgba(74,222,128,0.08)",  bd:"rgba(74,222,128,0.18)" },
+                    { v:unpaid.length,  l:"En attente", c:"var(--yellow)", bg:"rgba(251,191,36,0.08)",  bd:"rgba(251,191,36,0.18)" },
+                    { v:overdue.length, l:"En retard",  c:"var(--red)",    bg:"rgba(248,113,113,0.08)", bd:"rgba(248,113,113,0.22)" },
+                  ].map(s => (
+                    <div key={s.l} style={{ textAlign:"center", background:s.bg, border:`1px solid ${s.bd}`, borderRadius:11, padding:"9px 4px" }}>
+                      <div className="stat-num" style={{ fontSize:22, color:s.c }}>{s.v}</div>
+                      <div style={{ fontSize:10, color:"var(--text3)", fontWeight:600 }}>{s.l}</div>
                     </div>
                   ))}
-                </>
-              )
-            }
+                </div>
+
+                {/* Progress */}
+                <div className="progress-track" style={{ height:5, marginBottom:13 }}>
+                  <div className="progress-fill" style={{ width:`${data.bills.length?(paid.length/data.bills.length)*100:0}%`, background:"var(--grad-green)" }}/>
+                </div>
+
+                {/* Bill rows WITH due dates */}
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {unpaid.slice(0,4).map(b => {
+                    const due = fmtDue(b.dueDate);
+                    const isOvr = b.dueDate && new Date(b.dueDate) < new Date();
+                    return (
+                      <div key={b.id} style={{
+                        display:"flex", alignItems:"center", gap:10, padding:"11px 13px",
+                        background: isOvr?"rgba(248,113,113,0.06)":"rgba(255,255,255,0.03)",
+                        border:`1px solid ${isOvr?"rgba(248,113,113,0.2)":"rgba(255,255,255,0.07)"}`,
+                        borderRadius:12,
+                      }}>
+                        <span style={{ fontSize:20, flexShrink:0 }}>{b.icon||"📋"}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontWeight:700, fontSize:13, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{b.name}</div>
+                          {due && (
+                            <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:3 }}>
+                              <span style={{ fontSize:10, color:due.color, fontWeight:700 }}>📅 {due.text}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ fontWeight:800, fontSize:14, color:isOvr?"var(--red)":"var(--orange)", flexShrink:0 }}>
+                          -{fmt(b.amount)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {unpaid.length > 4 && <div style={{ textAlign:"center", fontSize:11, color:"var(--text3)", padding:"5px 0" }}>+{unpaid.length-4} autre{unpaid.length-4>1?"s":""}</div>}
+                  {unpaid.length === 0 && <div style={{ textAlign:"center", fontSize:13, color:"var(--green)", fontWeight:700, padding:"10px 0" }}>🎉 Toutes les factures sont payées !</div>}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Quick stats */}
+          {/* ── QUICK STATS ── */}
           <div className="card">
-            <div style={{ fontWeight:700,fontSize:15,marginBottom:14 }}>⚡ Stats rapides</div>
-            <div style={{ display:"flex",flexDirection:"column",gap:9 }}>
+            <div style={{ fontWeight:800, fontSize:14, marginBottom:13, display:"flex", alignItems:"center", gap:9 }}>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(251,191,36,0.1)", border:"1px solid rgba(251,191,36,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>⚡</div>
+              Stats rapides
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
               {[
-                { label:"Tx. moy./jour", val:fmt(dayOfMonth>0?totalExp/dayOfMonth:0), icon:"📅" },
-                { label:"Plus grosse dép.", val:transactions.length?fmt(Math.max(...transactions.map(t=>t.amount))):"—", icon:"🔺" },
-                { label:"Nb. transactions", val:transactions.length, icon:"🧾" },
-                { label:"Taux d'épargne", val:totalIncome>0?`${Math.round(((totalIncome-totalExp)/totalIncome)*100)}%`:"—", icon:"💹" },
+                { label:"Tx. moy./jour",    val:fmt(dayOfMonth>0?totalExp/dayOfMonth:0),  icon:"📅", color:"var(--blue)" },
+                { label:"Plus grosse dép.", val:transactions.length?fmt(Math.max(...transactions.map(t=>t.amount))):"—", icon:"🔺", color:"var(--orange)" },
+                { label:"Nb. transactions", val:transactions.length, icon:"🧾", color:"var(--purple)" },
+                { label:"Taux d'épargne",   val:totalIncome>0?`${Math.round(((totalIncome-totalExp)/totalIncome)*100)}%`:"—", icon:"💹", color:"var(--green)" },
               ].map(s => (
-                <div key={s.label} style={{ display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:"rgba(255,255,255,0.03)",borderRadius:12 }}>
-                  <span style={{ fontSize:20 }}>{s.icon}</span>
-                  <span style={{ flex:1,fontSize:13,color:"var(--text2)" }}>{s.label}</span>
-                  <span style={{ fontWeight:800,fontSize:14 }}>{s.val}</span>
+                <div key={s.label} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background:"rgba(255,255,255,0.025)", borderRadius:11, border:"1px solid rgba(255,255,255,0.05)" }}>
+                  <span style={{ fontSize:17 }}>{s.icon}</span>
+                  <span style={{ flex:1, fontSize:12.5, color:"var(--text2)", fontWeight:600 }}>{s.label}</span>
+                  <span style={{ fontWeight:800, fontSize:14, color:s.color }}>{s.val}</span>
                 </div>
               ))}
             </div>
@@ -1424,6 +1559,7 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
     </div>
   );
 }
+
 
 // ═══════════════════════════════════════════════════════════
 //  INCOMES
