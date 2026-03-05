@@ -254,14 +254,20 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .content-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;}
 .content-grid.wide{grid-template-columns:1fr !important;}
 
+/* ── TOOLTIP SYSTEM ── */
+.tip{position:relative;}.tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) scale(.92);background:linear-gradient(135deg,#1e1b3a,#2a2450);color:var(--text);font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:600;white-space:nowrap;padding:7px 12px;border-radius:10px;border:1px solid rgba(167,139,250,0.25);box-shadow:0 8px 24px rgba(0,0,0,0.5);pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;z-index:9999;}.tip::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#2a2450;pointer-events:none;opacity:0;transition:opacity .18s;z-index:9999;}.tip:hover::after,.tip:hover::before{opacity:1;transform:translateX(-50%) scale(1);}.tip-right::after{left:auto;right:0;transform:translateX(0) scale(.92);}.tip-right:hover::after{transform:translateX(0) scale(1);}.tip-right::before{left:auto;right:14px;transform:none;}.tip-left::after{left:0;transform:translateX(0) scale(.92);}.tip-left:hover::after{transform:translateX(0) scale(1);}
+
 /* ── NAV ── */
-.nav-section-label{font-size:9.5px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;color:var(--text3);padding:0 18px;margin:16px 0 5px;}
-.nav-item{display:flex;align-items:center;gap:11px;padding:10px 14px;margin:2px 8px;border-radius:13px;cursor:pointer;transition:all .18s;font-size:14px;font-weight:600;color:var(--text2);position:relative;user-select:none;}
-.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.06);}
-.nav-item.active{color:var(--purple);background:rgba(167,139,250,0.12);}
-.nav-item.active::before{content:'';position:absolute;left:-8px;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--grad-main);border-radius:0 4px 4px 0;}
-.nav-icon{font-size:17px;width:22px;text-align:center;flex-shrink:0;}
-.nav-badge{margin-left:auto;background:rgba(248,113,113,0.2);color:var(--red);border-radius:10px;padding:1px 7px;font-size:11px;font-weight:800;}
+.nav-section-label{font-size:9px;font-weight:900;letter-spacing:2.2px;text-transform:uppercase;color:var(--text3);padding:0 18px;margin:20px 0 7px;display:flex;align-items:center;gap:8px;}
+.nav-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);margin-left:4px;}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;margin:2px 10px;border-radius:14px;cursor:pointer;transition:all .2s;font-size:13.5px;font-weight:600;color:var(--text2);position:relative;user-select:none;border:1px solid transparent;}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.07);}
+.nav-item.active{color:#fff;background:linear-gradient(135deg,rgba(167,139,250,0.2),rgba(244,114,182,0.1));border-color:rgba(167,139,250,0.3);box-shadow:0 2px 20px rgba(167,139,250,0.14),inset 0 1px 0 rgba(255,255,255,0.07);}
+.nav-item.active .nav-icon-wrap{background:var(--grad-main);box-shadow:0 4px 12px rgba(167,139,250,0.4);}
+.nav-icon-wrap{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.05);transition:all .2s;flex-shrink:0;}
+.nav-item:hover .nav-icon-wrap{background:rgba(255,255,255,0.1);}
+.nav-icon{font-size:16px;}
+.nav-badge{margin-left:auto;background:rgba(248,113,113,0.18);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:900;border:1px solid rgba(248,113,113,0.3);}
 
 /* ── CARDS ── */
 .glass{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--r);}
@@ -304,9 +310,15 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .progress-fill{height:100%;border-radius:20px;transition:width .7s cubic-bezier(.4,0,.2,1);}
 
 /* ── TRANSACTIONS ── */
-.tx-row{border-radius:13px;padding:11px 13px;transition:all .15s;border:1px solid transparent;display:flex;align-items:center;gap:12px;}
+.tx-row{border-radius:13px;padding:11px 13px;transition:all .2s;border:1px solid transparent;display:flex;align-items:center;gap:12px;}
 .tx-row:hover{background:rgba(255,255,255,0.05);border-color:var(--border);}
 .tx-row.selected{background:rgba(167,139,250,0.08);border-color:rgba(167,139,250,0.25);}
+
+/* ── EXPENSE ROW PREMIUM HOVER ── */
+.expense-row{transition:all .22s cubic-bezier(.4,0,.2,1);cursor:default;}
+.expense-row:hover{background:linear-gradient(135deg,rgba(167,139,250,0.07),rgba(244,114,182,0.04)) !important;border-color:rgba(167,139,250,0.28) !important;box-shadow:0 4px 24px rgba(167,139,250,0.1),inset 0 1px 0 rgba(255,255,255,0.05) !important;transform:translateX(2px);}
+.expense-row .row-actions{opacity:0;transform:translateX(8px);transition:all .2s;}
+.expense-row:hover .row-actions{opacity:1;transform:translateX(0);}
 
 /* ── MISC ── */
 .glow-text{background:var(--grad-main);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
@@ -342,11 +354,21 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .tab-item:hover:not(.active){color:var(--text2);background:rgba(255,255,255,0.03);}
 
 /* ── FILTER BAR ── */
-.filter-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;flex-wrap:nowrap;}
+.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;flex-wrap:wrap;}
 .filter-bar::-webkit-scrollbar{display:none;}
-.filter-chip{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--glass);color:var(--text2);cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0;transition:all .15s;}
-.filter-chip.active{border-color:rgba(167,139,250,0.5);background:rgba(167,139,250,0.12);color:var(--purple);}
-.filter-chip:hover:not(.active){background:var(--glass2);}
+.filter-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:22px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text2);cursor:pointer;font-size:12.5px;font-weight:600;white-space:nowrap;flex-shrink:0;transition:all .2s;user-select:none;}
+.filter-chip .chip-emoji{font-size:15px;line-height:1;}
+.filter-chip.active{border-color:rgba(167,139,250,0.55);background:rgba(167,139,250,0.14);color:var(--purple);box-shadow:0 2px 12px rgba(167,139,250,0.15),inset 0 1px 0 rgba(167,139,250,0.12);}
+.filter-chip:hover:not(.active){background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.15);transform:translateY(-1px);}
+
+/* ── ACTION BUTTONS WITH LABELS ── */
+.action-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:11px;border:1px solid;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;transition:all .2s;white-space:nowrap;flex-shrink:0;letter-spacing:.2px;}
+.action-btn-edit{background:rgba(167,139,250,0.07);border-color:rgba(167,139,250,0.2);color:var(--purple);}
+.action-btn-edit:hover{background:rgba(167,139,250,0.22);border-color:rgba(167,139,250,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(167,139,250,0.25);}
+.action-btn-dup{background:rgba(96,165,250,0.07);border-color:rgba(96,165,250,0.2);color:var(--blue);}
+.action-btn-dup:hover{background:rgba(96,165,250,0.22);border-color:rgba(96,165,250,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(96,165,250,0.25);}
+.action-btn-del{background:rgba(248,113,113,0.07);border-color:rgba(248,113,113,0.2);color:var(--red);}
+.action-btn-del:hover{background:rgba(248,113,113,0.22);border-color:rgba(248,113,113,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(248,113,113,0.25);}
 
 /* ── BOTTOM NAV ── */
 .bottom-nav{display:none;}
@@ -896,12 +918,12 @@ export default function App() {
   }).length;
 
   const navItems = [
-    { id:"dashboard", icon:"🏠", label:"Accueil" },
-    { id:"incomes",   icon:"💵", label:"Revenus" },
-    { id:"expenses",  icon:"💳", label:"Dépenses" },
-    { id:"bills",     icon:"📋", label:"Factures", badge: unpaidBills },
-    { id:"stats",     icon:"📊", label:"Stats" },
-    { id:"settings",  icon:"⚙️", label:"Réglages" },
+    { id:"dashboard", icon:"🏠", label:"Tableau de bord", desc:"Vue d'ensemble de vos finances" },
+    { id:"incomes",   icon:"💵", label:"Revenus",         desc:"Gérer les revenus mensuels" },
+    { id:"expenses",  icon:"💳", label:"Dépenses",        desc:"Toutes vos transactions du mois" },
+    { id:"bills",     icon:"📋", label:"Factures",        desc:"Charges récurrentes à payer", badge: unpaidBills },
+    { id:"stats",     icon:"📊", label:"Statistiques",   desc:"Analyses et tendances sur plusieurs mois" },
+    { id:"settings",  icon:"⚙️", label:"Réglages",       desc:"Gérer profils, catégories, thème" },
   ];
 
   const navigate = id => { setPage(id); setSidebarOpen(false); };
@@ -918,75 +940,95 @@ export default function App() {
       <div className="app-shell">
         <div className={`sidebar-overlay ${sidebarOpen ? "open":""}`} onClick={() => setSidebarOpen(false)} />
 
-        {/* ── SIDEBAR ── */}
+        {/* ── SIDEBAR PREMIUM ── */}
         <aside className={`sidebar ${sidebarOpen ? "open":""}`}>
-          {/* Logo */}
-          <div style={{ padding:"22px 18px 16px", borderBottom:"1px solid var(--border)" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ width:42, height:42, borderRadius:13, background:"var(--grad-main)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, boxShadow:"0 4px 18px rgba(167,139,250,0.5)", flexShrink:0 }}>💑</div>
+
+          {/* ── LOGO BLOCK ── */}
+          <div style={{ padding:"20px 16px 18px", borderBottom:"1px solid var(--border)", background:"linear-gradient(180deg,rgba(167,139,250,0.06),transparent)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:13 }}>
+              <div style={{ width:46, height:46, borderRadius:15, background:"var(--grad-main)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, boxShadow:"0 6px 22px rgba(167,139,250,0.55),inset 0 1px 0 rgba(255,255,255,0.25)", flexShrink:0 }}>💑</div>
               <div>
                 <div className="glow-text" style={{ fontFamily:"'Fraunces',serif", fontSize:22, fontWeight:700, lineHeight:1 }}>DuoBudget</div>
-                <div style={{ fontSize:9, color:"var(--text3)", letterSpacing:1.4, textTransform:"uppercase", marginTop:3 }}>Finance à deux</div>
+                <div style={{ fontSize:9, color:"var(--text3)", letterSpacing:1.6, textTransform:"uppercase", marginTop:3, fontWeight:700 }}>Finance à deux</div>
               </div>
+            </div>
+
+            {/* Mini profile pills */}
+            <div style={{ display:"flex", gap:6, marginTop:14 }}>
+              {data.profiles.filter(p => p.id !== "common").map(p => {
+                const inc = mdata(selMonth).incomes[p.id] || 0;
+                const spent = mdata(selMonth).transactions.filter(t => t.profileId===p.id).reduce((s,t)=>s+t.amount,0);
+                return (
+                  <div key={p.id} className="tip" data-tip={`${p.name} · Revenu: ${fmt(inc)} · Dép: ${fmt(spent)}`}
+                    style={{ flex:1, display:"flex", alignItems:"center", gap:8, padding:"9px 11px", borderRadius:12, background:`${p.color}0c`, border:`1px solid ${p.color}25`, cursor:"default", transition:"all .2s" }}
+                    onMouseEnter={e=>e.currentTarget.style.background=p.color+"1e"}
+                    onMouseLeave={e=>e.currentTarget.style.background=p.color+"0c"}>
+                    <div style={{ width:30, height:30, borderRadius:9, background:p.color+"22", border:`1px solid ${p.color}35`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>{p.avatar}</div>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:11.5, fontWeight:800, color:p.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
+                      <div style={{ fontSize:10, color:"var(--text3)", fontWeight:600, marginTop:1 }}>{inc > 0 ? fmt(inc) : "—"}</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Month selector */}
+          {/* ── MONTH SELECTOR ── */}
           <div style={{ padding:"12px 14px", borderBottom:"1px solid var(--border)" }}>
-            <div style={{ fontSize:10, color:"var(--text3)", textTransform:"uppercase", letterSpacing:1, fontWeight:700, marginBottom:6 }}>Période</div>
-            <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ background:"rgba(167,139,250,0.08)", border:"1px solid rgba(167,139,250,0.22)", borderRadius:10, color:"var(--text)", padding:"8px 12px", fontSize:12, fontWeight:700, cursor:"pointer", width:"100%" }}>
+            <div style={{ fontSize:9, color:"var(--text3)", textTransform:"uppercase", letterSpacing:1.6, fontWeight:800, marginBottom:7, display:"flex", alignItems:"center", gap:6 }}>
+              <span>📅</span> Période
+            </div>
+            <select value={selMonth} onChange={e => setSelMonth(e.target.value)}
+              className="tip" data-tip="Changer le mois affiché"
+              style={{ background:"rgba(167,139,250,0.08)", border:"1px solid rgba(167,139,250,0.22)", borderRadius:10, color:"var(--text)", padding:"8px 12px", fontSize:12, fontWeight:700, cursor:"pointer", width:"100%" }}>
               {allMonths.map(k => <option key={k} value={k}>{monthLabel(k)}</option>)}
             </select>
           </div>
 
-          {/* Sync status */}
-          <div style={{ padding:"8px 14px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:7 }}>
-            <div className={`sync-dot ${syncStatus}`}/>
-            <span style={{ fontSize:11, color:syncColor[syncStatus], fontWeight:700 }}>{syncLabel[syncStatus]}</span>
-          </div>
-
-          {/* Nav */}
-          <nav style={{ flex:1, paddingTop:8, overflowY:"auto" }}>
+          {/* ── NAVIGATION ── */}
+          <nav style={{ flex:1, paddingTop:4, overflowY:"auto" }}>
             <div className="nav-section-label">Navigation</div>
             {navItems.slice(0,5).map(n => (
-              <div key={n.id} className={`nav-item ${page===n.id?"active":""}`} onClick={() => navigate(n.id)}>
-                <div style={{ width:30, height:30, borderRadius:9, background: page===n.id ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0, transition:"all .2s" }}>
-                  {n.icon}
+              <div key={n.id} className={`nav-item tip ${page===n.id?"active":""}`}
+                data-tip={n.desc || n.label}
+                onClick={() => navigate(n.id)}>
+                <div className="nav-icon-wrap">
+                  <span className="nav-icon">{n.icon}</span>
                 </div>
                 <span style={{ flex:1 }}>{n.label}</span>
                 {n.badge > 0 && (
-                  <span className="nav-badge" style={{ background:overdueBills>0?"rgba(248,113,113,0.2)":undefined, color:overdueBills>0?"var(--red)":undefined }}>
+                  <span className="nav-badge">
                     {overdueBills > 0 ? "⚠️ " : ""}{n.badge}
                   </span>
                 )}
               </div>
             ))}
-            <div className="nav-section-label" style={{ marginTop:10 }}>Système</div>
-            <div className={`nav-item ${page==="settings"?"active":""}`} onClick={() => navigate("settings")}>
-              <div style={{ width:30, height:30, borderRadius:9, background: page==="settings" ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, flexShrink:0 }}>⚙️</div>
+
+            <div className="nav-section-label">Système</div>
+            <div className={`nav-item tip ${page==="settings"?"active":""}`}
+              data-tip="Gérer profils, catégories, thème"
+              onClick={() => navigate("settings")}>
+              <div className="nav-icon-wrap"><span className="nav-icon">⚙️</span></div>
               <span>Réglages</span>
             </div>
           </nav>
 
-          {/* Profiles + logout */}
+          {/* ── SYNC + LOGOUT ── */}
           <div style={{ padding:"12px 14px", borderTop:"1px solid var(--border)" }}>
-            <div style={{ display:"flex", gap:7, marginBottom:10 }}>
-              {data.profiles.filter(p => p.id !== "common").map(p => (
-                <div key={p.id} style={{ flex:1, display:"flex", alignItems:"center", gap:7, padding:"9px 10px", borderRadius:11, background:`${p.color}0e`, border:`1px solid ${p.color}28` }}>
-                  <span style={{ fontSize:18 }}>{p.avatar}</span>
-                  <div style={{ minWidth:0 }}>
-                    <div style={{ fontSize:11, fontWeight:800, color:p.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
-                    <div style={{ fontSize:9.5, color:"var(--text3)" }}>
-                      {fmt((mdata(selMonth).incomes[p.id]||0))}
-                    </div>
-                  </div>
-                </div>
-              ))}
+            {/* Sync row */}
+            <div className="tip tip-left" data-tip="État de la synchronisation Firebase" style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 10px", borderRadius:10, background:"rgba(255,255,255,0.03)", marginBottom:10, border:"1px solid var(--border)" }}>
+              <div className={`sync-dot ${syncStatus}`}/>
+              <span style={{ fontSize:11, color:syncColor[syncStatus], fontWeight:700 }}>{syncLabel[syncStatus]}</span>
             </div>
-            <button onClick={() => signOut(auth)} style={{ width:"100%", background:"rgba(248,113,113,0.07)", border:"1px solid rgba(248,113,113,0.18)", borderRadius:10, color:"var(--red)", cursor:"pointer", fontSize:12, fontWeight:700, padding:"9px", fontFamily:"'Outfit',sans-serif", transition:"all .2s", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}
-              onMouseEnter={e => e.currentTarget.style.background="rgba(248,113,113,0.14)"}
-              onMouseLeave={e => e.currentTarget.style.background="rgba(248,113,113,0.07)"}>
-              🚪 Déconnexion
+
+            {/* Logout */}
+            <button onClick={() => signOut(auth)}
+              className="tip tip-left" data-tip="Se déconnecter de votre compte"
+              style={{ width:"100%", background:"rgba(248,113,113,0.06)", border:"1px solid rgba(248,113,113,0.16)", borderRadius:11, color:"var(--red)", cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", fontFamily:"'Outfit',sans-serif", transition:"all .22s", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
+              onMouseEnter={e => { e.currentTarget.style.background="rgba(248,113,113,0.16)"; e.currentTarget.style.borderColor="rgba(248,113,113,0.35)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background="rgba(248,113,113,0.06)"; e.currentTarget.style.borderColor="rgba(248,113,113,0.16)"; }}>
+              <span style={{ fontSize:16 }}>🚪</span> Déconnexion
             </button>
           </div>
         </aside>
@@ -1001,13 +1043,13 @@ export default function App() {
             <div style={{ display:"flex",alignItems:"center",gap:8,flexShrink:0 }}>
               {page === "expenses" && (
                 <>
-                  <button className="btn btn-ghost btn-sm" onClick={() => exportCSV(mdata(selMonth).transactions, data.categories, data.profiles, selMonth)} title="Exporter CSV">📥</button>
-                  <button className="btn btn-primary btn-sm" onClick={() => setModal({ type:"addTransaction",selMonth })}>+ Dépense</button>
+                  <button className="btn btn-ghost btn-sm tip" data-tip="Exporter les dépenses du mois en CSV (Excel)" onClick={() => exportCSV(mdata(selMonth).transactions, data.categories, data.profiles, selMonth)}>📥 Export CSV</button>
+                  <button className="btn btn-primary btn-sm tip" data-tip="Ajouter une nouvelle dépense pour ce mois" onClick={() => setModal({ type:"addTransaction",selMonth })}>+ Dépense</button>
                 </>
               )}
-              {page === "bills"   && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type:"addBill" })}>+ Facture</button>}
-              {page === "incomes" && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type:"addRecurringIncome" })}>+ Récurrent</button>}
-              <div className={`sync-dot ${syncStatus}`} title={syncLabel[syncStatus]} />
+              {page === "bills" && <button className="btn btn-primary btn-sm tip" data-tip="Créer une nouvelle facture récurrente" onClick={() => setModal({ type:"addBill" })}>+ Facture</button>}
+              {page === "incomes" && <button className="btn btn-primary btn-sm tip" data-tip="Configurer un revenu mensuel automatique" onClick={() => setModal({ type:"addRecurringIncome" })}>+ Récurrent</button>}
+              <div className={`sync-dot tip ${syncStatus}`} data-tip={syncLabel[syncStatus]} />
               <LiveClock />
             </div>
           </div>
@@ -1720,7 +1762,8 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
   const [filter, setFilter]   = useState("all");
   const [search, setSearch]   = useState("");
   const [sort, setSort]       = useState("date_desc");
-  const [groupBy, setGroupBy] = useState("none"); // "none" | "day" | "category"
+  const [groupBy, setGroupBy] = useState("none");
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const catMap  = useMemo(() => Object.fromEntries(data.categories.map(c=>[c.id,c])), [data.categories]);
   const profMap = useMemo(() => Object.fromEntries(data.profiles.map(p=>[p.id,p])), [data.profiles]);
@@ -1755,8 +1798,11 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
     ensureMonth(d, selMonth);
     d.monthsData[selMonth].transactions.push({ ...tx, id:mkid(), timestamp:nowISO(), auto:false });
   });
+  const clearAll = () => {
+    update(d => { ensureMonth(d, selMonth); d.monthsData[selMonth].transactions = []; });
+    setConfirmClear(false);
+  };
 
-  // Grouping logic
   const grouped = useMemo(() => {
     if (groupBy === "none") return [{ key:"all", label:null, items:sorted }];
     if (groupBy === "day") {
@@ -1784,7 +1830,6 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
     return [{ key:"all", label:null, items:sorted }];
   }, [sorted, groupBy, catMap]);
 
-  // Full datetime with seconds formatter
   const fmtFull = iso => {
     if (!iso) return "";
     const d = new Date(iso);
@@ -1795,100 +1840,117 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
   return (
     <div className="fade-up">
 
-      {/* ── TOP STATS BAR ── */}
-      <div style={{
-        display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:18,
-      }}>
+      {/* ── TOP KPI BAR ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:18 }}>
         {[
-          { label:"Total dépensé",    val:`-${fmt(totalAll)}`,   color:"var(--red)",    icon:"💸", bg:"rgba(248,113,113,0.08)",  border:"rgba(248,113,113,0.18)" },
-          { label:"Transactions",     val:transactions.length,   color:"var(--text)",   icon:"🧾", bg:"rgba(255,255,255,0.03)",  border:"var(--border)" },
-          { label:"Dépense moyenne",  val:fmt(transactions.length ? totalAll/transactions.length : 0), color:"var(--orange)", icon:"📊", bg:"rgba(251,146,60,0.08)", border:"rgba(251,146,60,0.18)" },
-          { label:"Plus grosse dép.", val:transactions.length ? fmt(Math.max(...transactions.map(t=>t.amount))) : "—", color:"var(--purple)", icon:"🔺", bg:"rgba(167,139,250,0.08)", border:"rgba(167,139,250,0.2)" },
+          { label:"Total dépensé",    val:`-${fmt(totalAll)}`,   color:"var(--red)",    icon:"💸", bg:"rgba(248,113,113,0.08)",  border:"rgba(248,113,113,0.18)", tip:"Somme de toutes les dépenses ce mois" },
+          { label:"Transactions",     val:transactions.length,   color:"var(--text)",   icon:"🧾", bg:"rgba(255,255,255,0.03)",  border:"var(--border)",           tip:"Nombre d'opérations enregistrées" },
+          { label:"Dépense moyenne",  val:fmt(transactions.length ? totalAll/transactions.length : 0), color:"var(--orange)", icon:"📊", bg:"rgba(251,146,60,0.08)", border:"rgba(251,146,60,0.18)", tip:"Montant moyen par transaction" },
+          { label:"Plus grosse dép.", val:transactions.length ? fmt(Math.max(...transactions.map(t=>t.amount))) : "—", color:"var(--purple)", icon:"🔺", bg:"rgba(167,139,250,0.08)", border:"rgba(167,139,250,0.2)", tip:"La dépense la plus élevée du mois" },
         ].map(s => (
-          <div key={s.label} style={{
+          <div key={s.label} className="tip" data-tip={s.tip} style={{
             background:s.bg, border:`1px solid ${s.border}`, borderRadius:14,
-            padding:"14px 16px", display:"flex", alignItems:"center", gap:12,
-          }}>
-            <div style={{
-              width:38, height:38, borderRadius:11, background:"rgba(255,255,255,0.05)",
-              display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0,
-            }}>{s.icon}</div>
+            padding:"16px 18px", display:"flex", alignItems:"center", gap:13, cursor:"default",
+            transition:"all .2s",
+          }}
+            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(0,0,0,0.3)";}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+            <div style={{ width:42, height:42, borderRadius:12, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{s.icon}</div>
             <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:10, color:"var(--text3)", textTransform:"uppercase", letterSpacing:.8, fontWeight:700, marginBottom:3 }}>{s.label}</div>
-              <div className="stat-num" style={{ fontSize:16, fontWeight:800, color:s.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.val}</div>
+              <div style={{ fontSize:10.5, color:"var(--text3)", textTransform:"uppercase", letterSpacing:.9, fontWeight:800, marginBottom:4 }}>{s.label}</div>
+              <div className="stat-num" style={{ fontSize:17, fontWeight:900, color:s.color }}>{s.val}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── TOOLBAR : search + sort + group ── */}
-      <div style={{
-        display:"flex", gap:8, marginBottom:14, alignItems:"center",
-        background:"var(--glass)", border:"1px solid var(--border)",
-        borderRadius:14, padding:"10px 14px",
-      }}>
+      {/* ── TOOLBAR ── */}
+      <div style={{ display:"flex", gap:8, marginBottom:14, alignItems:"center", background:"var(--glass)", border:"1px solid var(--border)", borderRadius:15, padding:"10px 14px", flexWrap:"wrap" }}>
         {/* Search */}
-        <div style={{ position:"relative", flex:1 }}>
-          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, pointerEvents:"none", opacity:.5 }}>🔍</span>
+        <div style={{ position:"relative", flex:1, minWidth:180 }} className="tip" data-tip="Chercher par nom ou catégorie">
+          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, pointerEvents:"none", opacity:.4 }}>🔍</span>
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher…"
+            placeholder="Rechercher une dépense…"
             style={{ paddingLeft:34, background:"rgba(255,255,255,0.05)", border:"1px solid var(--border)", borderRadius:10, fontSize:13 }}/>
+          {search && <button onClick={() => setSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"var(--text3)", fontSize:18, lineHeight:1 }}>×</button>}
         </div>
 
         {/* Sort */}
-        <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
-          <span style={{ fontSize:11, color:"var(--text3)", fontWeight:700, whiteSpace:"nowrap" }}>Trier</span>
-          <select value={sort} onChange={e => setSort(e.target.value)} style={{ width:"auto", padding:"9px 10px", fontSize:12, background:"rgba(255,255,255,0.06)", border:"1px solid var(--border)", borderRadius:10 }}>
-            <option value="date_desc">⬇ Date</option>
-            <option value="date_asc">⬆ Date</option>
-            <option value="amount_desc">⬇ Montant</option>
-            <option value="amount_asc">⬆ Montant</option>
+        <div className="tip" data-tip="Trier les transactions" style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+          <span style={{ fontSize:11, color:"var(--text3)", fontWeight:800, whiteSpace:"nowrap" }}>↕ Trier</span>
+          <select value={sort} onChange={e => setSort(e.target.value)} style={{ width:"auto", padding:"8px 10px", fontSize:12, background:"rgba(255,255,255,0.06)", border:"1px solid var(--border)", borderRadius:10 }}>
+            <option value="date_desc">Date ↓</option>
+            <option value="date_asc">Date ↑</option>
+            <option value="amount_desc">Montant ↓</option>
+            <option value="amount_asc">Montant ↑</option>
           </select>
         </div>
 
-        {/* Group by */}
-        <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
-          <span style={{ fontSize:11, color:"var(--text3)", fontWeight:700, whiteSpace:"nowrap" }}>Grouper</span>
-          <select value={groupBy} onChange={e => setGroupBy(e.target.value)} style={{ width:"auto", padding:"9px 10px", fontSize:12, background:"rgba(255,255,255,0.06)", border:"1px solid var(--border)", borderRadius:10 }}>
+        {/* Group */}
+        <div className="tip" data-tip="Regrouper les transactions par période ou catégorie" style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+          <span style={{ fontSize:11, color:"var(--text3)", fontWeight:800, whiteSpace:"nowrap" }}>⊞ Grouper</span>
+          <select value={groupBy} onChange={e => setGroupBy(e.target.value)} style={{ width:"auto", padding:"8px 10px", fontSize:12, background:"rgba(255,255,255,0.06)", border:"1px solid var(--border)", borderRadius:10 }}>
             <option value="none">Aucun</option>
             <option value="day">Par jour</option>
             <option value="category">Par catégorie</option>
           </select>
         </div>
+
+        {/* Clear all */}
+        {transactions.length > 0 && !confirmClear && (
+          <button onClick={() => setConfirmClear(true)}
+            className="tip" data-tip="Supprimer toutes les dépenses de ce mois"
+            style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:10, border:"1px solid rgba(248,113,113,0.22)", background:"rgba(248,113,113,0.07)", color:"var(--red)", cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Outfit',sans-serif", transition:"all .2s", flexShrink:0 }}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(248,113,113,0.18)";e.currentTarget.style.borderColor="rgba(248,113,113,0.45)";}}
+            onMouseLeave={e=>{e.currentTarget.style.background="rgba(248,113,113,0.07)";e.currentTarget.style.borderColor="rgba(248,113,113,0.22)";}}>
+            🗑 Tout effacer
+          </button>
+        )}
+        {confirmClear && (
+          <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+            <span style={{ fontSize:12, color:"var(--red)", fontWeight:700 }}>Confirmer ?</span>
+            <button onClick={clearAll} style={{ padding:"7px 12px", borderRadius:9, border:"1px solid rgba(248,113,113,0.5)", background:"rgba(248,113,113,0.2)", color:"var(--red)", cursor:"pointer", fontSize:12, fontWeight:800, fontFamily:"'Outfit',sans-serif" }}>Oui, tout</button>
+            <button onClick={() => setConfirmClear(false)} style={{ padding:"7px 12px", borderRadius:9, border:"1px solid var(--border)", background:"var(--glass)", color:"var(--text2)", cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Outfit',sans-serif" }}>Annuler</button>
+          </div>
+        )}
       </div>
 
       {/* ── FILTER CHIPS ── */}
-      <div className="filter-bar" style={{ marginBottom:14 }}>
+      <div className="filter-bar" style={{ marginBottom:16 }}>
         {[
-          { id:"all", label:"Tout", icon:"" },
-          ...data.profiles.map(p => ({ id:p.id, label:p.name, icon:p.avatar })),
-          ...data.categories.map(c => ({ id:c.id, label:c.name, icon:c.icon })),
+          { id:"all",   label:"Tout",  icon:"",      tip:"Afficher toutes les dépenses" },
+          ...data.profiles.map(p => ({ id:p.id, label:p.name, icon:p.avatar, tip:`Dépenses de ${p.name} uniquement`, color:p.color })),
+          ...data.categories.map(c => ({ id:c.id, label:c.name, icon:c.icon, tip:`Filtrer par catégorie : ${c.name}`, color:c.color })),
         ].map(f => (
-          <div key={f.id} className={`filter-chip ${filter===f.id?"active":""}`}
-            onClick={() => setFilter(f.id)}
-            style={{ display:"flex", alignItems:"center", gap:5 }}>
-            {f.icon && <span>{f.icon}</span>}
-            {f.label}
+          <div key={f.id}
+            className={`filter-chip tip ${filter===f.id?"active":""}`}
+            data-tip={f.tip}
+            onClick={() => setFilter(filter===f.id && f.id!=="all" ? "all" : f.id)}
+            style={ filter===f.id && f.color ? { borderColor:f.color+"66", background:f.color+"18", color:f.color, boxShadow:`0 2px 12px ${f.color}22` } : {} }>
+            {f.icon && <span className="chip-emoji">{f.icon}</span>}
+            <span>{f.label}</span>
           </div>
         ))}
       </div>
 
       {/* ── RESULTS HEADER ── */}
-      <div style={{
-        display:"flex", justifyContent:"space-between", alignItems:"center",
-        marginBottom:12, padding:"0 4px",
-      }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontSize:13, color:"var(--text2)", fontWeight:600 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, padding:"0 2px" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+          <span style={{ fontSize:13, color:"var(--text2)", fontWeight:700 }}>
             {sorted.length} transaction{sorted.length !== 1 ? "s" : ""}
           </span>
           {search && (
-            <span style={{ fontSize:11, background:"rgba(167,139,250,0.12)", border:"1px solid rgba(167,139,250,0.25)", color:"var(--purple)", borderRadius:20, padding:"2px 9px", fontWeight:600 }}>
-              "{search}"
+            <span style={{ fontSize:11, background:"rgba(167,139,250,0.12)", border:"1px solid rgba(167,139,250,0.25)", color:"var(--purple)", borderRadius:20, padding:"3px 10px", fontWeight:700 }}>
+              🔍 "{search}"
             </span>
           )}
+          {filter !== "all" && (
+            <button onClick={() => setFilter("all")} style={{ fontSize:11, background:"rgba(251,146,60,0.1)", border:"1px solid rgba(251,146,60,0.25)", color:"var(--orange)", borderRadius:20, padding:"3px 10px", fontWeight:700, cursor:"pointer", fontFamily:"'Outfit',sans-serif" }}>
+              ✕ Filtre actif
+            </button>
+          )}
         </div>
-        <div style={{ fontFamily:"'Fraunces',serif", fontSize:20, fontWeight:800, color:"var(--red)" }}>
+        <div style={{ fontFamily:"'Fraunces',serif", fontSize:22, fontWeight:900, color:"var(--red)", textShadow:"0 0 20px rgba(248,113,113,0.3)" }}>
           -{fmt(total)}
         </div>
       </div>
@@ -1901,159 +1963,122 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
           <div style={{ fontSize:13 }}>{search ? `Aucune dépense ne correspond à "${search}"` : "Ajoutez votre première dépense !"}</div>
         </div>
       ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:groupBy==="none"?0:14 }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:groupBy==="none"?0:16 }}>
           {grouped.map((group) => {
             const groupTotal = group.items.reduce((s,t) => s+t.amount, 0);
             return (
               <div key={group.key}>
                 {/* Group header */}
                 {group.label && (
-                  <div style={{
-                    display:"flex", alignItems:"center", justifyContent:"space-between",
-                    padding:"8px 4px", marginBottom:6,
-                  }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 6px", marginBottom:8 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                       {group.icon && (
-                        <div style={{ width:28, height:28, borderRadius:8, background:`${group.color}18`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>
+                        <div style={{ width:32, height:32, borderRadius:10, background:`${group.color}18`, border:`1px solid ${group.color}28`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>
                           {group.icon}
                         </div>
                       )}
-                      <span style={{
-                        fontSize:13, fontWeight:800, color:"var(--text2)",
-                        textTransform: groupBy==="day" ? "capitalize" : "none",
-                      }}>{group.label}</span>
-                      <span style={{ fontSize:11, color:"var(--text3)", background:"rgba(255,255,255,0.05)", borderRadius:20, padding:"2px 8px" }}>
+                      {!group.icon && <div style={{ width:6, height:24, borderRadius:3, background:"var(--grad-main)" }}/>}
+                      <span style={{ fontSize:14, fontWeight:900, color:"var(--text)", textTransform:groupBy==="day"?"capitalize":"none" }}>{group.label}</span>
+                      <span style={{ fontSize:11, color:"var(--text3)", background:"rgba(255,255,255,0.06)", borderRadius:20, padding:"2px 9px", fontWeight:700 }}>
                         {group.items.length} tx
                       </span>
                     </div>
-                    <span style={{ fontWeight:800, fontSize:14, color:"var(--red)" }}>-{fmt(groupTotal)}</span>
+                    <span style={{ fontFamily:"'Fraunces',serif", fontWeight:800, fontSize:16, color:"var(--red)" }}>-{fmt(groupTotal)}</span>
                   </div>
                 )}
 
-                {/* Cards */}
-                <div style={{
-                  background:"var(--glass)", border:"1px solid var(--border)",
-                  borderRadius:16, overflow:"hidden",
-                  boxShadow:"0 2px 12px rgba(0,0,0,0.25)",
-                }}>
+                {/* Cards container */}
+                <div style={{ background:"var(--glass)", border:"1px solid var(--border)", borderRadius:18, overflow:"hidden", boxShadow:"0 2px 20px rgba(0,0,0,0.2)" }}>
                   {group.items.map((tx, idx) => {
                     const cat  = catMap[tx.categoryId]  || { icon:"❓", color:"#888", name:"Autre" };
                     const prof = profMap[tx.profileId]  || { avatar:"❓", name:"?", color:"#888" };
                     const isLast = idx === group.items.length - 1;
+                    const pct = totalAll > 0 ? Math.round((tx.amount/totalAll)*100) : 0;
 
                     return (
-                      <div key={tx.id} style={{
-                        display:"flex", alignItems:"center", gap:14,
-                        padding:"14px 16px",
-                        borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.05)",
-                        transition:"background .15s",
-                        cursor:"default",
-                      }}
-                        onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.03)"}
-                        onMouseLeave={e => e.currentTarget.style.background="transparent"}>
-
-                        {/* Category icon */}
-                        <div style={{
-                          width:48, height:48, borderRadius:14, flexShrink:0,
-                          background:`${cat.color}15`,
-                          border:`1.5px solid ${cat.color}30`,
-                          display:"flex", alignItems:"center", justifyContent:"center",
-                          fontSize:22, position:"relative",
+                      <div key={tx.id}
+                        className="expense-row"
+                        style={{
+                          display:"flex", alignItems:"center", gap:16,
+                          padding:"18px 20px",
+                          borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.05)",
+                          background:"transparent",
+                          border: isLast ? "none" : undefined,
+                          borderLeft:"3px solid transparent",
+                          transition:"all .22s cubic-bezier(.4,0,.2,1)",
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background=`linear-gradient(135deg,${cat.color}08,rgba(167,139,250,0.05))`;
+                          e.currentTarget.style.borderLeftColor=cat.color;
+                          e.currentTarget.style.paddingLeft="24px";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background="transparent";
+                          e.currentTarget.style.borderLeftColor="transparent";
+                          e.currentTarget.style.paddingLeft="20px";
                         }}>
+
+                        {/* Icon */}
+                        <div style={{ width:54, height:54, borderRadius:16, flexShrink:0, background:`${cat.color}14`, border:`2px solid ${cat.color}28`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:25, position:"relative", boxShadow:`0 4px 16px ${cat.color}15` }}>
                           {cat.icon}
-                          {/* Profile dot badge */}
-                          <div style={{
-                            position:"absolute", bottom:-3, right:-3,
-                            width:18, height:18, borderRadius:"50%",
-                            background:prof.color || "var(--bg3)",
-                            border:"2px solid var(--bg)",
-                            display:"flex", alignItems:"center", justifyContent:"center",
-                            fontSize:9,
-                          }}>{prof.avatar}</div>
+                          <div className="tip tip-right" data-tip={`${prof.name}`} style={{ position:"absolute", bottom:-4, right:-4, width:20, height:20, borderRadius:"50%", background:prof.color||"var(--bg3)", border:"2px solid var(--bg)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>{prof.avatar}</div>
                         </div>
 
-                        {/* Main info */}
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:4 }}>
-                            <span style={{ fontWeight:700, fontSize:15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                        {/* Info — occupies ALL available space */}
+                        <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", gap:7 }}>
+                          {/* Row 1: label + auto */}
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <span style={{ fontWeight:800, fontSize:16, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                               {tx.label}
                             </span>
                             {tx.auto && (
-                              <span style={{ flexShrink:0, fontSize:10, background:"rgba(167,139,250,0.15)", border:"1px solid rgba(167,139,250,0.3)", color:"var(--purple)", borderRadius:20, padding:"1px 7px", fontWeight:700 }}>
-                                AUTO
+                              <span className="tip" data-tip="Transaction ajoutée automatiquement depuis une facture récurrente" style={{ flexShrink:0, fontSize:10, background:"rgba(167,139,250,0.15)", border:"1px solid rgba(167,139,250,0.3)", color:"var(--purple)", borderRadius:20, padding:"2px 8px", fontWeight:800 }}>
+                                🤖 AUTO
                               </span>
                             )}
                           </div>
 
-                          {/* Meta row */}
+                          {/* Row 2: meta chips */}
                           <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                             {/* Profile chip */}
-                            <div style={{
-                              display:"flex", alignItems:"center", gap:4,
-                              background:"rgba(255,255,255,0.05)", borderRadius:20,
-                              padding:"2px 8px", border:"1px solid rgba(255,255,255,0.08)",
-                            }}>
-                              <span style={{ fontSize:11 }}>{prof.avatar}</span>
-                              <span style={{ fontSize:11, fontWeight:600, color:"var(--text2)" }}>{prof.name}</span>
-                            </div>
-
+                            <span className="tip" data-tip={`Compte : ${prof.name}`} style={{ display:"inline-flex", alignItems:"center", gap:4, background:"rgba(255,255,255,0.06)", borderRadius:20, padding:"3px 10px", border:"1px solid rgba(255,255,255,0.1)", fontSize:12, fontWeight:700, color:"var(--text2)" }}>
+                              {prof.avatar} {prof.name}
+                            </span>
                             {/* Category chip */}
-                            <div style={{
-                              display:"flex", alignItems:"center", gap:4,
-                              background:`${cat.color}12`, borderRadius:20,
-                              padding:"2px 8px", border:`1px solid ${cat.color}25`,
-                            }}>
-                              <span style={{ fontSize:11 }}>{cat.icon}</span>
-                              <span style={{ fontSize:11, fontWeight:600, color:cat.color }}>{cat.name}</span>
-                            </div>
-
-                            {/* Timestamp with full hh:mm:ss */}
-                            <div style={{
-                              display:"flex", alignItems:"center", gap:4,
-                              fontSize:11, color:"var(--text3)", fontWeight:500,
-                            }}>
-                              <span>🕐</span>
-                              <span style={{ fontFamily:"monospace", letterSpacing:.3 }}>{fmtFull(tx.timestamp)}</span>
-                            </div>
+                            <span className="tip" data-tip={`Catégorie : ${cat.name}`} style={{ display:"inline-flex", alignItems:"center", gap:4, background:`${cat.color}12`, borderRadius:20, padding:"3px 10px", border:`1px solid ${cat.color}28`, fontSize:12, fontWeight:700, color:cat.color }}>
+                              {cat.icon} {cat.name}
+                            </span>
+                            {/* Timestamp */}
+                            <span className="tip" data-tip="Date et heure exactes de la transaction" style={{ display:"inline-flex", alignItems:"center", gap:4, background:"rgba(255,255,255,0.04)", borderRadius:20, padding:"3px 10px", border:"1px solid rgba(255,255,255,0.07)", fontSize:11.5, color:"var(--text3)", fontWeight:600 }}>
+                              🕐 {smartDate(tx.timestamp)}
+                            </span>
                           </div>
                         </div>
 
-                        {/* Amount */}
-                        <div style={{
-                          textAlign:"right", flexShrink:0,
-                          minWidth:90,
-                        }}>
-                          <div style={{
-                            fontFamily:"'Fraunces',serif", fontWeight:800, fontSize:18,
-                            color:"var(--red)",
-                            textShadow:"0 0 20px rgba(248,113,113,0.25)",
-                          }}>
+                        {/* Amount + percent */}
+                        <div className="tip tip-right" data-tip={`${pct}% du total mensuel de ${fmt(totalAll)}`} style={{ textAlign:"right", flexShrink:0, minWidth:100 }}>
+                          <div style={{ fontFamily:"'Fraunces',serif", fontWeight:900, fontSize:20, color:"var(--red)", textShadow:"0 0 18px rgba(248,113,113,0.3)", letterSpacing:-.5 }}>
                             -{fmt(tx.amount)}
                           </div>
-                          {totalAll > 0 && (
-                            <div style={{ fontSize:10, color:"var(--text3)", marginTop:2, fontWeight:600 }}>
-                              {Math.round((tx.amount/totalAll)*100)}% du total
-                            </div>
-                          )}
+                          <div style={{ fontSize:11, color:"var(--text3)", marginTop:3, fontWeight:700 }}>
+                            {pct}% du total
+                          </div>
                         </div>
 
-                        {/* Actions */}
-                        <div style={{ display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
+                        {/* Action buttons — appear on hover via CSS */}
+                        <div className="row-actions" style={{ display:"flex", flexDirection:"column", gap:5, flexShrink:0 }}>
                           <button onClick={() => setModal({ type:"editTransaction",tx,selMonth })}
-                            title="Modifier"
-                            style={{ width:30, height:30, borderRadius:8, border:"1px solid var(--border)", background:"rgba(167,139,250,0.08)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, transition:"all .15s" }}
-                            onMouseEnter={e => e.currentTarget.style.background="rgba(167,139,250,0.2)"}
-                            onMouseLeave={e => e.currentTarget.style.background="rgba(167,139,250,0.08)"}>✏️</button>
+                            className="action-btn action-btn-edit tip tip-right" data-tip="Modifier le montant, le libellé ou la catégorie">
+                            ✏️ Modifier
+                          </button>
                           <button onClick={() => duplicate(tx)}
-                            title="Dupliquer"
-                            style={{ width:30, height:30, borderRadius:8, border:"1px solid var(--border)", background:"rgba(96,165,250,0.08)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, transition:"all .15s" }}
-                            onMouseEnter={e => e.currentTarget.style.background="rgba(96,165,250,0.2)"}
-                            onMouseLeave={e => e.currentTarget.style.background="rgba(96,165,250,0.08)"}>📋</button>
+                            className="action-btn action-btn-dup tip tip-right" data-tip="Créer une copie de cette dépense à l'instant présent">
+                            📋 Dupliquer
+                          </button>
                           <button onClick={() => del(tx.id)}
-                            title="Supprimer"
-                            style={{ width:30, height:30, borderRadius:8, border:"1px solid rgba(248,113,113,0.2)", background:"rgba(248,113,113,0.08)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, transition:"all .15s" }}
-                            onMouseEnter={e => e.currentTarget.style.background="rgba(248,113,113,0.25)"}
-                            onMouseLeave={e => e.currentTarget.style.background="rgba(248,113,113,0.08)"}>🗑</button>
+                            className="action-btn action-btn-del tip tip-right" data-tip="Supprimer définitivement cette transaction">
+                            🗑 Supprimer
+                          </button>
                         </div>
                       </div>
                     );
