@@ -990,7 +990,6 @@ export default function App() {
             </button>
           </div>
         </aside>
-        </aside>
 
         {/* ── MAIN ── */}
         <div className="main-area">
