@@ -138,12 +138,11 @@ const CSS = `
   --sw:240px;--r:16px;--r-sm:11px;--r-lg:22px;
 }
 html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);width:100%;height:100%;margin:0;padding:0;overflow:hidden;}
-::-webkit-scrollbar{width:4px;height:4px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:rgba(167,139,250,0.25);border-radius:10px;}
 
 /* ── AUTH SCREEN ── */
 .auth-shell{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;
+  padding-top:calc(20px + env(safe-area-inset-top));
+  padding-bottom:calc(20px + env(safe-area-inset-bottom));
   background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(167,139,250,0.18),transparent 70%),var(--bg);}
 .auth-card{background:linear-gradient(145deg,#110f24,#1a1635);border:1px solid var(--border2);border-radius:24px;padding:36px;width:100%;max-width:420px;}
 
@@ -156,14 +155,22 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 /* ── SIDEBAR ── */
 .sidebar{width:var(--sw);flex-shrink:0;background:linear-gradient(180deg,#0e0c1e,#09070f);border-right:1px solid var(--border);
   position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:300;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
   transition:transform .25s cubic-bezier(.4,0,.2,1);}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:299;}
 
 /* ── MAIN AREA ── */
 .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;width:0;
   transition:margin-left .25s cubic-bezier(.4,0,.2,1);}
-.topbar{height:60px;background:rgba(7,6,15,0.9);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0;gap:10px;z-index:200;}
+.topbar{
+  height:calc(60px + env(safe-area-inset-top));
+  padding-top:calc(10px + env(safe-area-inset-top));
+  padding-left:calc(24px + env(safe-area-inset-left));
+  padding-right:calc(24px + env(safe-area-inset-right));
+  padding-bottom:10px;
+  background:rgba(7,6,15,0.9);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
 .page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:hidden;min-height:0;}
 
 /* ── CONTENT GRIDS ── */
@@ -273,11 +280,30 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .main-area{margin-left:0 !important;}
   .content-grid{grid-template-columns:1fr !important;}
   .grid-4{grid-template-columns:1fr 1fr !important;}
-  .page-content{padding:14px;padding-bottom:68px;}
-  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:rgba(7,6,15,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);justify-content:space-around;padding:5px 0 8px;z-index:250;height:58px;}
+  .page-content{
+    padding:14px;
+    padding-bottom:calc(68px + env(safe-area-inset-bottom));
+    padding-left:calc(14px + env(safe-area-inset-left));
+    padding-right:calc(14px + env(safe-area-inset-right));
+  }
+  .bottom-nav{
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    background:rgba(7,6,15,0.96);backdrop-filter:blur(20px);
+    border-top:1px solid var(--border);
+    justify-content:space-around;
+    padding-top:5px;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom));
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
+    z-index:250;
+  }
   .bnav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 10px;border-radius:10px;cursor:pointer;transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;min-width:50px;position:relative;}
   .bnav-item.active{color:var(--purple);background:rgba(167,139,250,0.1);}
   .bnav-icon{font-size:18px;}
+  .topbar{
+    padding-left:calc(16px + env(safe-area-inset-left));
+    padding-right:calc(16px + env(safe-area-inset-right));
+  }
 }
 @media(max-width:520px){
   .grid-2{grid-template-columns:1fr !important;}
