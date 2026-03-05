@@ -10,6 +10,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  fetchSignInMethodsForEmail,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 
@@ -491,13 +492,23 @@ function AuthScreen() {
   };
 
   const sendReset = async () => {
-    if (!email.trim()) { setError("Entrez votre adresse email ci-dessus."); return; }
+    const trimmed = email.trim();
+    if (!trimmed) { setError("Veuillez saisir votre adresse email."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) { setError("Adresse email invalide."); return; }
     setError(""); setLoading(true);
     try {
-      await sendPasswordResetEmail(auth, email.trim());
+      // Vérifie d'abord si un compte existe (fetchSignInMethodsForEmail retourne [] si aucun compte)
+      let methods = [];
+      try { methods = await fetchSignInMethodsForEmail(auth, trimmed); } catch {}
+      if (!methods || methods.length === 0) {
+        setError("Aucun compte n'est associé à cette adresse. Vérifiez l'email ou créez un compte.");
+        setLoading(false);
+        return;
+      }
+      await sendPasswordResetEmail(auth, trimmed);
       setResetSent(true);
     } catch (e) {
-      setError(AUTH_ERRORS[e.code] || "Impossible d'envoyer l'email.");
+      setError(AUTH_ERRORS[e.code] || `Erreur inattendue (${e.code || e.message})`);
     }
     setLoading(false);
   };
@@ -517,7 +528,6 @@ function AuthScreen() {
           {resetSent ? (
             /* ── SUCCESS STATE ── */
             <div style={{ textAlign: "center", padding: "10px 0 20px" }} className="fade-up">
-              {/* Animated checkmark circle */}
               <div style={{ position: "relative", width: 80, height: 80, margin: "0 auto 24px" }}>
                 <div style={{
                   width: 80, height: 80, borderRadius: "50%",
@@ -532,7 +542,6 @@ function AuthScreen() {
                   </svg>
                 </div>
               </div>
-
               <div style={{ fontFamily: "'Fraunces',serif", fontSize: 24, fontWeight: 700, marginBottom: 10 }}>
                 Email envoyé !
               </div>
@@ -544,12 +553,30 @@ function AuthScreen() {
                 border: "1px solid rgba(167,139,250,0.3)", borderRadius: 10,
                 padding: "6px 14px", fontSize: 13, fontWeight: 700, color: "var(--purple)", marginBottom: 20,
               }}>{email}</div>
-              <p style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.6, marginBottom: 28 }}>
-                Vérifiez également votre dossier spam si vous ne voyez pas l'email dans les prochaines minutes.
-              </p>
+
+              {/* Checklist pour ne pas rater l'email */}
+              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", marginBottom: 20, textAlign: "left" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Si vous ne recevez pas l'email :</div>
+                {[
+                  { icon: "📁", text: "Vérifiez votre dossier spam / courriers indésirables" },
+                  { icon: "⏱️", text: "Attendez 1–2 minutes, le délai peut varier" },
+                  { icon: "🔁", text: "Retournez en arrière et réessayez si nécessaire" },
+                  { icon: "⚙️", text: "Si le problème persiste : Firebase Console → Authentication → Templates → vérifiez que l'email « Password reset » est activé" },
+                ].map((item, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: i < 3 ? 8 : 0 }}>
+                    <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
+                    <span style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.5 }}>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+
               <button className="btn btn-primary" onClick={() => switchView("login")}
                 style={{ width: "100%", justifyContent: "center", padding: "13px", fontSize: 14 }}>
                 🔑 Retour à la connexion
+              </button>
+              <button onClick={() => { setResetSent(false); setError(""); }}
+                style={{ marginTop: 10, width: "100%", background: "none", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "'Outfit',sans-serif" }}>
+                ↩ Renvoyer l'email
               </button>
             </div>
           ) : (
@@ -965,9 +992,7 @@ export default function App() {
               {page === "bills"   && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type:"addBill" })}>+ Facture</button>}
               {page === "incomes" && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type:"addRecurringIncome" })}>+ Récurrent</button>}
               <div className={`sync-dot ${syncStatus}`} title={syncLabel[syncStatus]} />
-              <div style={{ fontSize:11,color:"var(--text3)",background:"var(--glass)",border:"1px solid var(--border)",borderRadius:9,padding:"5px 10px",whiteSpace:"nowrap" }}>
-                {new Date().toLocaleDateString("fr-FR",{ weekday:"short",day:"numeric",month:"short" })}
-              </div>
+              <LiveClock />
             </div>
           </div>
 
@@ -1053,6 +1078,93 @@ function ProfileSetup({ label, emoji, color, value, onChange }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DASHBOARD RECENT TRANSACTIONS (with search)
+// ═══════════════════════════════════════════════════════════
+function DashboardRecentTx({ transactions, catMap, profMap, setModal, selMonth }) {
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState(false);
+
+  const filtered = useMemo(() => {
+    const sorted = [...transactions].sort((a,b) => new Date(b.timestamp)-new Date(a.timestamp));
+    if (!search.trim()) return expanded ? sorted : sorted.slice(0,6);
+    const q = search.toLowerCase();
+    return sorted.filter(tx =>
+      tx.label.toLowerCase().includes(q) ||
+      (catMap[tx.categoryId]?.name||"").toLowerCase().includes(q) ||
+      (profMap[tx.profileId]?.name||"").toLowerCase().includes(q)
+    );
+  }, [transactions, search, expanded, catMap, profMap]);
+
+  const fmtFull = iso => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear()+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+  };
+
+  return (
+    <>
+      <div style={{ fontWeight:700, fontSize:15, marginBottom:12, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <span style={{ display:"flex", alignItems:"center", gap:6 }}><span>🕐</span> Dernières transactions</span>
+        {transactions.length > 0 && <span style={{ fontSize:12, color:"var(--text3)" }}>{transactions.length} au total</span>}
+      </div>
+
+      {transactions.length > 0 && (
+        <div style={{ position:"relative", marginBottom:12 }}>
+          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, pointerEvents:"none", opacity:.45 }}>🔍</span>
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Rechercher dans les transactions…"
+            style={{ paddingLeft:34, background:"rgba(255,255,255,0.04)", border:"1px solid var(--border)", borderRadius:10, fontSize:12, padding:"8px 12px 8px 34px" }}
+          />
+          {search && (
+            <button onClick={() => setSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"var(--text3)", fontSize:16 }}>×</button>
+          )}
+        </div>
+      )}
+
+      {transactions.length === 0 ? (
+        <div className="empty-state"><div className="empty-icon">💸</div>Aucune transaction</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding:"24px", textAlign:"center", color:"var(--text3)", fontSize:13 }}>
+          Aucun résultat pour « {search} »
+        </div>
+      ) : (
+        <>
+          {filtered.map(tx => {
+            const cat  = catMap[tx.categoryId]  || { icon:"❓", color:"#888", name:"?" };
+            const prof = profMap[tx.profileId]  || { avatar:"❓", name:"?" };
+            return (
+              <div key={tx.id} className="tx-row">
+                <div className="chip-icon" style={{ width:42, height:42, background:`${cat.color}18`, border:`1px solid ${cat.color}22`, fontSize:20 }}>{cat.icon}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{tx.label}</div>
+                  <div style={{ fontSize:11, color:"var(--text3)", display:"flex", gap:6, flexWrap:"wrap", marginTop:2 }}>
+                    <span>{prof.avatar} {prof.name}</span>
+                    <span style={{ color:cat.color }}>· {cat.name}</span>
+                    <span style={{ fontFamily:"monospace", letterSpacing:.2 }}>· {fmtFull(tx.timestamp)}</span>
+                  </div>
+                </div>
+                {tx.auto && <span className="auto-badge">🤖</span>}
+                <div style={{ fontWeight:800, fontSize:14, color:"var(--red)", flexShrink:0 }}>-{fmt(tx.amount)}</div>
+              </div>
+            );
+          })}
+          {!search && transactions.length > 6 && (
+            <button onClick={() => setExpanded(e => !e)} style={{
+              width:"100%", marginTop:10, background:"rgba(255,255,255,0.03)", border:"1px solid var(--border)",
+              borderRadius:10, color:"var(--text3)", cursor:"pointer", fontSize:12, fontWeight:700,
+              padding:"9px", fontFamily:"'Outfit',sans-serif", transition:"all .2s",
+            }}>
+              {expanded ? "▲ Réduire" : `▼ Voir toutes les ${transactions.length} transactions`}
+            </button>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
@@ -1225,28 +1337,7 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
 
           {/* Recent transactions */}
           <div className="card">
-            <div style={{ fontWeight:700,fontSize:15,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-              <span style={{ display:"flex",alignItems:"center",gap:6 }}><span>🕐</span> Dernières transactions</span>
-              {transactions.length > 0 && <span style={{ fontSize:12,color:"var(--text3)" }}>{transactions.length} au total</span>}
-            </div>
-            {transactions.length === 0
-              ? <div className="empty-state"><div className="empty-icon">💸</div>Aucune transaction</div>
-              : [...transactions].sort((a,b) => new Date(b.timestamp)-new Date(a.timestamp)).slice(0,6).map(tx => {
-                const cat  = catMap[tx.categoryId]  || { icon:"❓",color:"#888" };
-                const prof = profMap[tx.profileId]  || { avatar:"❓" };
-                return (
-                  <div key={tx.id} className="tx-row">
-                    <div className="chip-icon" style={{ width:44,height:44,background:`${cat.color}18`,border:`1px solid ${cat.color}22`,fontSize:21 }}>{cat.icon}</div>
-                    <div style={{ flex:1,minWidth:0 }}>
-                      <div style={{ fontSize:14,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{tx.label}</div>
-                      <div style={{ fontSize:11,color:"var(--text3)" }}>{prof.avatar} · {fmtDT(tx.timestamp)}</div>
-                    </div>
-                    {tx.auto && <span className="auto-badge">🤖</span>}
-                    <div style={{ fontWeight:800,fontSize:14,color:"var(--red)",flexShrink:0 }}>-{fmt(tx.amount)}</div>
-                  </div>
-                );
-              })
-            }
+            <DashboardRecentTx transactions={transactions} catMap={catMap} profMap={profMap} setModal={setModal} selMonth={selMonth} />
           </div>
         </div>
 
@@ -1437,14 +1528,64 @@ function Incomes({ data, update, selMonth, mdata, setModal }) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  EXPENSES
+//  LIVE CLOCK
+// ═══════════════════════════════════════════════════════════
+function LiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const weekday = now.toLocaleDateString("fr-FR", { weekday:"long" });
+  const date    = now.toLocaleDateString("fr-FR", { day:"numeric", month:"long", year:"numeric" });
+  const hh = pad(now.getHours());
+  const mm = pad(now.getMinutes());
+  const ss = pad(now.getSeconds());
+
+  return (
+    <div style={{
+      display:"flex", alignItems:"center", gap:10, flexShrink:0,
+      background:"var(--glass)", border:"1px solid var(--border)",
+      borderRadius:13, padding:"7px 14px",
+      boxShadow:"inset 0 1px 0 rgba(255,255,255,0.05)",
+    }}>
+      {/* Calendar side */}
+      <div style={{ textAlign:"right", lineHeight:1.2 }}>
+        <div style={{ fontSize:9.5, color:"var(--text3)", textTransform:"uppercase", letterSpacing:1, fontWeight:700 }}>
+          {weekday}
+        </div>
+        <div style={{ fontSize:12, color:"var(--text2)", fontWeight:600, marginTop:1 }}>
+          {date}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ width:1, height:28, background:"var(--border)" }}/>
+
+      {/* Clock side */}
+      <div style={{ display:"flex", alignItems:"baseline", gap:1, fontFamily:"'Fraunces',serif" }}>
+        <span style={{ fontSize:22, fontWeight:700, color:"var(--text)", letterSpacing:-1 }}>{hh}:{mm}</span>
+        <span style={{
+          fontSize:13, fontWeight:700, color:"var(--purple)",
+          minWidth:22, textAlign:"left", letterSpacing:0,
+          animation:"pulse 1s steps(1) infinite",
+        }}>:{ss}</span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  EXPENSES — redesign complet
 // ═══════════════════════════════════════════════════════════
 function Expenses({ data, update, selMonth, mdata, setModal }) {
   const md = mdata(selMonth);
   const { transactions } = md;
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("date_desc");
+  const [filter, setFilter]   = useState("all");
+  const [search, setSearch]   = useState("");
+  const [sort, setSort]       = useState("date_desc");
+  const [groupBy, setGroupBy] = useState("none"); // "none" | "day" | "category"
 
   const catMap  = useMemo(() => Object.fromEntries(data.categories.map(c=>[c.id,c])), [data.categories]);
   const profMap = useMemo(() => Object.fromEntries(data.profiles.map(p=>[p.id,p])), [data.profiles]);
@@ -1468,80 +1609,326 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
     }
   }, [filtered, sort]);
 
-  const total = useMemo(() => sorted.reduce((s,t) => s+t.amount, 0), [sorted]);
+  const total    = useMemo(() => sorted.reduce((s,t) => s+t.amount, 0), [sorted]);
+  const totalAll = useMemo(() => transactions.reduce((s,t) => s+t.amount, 0), [transactions]);
 
   const del = id => update(d => {
     ensureMonth(d, selMonth);
     d.monthsData[selMonth].transactions = d.monthsData[selMonth].transactions.filter(t => t.id!==id);
   });
-
   const duplicate = tx => update(d => {
     ensureMonth(d, selMonth);
     d.monthsData[selMonth].transactions.push({ ...tx, id:mkid(), timestamp:nowISO(), auto:false });
   });
 
+  // Grouping logic
+  const grouped = useMemo(() => {
+    if (groupBy === "none") return [{ key:"all", label:null, items:sorted }];
+    if (groupBy === "day") {
+      const map = new Map();
+      sorted.forEach(tx => {
+        const d  = new Date(tx.timestamp);
+        const key = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        const label = d.toLocaleDateString("fr-FR", { weekday:"long", day:"numeric", month:"long" });
+        if (!map.has(key)) map.set(key, { key, label, items:[] });
+        map.get(key).items.push(tx);
+      });
+      return Array.from(map.values());
+    }
+    if (groupBy === "category") {
+      const map = new Map();
+      sorted.forEach(tx => {
+        const cat = catMap[tx.categoryId] || { id:"?", name:"Autre", icon:"❓", color:"#888" };
+        if (!map.has(cat.id)) map.set(cat.id, { key:cat.id, label:cat.name, icon:cat.icon, color:cat.color, items:[] });
+        map.get(cat.id).items.push(tx);
+      });
+      return Array.from(map.values()).sort((a,b) =>
+        b.items.reduce((s,t)=>s+t.amount,0) - a.items.reduce((s,t)=>s+t.amount,0)
+      );
+    }
+    return [{ key:"all", label:null, items:sorted }];
+  }, [sorted, groupBy, catMap]);
+
+  // Full datetime with seconds formatter
+  const fmtFull = iso => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleDateString("fr-FR",{ day:"2-digit", month:"short", year:"numeric" })
+      + " · " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  };
+
   return (
     <div className="fade-up">
-      {/* Search + Sort bar */}
-      <div style={{ display:"flex",gap:10,marginBottom:12,alignItems:"center" }}>
-        <div className="search-wrap">
-          <input className="search-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher une dépense…"/>
-        </div>
-        <select value={sort} onChange={e => setSort(e.target.value)} style={{ width:"auto",flexShrink:0,padding:"9px 10px",fontSize:12,border:"1px solid var(--border)" }}>
-          <option value="date_desc">Plus récent</option>
-          <option value="date_asc">Plus ancien</option>
-          <option value="amount_desc">Plus cher</option>
-          <option value="amount_asc">Moins cher</option>
-        </select>
-      </div>
 
-      {/* Filter chips */}
-      <div className="filter-bar" style={{ marginBottom:14 }}>
+      {/* ── TOP STATS BAR ── */}
+      <div style={{
+        display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:18,
+      }}>
         {[
-          { id:"all", label:"Tout" },
-          ...data.profiles.map(p => ({ id:p.id, label:`${p.avatar} ${p.name}` })),
-          ...data.categories.map(c => ({ id:c.id, label:`${c.icon} ${c.name}` })),
-        ].map(f => (
-          <div key={f.id} className={`filter-chip ${filter===f.id?"active":""}`} onClick={() => setFilter(f.id)}>{f.label}</div>
+          { label:"Total dépensé",    val:`-${fmt(totalAll)}`,   color:"var(--red)",    icon:"💸", bg:"rgba(248,113,113,0.08)",  border:"rgba(248,113,113,0.18)" },
+          { label:"Transactions",     val:transactions.length,   color:"var(--text)",   icon:"🧾", bg:"rgba(255,255,255,0.03)",  border:"var(--border)" },
+          { label:"Dépense moyenne",  val:fmt(transactions.length ? totalAll/transactions.length : 0), color:"var(--orange)", icon:"📊", bg:"rgba(251,146,60,0.08)", border:"rgba(251,146,60,0.18)" },
+          { label:"Plus grosse dép.", val:transactions.length ? fmt(Math.max(...transactions.map(t=>t.amount))) : "—", color:"var(--purple)", icon:"🔺", bg:"rgba(167,139,250,0.08)", border:"rgba(167,139,250,0.2)" },
+        ].map(s => (
+          <div key={s.label} style={{
+            background:s.bg, border:`1px solid ${s.border}`, borderRadius:14,
+            padding:"14px 16px", display:"flex", alignItems:"center", gap:12,
+          }}>
+            <div style={{
+              width:38, height:38, borderRadius:11, background:"rgba(255,255,255,0.05)",
+              display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0,
+            }}>{s.icon}</div>
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontSize:10, color:"var(--text3)", textTransform:"uppercase", letterSpacing:.8, fontWeight:700, marginBottom:3 }}>{s.label}</div>
+              <div className="stat-num" style={{ fontSize:16, fontWeight:800, color:s.color, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.val}</div>
+            </div>
+          </div>
         ))}
       </div>
 
-      {/* Summary row */}
-      <div className="card-sm" style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
-        <span style={{ fontSize:13,color:"var(--text2)" }}>{sorted.length} transaction{sorted.length!==1?"s":""}</span>
-        <span style={{ fontWeight:800,fontSize:18,color:"var(--red)" }}>-{fmt(total)}</span>
+      {/* ── TOOLBAR : search + sort + group ── */}
+      <div style={{
+        display:"flex", gap:8, marginBottom:14, alignItems:"center",
+        background:"var(--glass)", border:"1px solid var(--border)",
+        borderRadius:14, padding:"10px 14px",
+      }}>
+        {/* Search */}
+        <div style={{ position:"relative", flex:1 }}>
+          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, pointerEvents:"none", opacity:.5 }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Rechercher…"
+            style={{ paddingLeft:34, background:"rgba(255,255,255,0.05)", border:"1px solid var(--border)", borderRadius:10, fontSize:13 }}/>
+        </div>
+
+        {/* Sort */}
+        <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+          <span style={{ fontSize:11, color:"var(--text3)", fontWeight:700, whiteSpace:"nowrap" }}>Trier</span>
+          <select value={sort} onChange={e => setSort(e.target.value)} style={{ width:"auto", padding:"9px 10px", fontSize:12, background:"rgba(255,255,255,0.06)", border:"1px solid var(--border)", borderRadius:10 }}>
+            <option value="date_desc">⬇ Date</option>
+            <option value="date_asc">⬆ Date</option>
+            <option value="amount_desc">⬇ Montant</option>
+            <option value="amount_asc">⬆ Montant</option>
+          </select>
+        </div>
+
+        {/* Group by */}
+        <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+          <span style={{ fontSize:11, color:"var(--text3)", fontWeight:700, whiteSpace:"nowrap" }}>Grouper</span>
+          <select value={groupBy} onChange={e => setGroupBy(e.target.value)} style={{ width:"auto", padding:"9px 10px", fontSize:12, background:"rgba(255,255,255,0.06)", border:"1px solid var(--border)", borderRadius:10 }}>
+            <option value="none">Aucun</option>
+            <option value="day">Par jour</option>
+            <option value="category">Par catégorie</option>
+          </select>
+        </div>
       </div>
 
-      {/* Transaction list */}
-      {sorted.length === 0
-        ? <div className="card empty-state"><div className="empty-icon">💸</div>{search ? "Aucun résultat" : "Aucune dépense ce mois"}</div>
-        : (
-          <div className="card" style={{ padding:8 }}>
-            {sorted.map(tx => {
-              const cat  = catMap[tx.categoryId]  || { icon:"❓",color:"#888",name:"Autre" };
-              const prof = profMap[tx.profileId]  || { avatar:"❓",name:"?" };
-              return (
-                <div key={tx.id} className="tx-row">
-                  <div className="chip-icon" style={{ width:44,height:44,background:`${cat.color}18`,border:`1px solid ${cat.color}25`,fontSize:21 }}>{cat.icon}</div>
-                  <div style={{ flex:1,minWidth:0 }}>
-                    <div style={{ fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{tx.label}</div>
-                    <div style={{ fontSize:11,color:"var(--text3)",display:"flex",gap:8,marginTop:2,flexWrap:"wrap" }}>
-                      <span>{prof.avatar} {prof.name}</span>
-                      <span style={{ color:cat.color }}>· {cat.icon} {cat.name}</span>
-                      <span>· {fmtDT(tx.timestamp)}</span>
-                    </div>
-                  </div>
-                  {tx.auto && <span className="auto-badge">🤖</span>}
-                  <div style={{ fontWeight:800,fontSize:14,color:"var(--red)",flexShrink:0,marginRight:6 }}>-{fmt(tx.amount)}</div>
-                  <button className="btn-icon" onClick={() => setModal({ type:"editTransaction",tx,selMonth })} style={{ marginRight:4,fontSize:13 }} title="Modifier">✏️</button>
-                  <button className="btn-icon" onClick={() => duplicate(tx)} style={{ marginRight:4,fontSize:13 }} title="Dupliquer">📋</button>
-                  <button className="btn-icon" onClick={() => del(tx.id)} style={{ color:"var(--red)",background:"rgba(248,113,113,0.08)",borderColor:"rgba(248,113,113,0.2)" }} title="Supprimer">🗑</button>
-                </div>
-              );
-            })}
+      {/* ── FILTER CHIPS ── */}
+      <div className="filter-bar" style={{ marginBottom:14 }}>
+        {[
+          { id:"all", label:"Tout", icon:"" },
+          ...data.profiles.map(p => ({ id:p.id, label:p.name, icon:p.avatar })),
+          ...data.categories.map(c => ({ id:c.id, label:c.name, icon:c.icon })),
+        ].map(f => (
+          <div key={f.id} className={`filter-chip ${filter===f.id?"active":""}`}
+            onClick={() => setFilter(f.id)}
+            style={{ display:"flex", alignItems:"center", gap:5 }}>
+            {f.icon && <span>{f.icon}</span>}
+            {f.label}
           </div>
-        )
-      }
+        ))}
+      </div>
+
+      {/* ── RESULTS HEADER ── */}
+      <div style={{
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        marginBottom:12, padding:"0 4px",
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:13, color:"var(--text2)", fontWeight:600 }}>
+            {sorted.length} transaction{sorted.length !== 1 ? "s" : ""}
+          </span>
+          {search && (
+            <span style={{ fontSize:11, background:"rgba(167,139,250,0.12)", border:"1px solid rgba(167,139,250,0.25)", color:"var(--purple)", borderRadius:20, padding:"2px 9px", fontWeight:600 }}>
+              "{search}"
+            </span>
+          )}
+        </div>
+        <div style={{ fontFamily:"'Fraunces',serif", fontSize:20, fontWeight:800, color:"var(--red)" }}>
+          -{fmt(total)}
+        </div>
+      </div>
+
+      {/* ── TRANSACTION LIST ── */}
+      {sorted.length === 0 ? (
+        <div className="card empty-state">
+          <div className="empty-icon">{search ? "🔍" : "💸"}</div>
+          <div style={{ fontSize:16, fontWeight:700, marginBottom:6 }}>{search ? "Aucun résultat" : "Aucune dépense ce mois"}</div>
+          <div style={{ fontSize:13 }}>{search ? `Aucune dépense ne correspond à "${search}"` : "Ajoutez votre première dépense !"}</div>
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:groupBy==="none"?0:14 }}>
+          {grouped.map((group) => {
+            const groupTotal = group.items.reduce((s,t) => s+t.amount, 0);
+            return (
+              <div key={group.key}>
+                {/* Group header */}
+                {group.label && (
+                  <div style={{
+                    display:"flex", alignItems:"center", justifyContent:"space-between",
+                    padding:"8px 4px", marginBottom:6,
+                  }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      {group.icon && (
+                        <div style={{ width:28, height:28, borderRadius:8, background:`${group.color}18`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15 }}>
+                          {group.icon}
+                        </div>
+                      )}
+                      <span style={{
+                        fontSize:13, fontWeight:800, color:"var(--text2)",
+                        textTransform: groupBy==="day" ? "capitalize" : "none",
+                      }}>{group.label}</span>
+                      <span style={{ fontSize:11, color:"var(--text3)", background:"rgba(255,255,255,0.05)", borderRadius:20, padding:"2px 8px" }}>
+                        {group.items.length} tx
+                      </span>
+                    </div>
+                    <span style={{ fontWeight:800, fontSize:14, color:"var(--red)" }}>-{fmt(groupTotal)}</span>
+                  </div>
+                )}
+
+                {/* Cards */}
+                <div style={{
+                  background:"var(--glass)", border:"1px solid var(--border)",
+                  borderRadius:16, overflow:"hidden",
+                  boxShadow:"0 2px 12px rgba(0,0,0,0.25)",
+                }}>
+                  {group.items.map((tx, idx) => {
+                    const cat  = catMap[tx.categoryId]  || { icon:"❓", color:"#888", name:"Autre" };
+                    const prof = profMap[tx.profileId]  || { avatar:"❓", name:"?", color:"#888" };
+                    const isLast = idx === group.items.length - 1;
+
+                    return (
+                      <div key={tx.id} style={{
+                        display:"flex", alignItems:"center", gap:14,
+                        padding:"14px 16px",
+                        borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.05)",
+                        transition:"background .15s",
+                        cursor:"default",
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.03)"}
+                        onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+
+                        {/* Category icon */}
+                        <div style={{
+                          width:48, height:48, borderRadius:14, flexShrink:0,
+                          background:`${cat.color}15`,
+                          border:`1.5px solid ${cat.color}30`,
+                          display:"flex", alignItems:"center", justifyContent:"center",
+                          fontSize:22, position:"relative",
+                        }}>
+                          {cat.icon}
+                          {/* Profile dot badge */}
+                          <div style={{
+                            position:"absolute", bottom:-3, right:-3,
+                            width:18, height:18, borderRadius:"50%",
+                            background:prof.color || "var(--bg3)",
+                            border:"2px solid var(--bg)",
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            fontSize:9,
+                          }}>{prof.avatar}</div>
+                        </div>
+
+                        {/* Main info */}
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:4 }}>
+                            <span style={{ fontWeight:700, fontSize:15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {tx.label}
+                            </span>
+                            {tx.auto && (
+                              <span style={{ flexShrink:0, fontSize:10, background:"rgba(167,139,250,0.15)", border:"1px solid rgba(167,139,250,0.3)", color:"var(--purple)", borderRadius:20, padding:"1px 7px", fontWeight:700 }}>
+                                AUTO
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Meta row */}
+                          <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+                            {/* Profile chip */}
+                            <div style={{
+                              display:"flex", alignItems:"center", gap:4,
+                              background:"rgba(255,255,255,0.05)", borderRadius:20,
+                              padding:"2px 8px", border:"1px solid rgba(255,255,255,0.08)",
+                            }}>
+                              <span style={{ fontSize:11 }}>{prof.avatar}</span>
+                              <span style={{ fontSize:11, fontWeight:600, color:"var(--text2)" }}>{prof.name}</span>
+                            </div>
+
+                            {/* Category chip */}
+                            <div style={{
+                              display:"flex", alignItems:"center", gap:4,
+                              background:`${cat.color}12`, borderRadius:20,
+                              padding:"2px 8px", border:`1px solid ${cat.color}25`,
+                            }}>
+                              <span style={{ fontSize:11 }}>{cat.icon}</span>
+                              <span style={{ fontSize:11, fontWeight:600, color:cat.color }}>{cat.name}</span>
+                            </div>
+
+                            {/* Timestamp with full hh:mm:ss */}
+                            <div style={{
+                              display:"flex", alignItems:"center", gap:4,
+                              fontSize:11, color:"var(--text3)", fontWeight:500,
+                            }}>
+                              <span>🕐</span>
+                              <span style={{ fontFamily:"monospace", letterSpacing:.3 }}>{fmtFull(tx.timestamp)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Amount */}
+                        <div style={{
+                          textAlign:"right", flexShrink:0,
+                          minWidth:90,
+                        }}>
+                          <div style={{
+                            fontFamily:"'Fraunces',serif", fontWeight:800, fontSize:18,
+                            color:"var(--red)",
+                            textShadow:"0 0 20px rgba(248,113,113,0.25)",
+                          }}>
+                            -{fmt(tx.amount)}
+                          </div>
+                          {totalAll > 0 && (
+                            <div style={{ fontSize:10, color:"var(--text3)", marginTop:2, fontWeight:600 }}>
+                              {Math.round((tx.amount/totalAll)*100)}% du total
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
+                          <button onClick={() => setModal({ type:"editTransaction",tx,selMonth })}
+                            title="Modifier"
+                            style={{ width:30, height:30, borderRadius:8, border:"1px solid var(--border)", background:"rgba(167,139,250,0.08)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, transition:"all .15s" }}
+                            onMouseEnter={e => e.currentTarget.style.background="rgba(167,139,250,0.2)"}
+                            onMouseLeave={e => e.currentTarget.style.background="rgba(167,139,250,0.08)"}>✏️</button>
+                          <button onClick={() => duplicate(tx)}
+                            title="Dupliquer"
+                            style={{ width:30, height:30, borderRadius:8, border:"1px solid var(--border)", background:"rgba(96,165,250,0.08)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, transition:"all .15s" }}
+                            onMouseEnter={e => e.currentTarget.style.background="rgba(96,165,250,0.2)"}
+                            onMouseLeave={e => e.currentTarget.style.background="rgba(96,165,250,0.08)"}>📋</button>
+                          <button onClick={() => del(tx.id)}
+                            title="Supprimer"
+                            style={{ width:30, height:30, borderRadius:8, border:"1px solid rgba(248,113,113,0.2)", background:"rgba(248,113,113,0.08)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, transition:"all .15s" }}
+                            onMouseEnter={e => e.currentTarget.style.background="rgba(248,113,113,0.25)"}
+                            onMouseLeave={e => e.currentTarget.style.background="rgba(248,113,113,0.08)"}>🗑</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1550,6 +1937,9 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
 //  BILLS
 // ═══════════════════════════════════════════════════════════
 function Bills({ data, update, selMonth, mdata, setModal }) {
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all"); // "all" | "unpaid" | "paid" | "overdue"
+
   const toggle = billId => {
     update(d => {
       const bill = d.bills.find(b => b.id===billId);
@@ -1572,72 +1962,149 @@ function Bills({ data, update, selMonth, mdata, setModal }) {
 
   const del = id => update(d => { d.bills = d.bills.filter(b => b.id!==id); });
 
-  const unpaid = useMemo(() => data.bills.filter(b => !b.paid?.[selMonth]).sort((a,b) => {
+  const allBillsFiltered = useMemo(() => {
+    let bills = [...data.bills];
+    // text search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      bills = bills.filter(b => b.name.toLowerCase().includes(q));
+    }
+    // status filter
+    const now = new Date();
+    bills = bills.filter(b => {
+      const isPaid    = b.paid?.[selMonth];
+      const isOverdue = b.dueDate && new Date(b.dueDate) < now && !isPaid;
+      if (filterStatus === "paid")    return isPaid;
+      if (filterStatus === "unpaid")  return !isPaid && !isOverdue;
+      if (filterStatus === "overdue") return isOverdue;
+      return true;
+    });
+    return bills;
+  }, [data.bills, search, filterStatus, selMonth]);
+
+  const unpaid = useMemo(() => allBillsFiltered.filter(b => !b.paid?.[selMonth]).sort((a,b) => {
     if (!a.dueDate) return 1; if (!b.dueDate) return -1;
     return new Date(a.dueDate) - new Date(b.dueDate);
-  }), [data.bills, selMonth]);
+  }), [allBillsFiltered, selMonth]);
 
-  const paid       = useMemo(() => data.bills.filter(b =>  b.paid?.[selMonth]), [data.bills, selMonth]);
-  const totalUnpaid = useMemo(() => unpaid.reduce((s,b) => s+(b.amount||0), 0), [unpaid]);
-  const totalPaid   = useMemo(() => paid.reduce((s,b) => s+(b.amount||0), 0), [paid]);
+  const paid        = useMemo(() => allBillsFiltered.filter(b =>  b.paid?.[selMonth]), [allBillsFiltered, selMonth]);
+  const totalUnpaid = useMemo(() => data.bills.filter(b => !b.paid?.[selMonth]).reduce((s,b) => s+(b.amount||0), 0), [data.bills, selMonth]);
+  const totalPaid   = useMemo(() => data.bills.filter(b =>  b.paid?.[selMonth]).reduce((s,b) => s+(b.amount||0), 0), [data.bills, selMonth]);
+  const overdueCount = useMemo(() => data.bills.filter(b => b.dueDate && new Date(b.dueDate) < new Date() && !b.paid?.[selMonth]).length, [data.bills, selMonth]);
 
   return (
     <div className="fade-up content-grid">
       <div>
-        {data.bills.length === 0
-          ? <div className="card empty-state"><div className="empty-icon">📋</div>Aucune facture configurée</div>
-          : (
-            <>
-              {unpaid.length>0 && (
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:11,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:10 }}>⏳ En attente ({unpaid.length})</div>
-                  {unpaid.map((b,i) => <BillRow key={b.id} bill={b} selMonth={selMonth} onToggle={toggle} onDelete={del} profiles={data.profiles} idx={i}/>)}
-                </div>
-              )}
-              {paid.length>0 && (
-                <div>
-                  <div style={{ fontSize:11,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:10 }}>✅ Réglées ({paid.length})</div>
-                  {paid.map((b,i) => <BillRow key={b.id} bill={b} selMonth={selMonth} onToggle={toggle} onDelete={del} profiles={data.profiles} idx={i}/>)}
-                </div>
-              )}
-            </>
-          )
-        }
+        {/* ── SEARCH + FILTER BAR ── */}
+        <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Search input */}
+          <div style={{ position: "relative" }}>
+            <span style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", opacity:.5 }}>🔍</span>
+            <input
+              value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher une facture…"
+              style={{ paddingLeft: 40, background:"rgba(255,255,255,0.06)", border:"1px solid var(--border)", borderRadius:13, fontSize:13, height:42 }}
+            />
+            {search && (
+              <button onClick={() => setSearch("")} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"var(--text3)", fontSize:16, lineHeight:1 }}>×</button>
+            )}
+          </div>
+          {/* Status chips */}
+          <div style={{ display:"flex", gap:7 }}>
+            {[
+              { id:"all",     label:"Toutes",          count: data.bills.length },
+              { id:"unpaid",  label:"En attente",       count: data.bills.filter(b => !b.paid?.[selMonth] && !(b.dueDate && new Date(b.dueDate) < new Date())).length },
+              { id:"overdue", label:"⚠️ En retard",     count: overdueCount },
+              { id:"paid",    label:"✅ Payées",         count: data.bills.filter(b => b.paid?.[selMonth]).length },
+            ].map(f => (
+              <button key={f.id} onClick={() => setFilterStatus(f.id)} style={{
+                padding: "6px 13px", borderRadius: 20, border: "none", cursor: "pointer",
+                fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 700,
+                background: filterStatus === f.id
+                  ? f.id === "overdue" ? "rgba(248,113,113,0.2)" : f.id === "paid" ? "rgba(74,222,128,0.15)" : "rgba(167,139,250,0.15)"
+                  : "rgba(255,255,255,0.05)",
+                color: filterStatus === f.id
+                  ? f.id === "overdue" ? "var(--red)" : f.id === "paid" ? "var(--green)" : "var(--purple)"
+                  : "var(--text3)",
+                border: `1px solid ${filterStatus === f.id
+                  ? f.id === "overdue" ? "rgba(248,113,113,0.35)" : f.id === "paid" ? "rgba(74,222,128,0.3)" : "rgba(167,139,250,0.3)"
+                  : "var(--border)"}`,
+                transition: "all .15s",
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+                {f.label}
+                <span style={{ background:"rgba(255,255,255,0.08)", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{f.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── BILL LIST ── */}
+        {data.bills.length === 0 ? (
+          <div className="card empty-state"><div className="empty-icon">📋</div>Aucune facture configurée</div>
+        ) : allBillsFiltered.length === 0 ? (
+          <div className="card empty-state">
+            <div className="empty-icon">{search ? "🔍" : "📋"}</div>
+            <div style={{ fontSize:15, fontWeight:700, marginBottom:6 }}>{search ? "Aucun résultat" : "Aucune facture dans cette catégorie"}</div>
+            {search && <div style={{ fontSize:12 }}>Aucune facture ne correspond à « {search} »</div>}
+          </div>
+        ) : (
+          <>
+            {unpaid.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize:11, color:"var(--text3)", textTransform:"uppercase", letterSpacing:1.2, marginBottom:10 }}>⏳ En attente ({unpaid.length})</div>
+                {unpaid.map((b,i) => <BillRow key={b.id} bill={b} selMonth={selMonth} onToggle={toggle} onDelete={del} profiles={data.profiles} idx={i}/>)}
+              </div>
+            )}
+            {paid.length > 0 && (
+              <div>
+                <div style={{ fontSize:11, color:"var(--text3)", textTransform:"uppercase", letterSpacing:1.2, marginBottom:10 }}>✅ Réglées ({paid.length})</div>
+                {paid.map((b,i) => <BillRow key={b.id} bill={b} selMonth={selMonth} onToggle={toggle} onDelete={del} profiles={data.profiles} idx={i}/>)}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         <div className="card">
-          <div style={{ fontWeight:700,fontSize:13,marginBottom:14 }}>📊 Progression — {monthLabel(selMonth)}</div>
-          <div style={{ display:"flex",gap:10,marginBottom:14 }}>
+          <div style={{ fontWeight:700, fontSize:13, marginBottom:14 }}>📊 Progression — {monthLabel(selMonth)}</div>
+          <div style={{ display:"flex", gap:10, marginBottom:14 }}>
             {[
-              { l:"Payées",    v:paid.length,   c:"var(--green)",  bg:"rgba(74,222,128,0.08)" },
-              { l:"En attente",v:unpaid.length,  c:"var(--yellow)", bg:"rgba(251,191,36,0.08)" },
+              { l:"Payées",     v:data.bills.filter(b =>  b.paid?.[selMonth]).length, c:"var(--green)",  bg:"rgba(74,222,128,0.08)" },
+              { l:"En attente", v:data.bills.filter(b => !b.paid?.[selMonth]).length, c:"var(--yellow)", bg:"rgba(251,191,36,0.08)" },
             ].map(s => (
-              <div key={s.l} style={{ flex:1,textAlign:"center",background:s.bg,borderRadius:12,padding:"12px 6px" }}>
-                <div className="stat-num" style={{ fontSize:28,color:s.c }}>{s.v}</div>
-                <div style={{ fontSize:11,color:"var(--text3)" }}>{s.l}</div>
+              <div key={s.l} style={{ flex:1, textAlign:"center", background:s.bg, borderRadius:12, padding:"12px 6px" }}>
+                <div className="stat-num" style={{ fontSize:28, color:s.c }}>{s.v}</div>
+                <div style={{ fontSize:11, color:"var(--text3)" }}>{s.l}</div>
               </div>
             ))}
           </div>
-          <div className="progress-track" style={{ height:10,marginBottom:10 }}>
-            <div className="progress-fill" style={{ width:data.bills.length?`${(paid.length/data.bills.length)*100}%`:"0%",background:"var(--grad-green)" }}/>
+          <div className="progress-track" style={{ height:10, marginBottom:10 }}>
+            <div className="progress-fill" style={{ width:data.bills.length?`${(data.bills.filter(b=>b.paid?.[selMonth]).length/data.bills.length)*100}%`:"0%", background:"var(--grad-green)" }}/>
           </div>
-          <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--text3)",marginBottom:12 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:"var(--text3)", marginBottom:12 }}>
             <span>{data.bills.length} factures</span>
-            <span style={{ color:"var(--red)",fontWeight:700 }}>{totalUnpaid>0?`-${fmt(totalUnpaid)} restant`:"🎉 Tout payé !"}</span>
+            <span style={{ color:"var(--red)", fontWeight:700 }}>{totalUnpaid>0?`-${fmt(totalUnpaid)} restant`:"🎉 Tout payé !"}</span>
           </div>
           {totalPaid > 0 && (
-            <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,padding:"8px 12px",background:"rgba(74,222,128,0.06)",borderRadius:10 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, padding:"8px 12px", background:"rgba(74,222,128,0.06)", borderRadius:10 }}>
               <span style={{ color:"var(--text3)" }}>Déjà réglé</span>
-              <span style={{ color:"var(--green)",fontWeight:700 }}>+{fmt(totalPaid)}</span>
+              <span style={{ color:"var(--green)", fontWeight:700 }}>+{fmt(totalPaid)}</span>
+            </div>
+          )}
+          {overdueCount > 0 && (
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, padding:"8px 12px", background:"rgba(248,113,113,0.06)", borderRadius:10, marginTop:8 }}>
+              <span style={{ color:"var(--red)" }}>⚠️ En retard</span>
+              <span style={{ color:"var(--red)", fontWeight:700 }}>{overdueCount} facture{overdueCount>1?"s":""}</span>
             </div>
           )}
         </div>
 
-        <div className="card" style={{ textAlign:"center",padding:28 }}>
-          <div style={{ fontSize:42,marginBottom:10 }}>📋</div>
-          <div style={{ fontWeight:700,marginBottom:6 }}>Nouvelle facture</div>
-          <div style={{ fontSize:12,color:"var(--text2)",marginBottom:18 }}>Charges fixes récurrentes</div>
+        <div className="card" style={{ textAlign:"center", padding:28 }}>
+          <div style={{ fontSize:42, marginBottom:10 }}>📋</div>
+          <div style={{ fontWeight:700, marginBottom:6 }}>Nouvelle facture</div>
+          <div style={{ fontSize:12, color:"var(--text2)", marginBottom:18 }}>Charges fixes récurrentes</div>
           <button className="btn btn-primary" style={{ width:"100%" }} onClick={() => setModal({ type:"addBill" })}>+ Créer une facture</button>
         </div>
       </div>
