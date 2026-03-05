@@ -931,23 +931,153 @@ function Bills({data,update,selMonth,mdata,setModal}){
 }
 
 function BillRow({bill,selMonth,onToggle,onDelete,profiles,idx}){
-  const isPaid=bill.paid?.[selMonth];const prof=profiles.find(p=>p.id===bill.profileId);
-  const dueDate=bill.dueDate?new Date(bill.dueDate):null;const isOverdue=dueDate&&dueDate<new Date()&&!isPaid;
-  return(
-    <div className={`card glass-hover fade-up stagger-${(idx%5)+1}`} style={{marginBottom:8,display:"flex",alignItems:"center",gap:12,opacity:isPaid?.7:1,borderColor:isOverdue?"rgba(248,113,113,0.3)":isPaid?"rgba(74,222,128,0.15)":"var(--border)"}}>
-      <div className="chip-icon" style={{width:44,height:44,background:isPaid?"rgba(74,222,128,0.1)":isOverdue?"rgba(248,113,113,0.1)":"rgba(251,191,36,0.1)",border:`1px solid ${isPaid?"rgba(74,222,128,0.2)":isOverdue?"rgba(248,113,113,0.2)":"rgba(251,191,36,0.2)"}`,fontSize:21}}>{bill.icon||"📋"}</div>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{fontWeight:700,fontSize:14,textDecoration:isPaid?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{bill.name}</div>
-        <div style={{fontSize:12,color:"var(--text3)",marginTop:2,display:"flex",gap:6,flexWrap:"wrap"}}>
-          {bill.amount>0&&<span style={{color:isOverdue?"var(--red)":undefined}}>-{fmt(bill.amount)}</span>}
-          {prof&&<span>· {prof.avatar} {prof.name}</span>}
-          {bill.dueDate&&<span style={{color:isOverdue?"var(--red)":undefined}}>· Éch. {fmtDate(bill.dueDate)}</span>}
-          {bill.recurring&&<span className="auto-badge" style={{fontSize:9}}>🔄 récurrent</span>}
-          {isOverdue&&<span style={{color:"var(--red)",fontWeight:700}}>· RETARD</span>}
+  const isPaid = bill.paid?.[selMonth];
+  const prof = profiles.find(p => p.id === bill.profileId);
+  const dueDate = bill.dueDate ? new Date(bill.dueDate) : null;
+  const isOverdue = dueDate && dueDate < new Date() && !isPaid;
+
+  // Horodatage complet avec secondes
+  const fmtFull = iso => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"long", year:"numeric" })
+      + " à " + d.toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  };
+
+  // Couleurs selon statut
+  const statusColor = isPaid ? "var(--green)" : isOverdue ? "var(--red)" : "var(--yellow)";
+  const statusBg    = isPaid ? "rgba(74,222,128,0.08)" : isOverdue ? "rgba(248,113,113,0.08)" : "rgba(251,191,36,0.06)";
+  const statusBorder= isPaid ? "rgba(74,222,128,0.25)" : isOverdue ? "rgba(248,113,113,0.35)" : "rgba(251,191,36,0.2)";
+  const statusLabel = isPaid ? "✅ Payée" : isOverdue ? "⚠️ En retard" : "⏳ En attente";
+
+  return (
+    <div className={`fade-up stagger-${(idx%5)+1}`} style={{
+      marginBottom: 14,
+      background: "var(--glass)",
+      border: `1px solid ${statusBorder}`,
+      borderRadius: 18,
+      overflow: "hidden",
+      opacity: isPaid ? 0.75 : 1,
+      transition: "all .2s",
+    }}>
+      {/* ── Bande de statut colorée en haut ── */}
+      <div style={{
+        height: 4,
+        background: `linear-gradient(90deg, ${statusColor}, transparent)`,
+      }}/>
+
+      <div style={{ padding: "16px 18px" }}>
+        {/* ── Ligne 1 : icône + nom + badge statut ── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
+          {/* Icône */}
+          <div style={{
+            width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+            background: statusBg, border: `1px solid ${statusBorder}`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,
+          }}>{bill.icon || "📋"}</div>
+
+          {/* Nom + badge */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontWeight: 800, fontSize: 18,
+              textDecoration: isPaid ? "line-through" : "none",
+              color: isPaid ? "var(--text3)" : "var(--text)",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              marginBottom: 4,
+            }}>{bill.name}</div>
+
+            {/* Badge statut */}
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              background: statusBg, border: `1px solid ${statusBorder}`,
+              color: statusColor, borderRadius: 20, padding: "3px 10px",
+              fontSize: 12, fontWeight: 700,
+            }}>{statusLabel}</span>
+            {bill.recurring && (
+              <span style={{
+                marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 4,
+                background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)",
+                color: "var(--purple)", borderRadius: 20, padding: "3px 10px",
+                fontSize: 12, fontWeight: 700,
+              }}>🔄 Récurrent</span>
+            )}
+          </div>
+
+          {/* Montant */}
+          {bill.amount > 0 && (
+            <div style={{
+              fontFamily: "'Fraunces',serif", fontWeight: 800,
+              fontSize: 22, color: isOverdue ? "var(--red)" : "var(--text)",
+              flexShrink: 0,
+            }}>-{fmt(bill.amount)}</div>
+          )}
+        </div>
+
+        {/* ── Ligne 2 : Compte + date horodatée ── */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+          background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "10px 14px",
+          marginBottom: 14, border: "1px solid var(--border)",
+        }}>
+          {/* Compte */}
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
+              Compte
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                background: prof ? `${prof.color}20` : "rgba(255,255,255,0.06)",
+                border: `1px solid ${prof ? prof.color+"40" : "var(--border)"}`,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+              }}>{prof?.avatar || "🏦"}</div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 14, color: prof?.color || "var(--text)" }}>
+                  {prof?.name || "—"}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--text3)" }}>
+                  {prof?.id === "common" ? "Compte commun" : "Personnel"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Date d'échéance horodatée */}
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
+              Échéance
+            </div>
+            <div style={{
+              fontWeight: 700, fontSize: 13,
+              color: isOverdue ? "var(--red)" : isPaid ? "var(--text3)" : "var(--text)",
+              lineHeight: 1.4,
+            }}>
+              {fmtFull(bill.dueDate)}
+              {isOverdue && <div style={{ fontSize: 11, color: "var(--red)", fontWeight: 800, marginTop: 2 }}>⚠️ Échéance dépassée</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Ligne 3 : boutons actions ── */}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => onToggle(bill.id)} style={{
+            flex: 1, padding: "11px", borderRadius: 12, cursor: "pointer",
+            background: isPaid ? "rgba(74,222,128,0.12)" : "rgba(167,139,250,0.12)",
+            border: `1px solid ${isPaid ? "rgba(74,222,128,0.35)" : "rgba(167,139,250,0.35)"}`,
+            color: isPaid ? "var(--green)" : "var(--purple)",
+            fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 14,
+            transition: "all .2s", letterSpacing: .3,
+          }}>
+            {isPaid ? "↩️ Marquer impayée" : "✅ Marquer comme payée"}
+          </button>
+          <button onClick={() => onDelete(bill.id)} style={{
+            width: 46, height: 46, borderRadius: 12, cursor: "pointer", flexShrink: 0,
+            background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)",
+            color: "var(--red)", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all .2s",
+          }}>🗑</button>
         </div>
       </div>
-      <button onClick={()=>onToggle(bill.id)} style={{background:isPaid?"rgba(74,222,128,0.1)":"rgba(251,191,36,0.07)",border:`1px solid ${isPaid?"rgba(74,222,128,0.3)":"rgba(251,191,36,0.25)"}`,borderRadius:9,color:isPaid?"var(--green)":"var(--yellow)",cursor:"pointer",fontSize:12,padding:"7px 13px",fontWeight:700,whiteSpace:"nowrap",flexShrink:0,transition:"all .2s"}}>{isPaid?"✅ Payée":"⬜ Payer"}</button>
-      <button className="btn-icon" onClick={()=>onDelete(bill.id)} style={{color:"var(--red)",background:"rgba(248,113,113,0.08)",borderColor:"rgba(248,113,113,0.2)"}}>🗑</button>
     </div>
   );
 }
