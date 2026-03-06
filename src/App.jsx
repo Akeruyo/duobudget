@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   PieChart, Pie, Cell, AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid
 } from "recharts";
 import { auth, db } from "./firebase";
 import {
@@ -10,10 +10,10 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
-  fetchSignInMethodsForEmail,
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  deleteUser,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs } from "firebase/firestore";
 
@@ -610,7 +610,13 @@ function AuthScreen({ onLinked }) {
         await setLinkedUID(cred.user.uid, ownerUID);
         if (onLinked) onLinked(ownerUID);
       }
-    } catch (e) { setError(AUTH_ERRORS[e.code] || "Une erreur est survenue."); }
+    } catch (e) {
+      if (e.code === "auth/email-already-in-use") {
+        setError("already-in-use");
+      } else {
+        setError(AUTH_ERRORS[e.code] || "Une erreur est survenue.");
+      }
+    }
     setLoading(false);
   };
 
@@ -620,15 +626,17 @@ function AuthScreen({ onLinked }) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) { setError("Adresse email invalide."); return; }
     setError(""); setLoading(true);
     try {
-      let methods = [];
-      try { methods = await fetchSignInMethodsForEmail(auth, trimmed); } catch {}
-      if (!methods || methods.length === 0) { setError("Aucun compte n'est associé à cette adresse."); setLoading(false); return; }
-      await sendPasswordResetEmail(auth, trimmed, {
-        url: window.location.origin,
-        handleCodeInApp: false,
-      });
+      // fetchSignInMethodsForEmail est obsolète en Firebase v10+ et retourne toujours []
+      // On envoie directement — Firebase gère si l'email n'existe pas
+      await sendPasswordResetEmail(auth, trimmed, { url: window.location.origin });
       setResetSent(true);
-    } catch (e) { setError(AUTH_ERRORS[e.code] || `Erreur inattendue (${e.code || e.message})`); }
+    } catch (e) {
+      if (e.code === "auth/user-not-found") {
+        setError("Aucun compte associé à cette adresse.");
+      } else {
+        setError(AUTH_ERRORS[e.code] || `Erreur inattendue (${e.code || e.message})`);
+      }
+    }
     setLoading(false);
   };
 
@@ -739,7 +747,24 @@ function AuthScreen({ onLinked }) {
         {view==="login" && <div style={{ textAlign:"right",marginBottom:18,marginTop:4 }}><button onClick={() => switchView("reset")} style={{ background:"none",border:"none",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,padding:0 }}>Mot de passe oublié ?</button></div>}
 
         {/* Errors/Info */}
-        {error && <div className="alert-banner alert-danger" style={{ marginBottom:14 }}>⚠️ {error}</div>}
+        {error === "already-in-use" ? (
+          <div style={{ marginBottom:14,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:13,padding:"14px 16px" }}>
+            <div style={{ fontWeight:800,color:"var(--yellow)",fontSize:13,marginBottom:8 }}>⚠️ Cette adresse est déjà associée à un compte</div>
+            <div style={{ fontSize:12,color:"var(--text2)",lineHeight:1.6,marginBottom:12 }}>
+              Un compte existe déjà avec <strong>{email}</strong>. Connectez-vous directement, ou réinitialisez votre mot de passe si vous l'avez oublié.
+            </div>
+            <div style={{ display:"flex",gap:8 }}>
+              <button onClick={() => switchView("login")} style={{ flex:1,padding:"9px 10px",borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.12)",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
+                🔑 Se connecter
+              </button>
+              <button onClick={() => switchView("reset")} style={{ flex:1,padding:"9px 10px",borderRadius:10,border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.08)",color:"var(--yellow)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
+                🔐 Mot de passe oublié
+              </button>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="alert-banner alert-danger" style={{ marginBottom:14 }}>⚠️ {error}</div>
+        ) : null}
         {info  && <div className="alert-banner alert-success" style={{ marginBottom:14 }}>✅ {info}</div>}
 
         {/* Submit */}
@@ -770,7 +795,8 @@ export default function App() {
   const [selMonth, setSelMonth] = useState(curMonthKey());
   const [modal, setModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeUID, setActiveUID] = useState(null); // UID whose data we're operating on
+  const [activeUID, setActiveUID] = useState(null);
+  const [isLinked, setIsLinked] = useState(false); // true if this user joined a partner's space
 
   const saveTimer = useRef(null);
   const isSaving = useRef(false);
@@ -779,12 +805,13 @@ export default function App() {
   useEffect(() => { const unsub = onAuthStateChanged(auth, u => setUser(u||null)); return unsub; }, []);
 
   useEffect(() => {
-    if (!user) { setReady(false); setActiveUID(null); return; }
+    if (!user) { setReady(false); setActiveUID(null); setIsLinked(false); setData(INIT); return; }
     let unsub; let remoteTs = 0;
-    // Resolve active UID (own or partner's)
+    setData(INIT); // reset before loading new user's data
     getLinkedUID(user.uid).then(async (linkedUID) => {
       const uid = linkedUID || user.uid;
       setActiveUID(uid);
+      setIsLinked(!!linkedUID);
       firestoreLoad(uid).then(saved => {
         if (saved) { const { data:processed } = processDueBills(saved); setData(processed); remoteTs = saved._ts||0; }
         setReady(true);
@@ -846,8 +873,9 @@ export default function App() {
     </div>
   );
 
-  const isSetup = data.profiles.length >= 2;
-  if (!isSetup) return (<><style>{CSS}</style><SetupScreen update={update}/></>);
+  const hasProfiles = data.profiles.length >= 2;
+  // New account with no profiles → show onboarding
+  if (!hasProfiles) return (<><style>{CSS}</style><OnboardingScreen update={update} isLinked={isLinked} user={user}/></>);
 
   const unpaidBills = data.bills.filter(b => !b.paid?.[selMonth]).length;
   const overdueBills = data.bills.filter(b => { if (b.paid?.[selMonth]) return false; return b.dueDate && new Date(b.dueDate) < new Date(); }).length;
@@ -993,34 +1021,134 @@ export default function App() {
 }
 
 
-function SetupScreen({ update }) {
-  const [p1, setP1] = useState({ name:"", avatar:"😊" });
-  const [p2, setP2] = useState({ name:"", avatar:"🥰" });
-  const go = () => {
-    if (!p1.name.trim() || !p2.name.trim()) return;
-    update(d => { d.profiles = [
-      { id:"p1",name:p1.name.trim(),avatar:p1.avatar,color:"#a78bfa" },
-      { id:"p2",name:p2.name.trim(),avatar:p2.avatar,color:"#f472b6" },
-      { id:"common",name:"Compte commun",avatar:"🏦",color:"#60a5fa" },
-    ]; });
-  };
-  return (
-    <div style={{ position:"fixed",inset:0,display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse 80% 60% at 50% 0%,rgba(167,139,250,0.2),transparent 70%),var(--bg)` }}>
-      <div style={{ maxWidth:700,width:"100%",textAlign:"center" }} className="fade-up">
-        <div style={{ fontSize:68,marginBottom:12,animation:"float 3s ease-in-out infinite" }}>💑</div>
-        <h1 style={{ fontFamily:"'Fraunces',serif",fontSize:46,marginBottom:8 }} className="glow-text">DuoBudget</h1>
-        <p style={{ color:"var(--text2)",marginBottom:36,fontSize:15 }}>Créez vos profils pour commencer l'aventure financière</p>
-        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:26 }}>
-          <div className="glass" style={{ padding:26,borderRadius:22 }}><ProfileSetup label="Profil 1" emoji="💜" color="#a78bfa" value={p1} onChange={setP1}/></div>
-          <div className="glass" style={{ padding:26,borderRadius:22 }}><ProfileSetup label="Profil 2" emoji="🩷" color="#f472b6" value={p2} onChange={setP2}/></div>
+function OnboardingScreen({ update, isLinked, user }) {
+  const [step, setStep] = useState(0); // 0=welcome, 1=profiles
+  const [p1, setP1] = useState({ name:"", avatar:"😊", color:"#a78bfa" });
+  const [p2, setP2] = useState({ name:"", avatar:"🥰", color:"#f472b6" });
+  const [myProfile, setMyProfile] = useState({ name:"", avatar:"😊", color:"#a78bfa" });
+
+  const colors = ["#a78bfa","#f472b6","#60a5fa","#4ade80","#fb923c","#f87171","#fbbf24","#34d399"];
+
+  if (isLinked) {
+    // Joined a shared space → add personal profile only
+    return (
+      <div style={{ position:"fixed",inset:0,display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse 80% 60% at 50% 0%,rgba(167,139,250,0.18),transparent 65%),var(--bg)` }}>
+        <div style={{ maxWidth:480,width:"100%",textAlign:"center" }} className="fade-up">
+          <div style={{ fontSize:64,marginBottom:12,animation:"float 3s ease-in-out infinite" }}>👋</div>
+          <h1 style={{ fontFamily:"'Fraunces',serif",fontSize:36,marginBottom:8 }} className="glow-text">Bienvenue !</h1>
+          <p style={{ color:"var(--text2)",marginBottom:8,fontSize:14,lineHeight:1.6 }}>
+            Vous rejoignez un espace partagé. Créez votre profil personnel pour interagir avec cet espace.
+          </p>
+          <div style={{ display:"inline-flex",alignItems:"center",gap:8,background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:20,padding:"6px 14px",fontSize:12,color:"var(--purple)",fontWeight:700,marginBottom:32 }}>
+            💑 Espace partagé · {user?.email}
+          </div>
+          <div className="glass" style={{ padding:28,borderRadius:24,marginBottom:24,textAlign:"left" }}>
+            <div style={{ fontWeight:800,fontSize:15,marginBottom:18,color:"var(--purple)" }}>🧑 Votre profil</div>
+            <div style={{ textAlign:"center",fontSize:56,marginBottom:14 }}>{myProfile.avatar}</div>
+            <input value={myProfile.name} onChange={e=>setMyProfile(v=>({...v,name:e.target.value}))}
+              placeholder="Votre prénom…" style={{ marginBottom:14,textAlign:"center",fontSize:15,fontWeight:700 }}/>
+            <div style={{ display:"flex",flexWrap:"wrap",gap:5,justifyContent:"center",marginBottom:14 }}>
+              {AVATARS.map(a => (
+                <button key={a} onClick={() => setMyProfile(v=>({...v,avatar:a}))}
+                  style={{ fontSize:18,background:myProfile.avatar===a?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.05)",border:`2px solid ${myProfile.avatar===a?"#a78bfa":"transparent"}`,borderRadius:9,width:38,height:38,cursor:"pointer",transition:"all .15s" }}>{a}</button>
+              ))}
+            </div>
+            <div style={{ display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center" }}>
+              {colors.map(c => (
+                <button key={c} onClick={() => setMyProfile(v=>({...v,color:c}))}
+                  style={{ width:26,height:26,borderRadius:"50%",background:c,border:myProfile.color===c?"3px solid white":"2px solid transparent",cursor:"pointer",transition:"all .15s",boxShadow:myProfile.color===c?`0 0 10px ${c}`:"none" }}/>
+              ))}
+            </div>
+          </div>
+          <button className="btn btn-primary" onClick={() => {
+            if (!myProfile.name.trim()) return;
+            const pid = "p_" + Date.now();
+            update(d => {
+              d.profiles = [...(d.profiles||[]), { id:pid,name:myProfile.name.trim(),avatar:myProfile.avatar,color:myProfile.color }];
+            });
+          }} disabled={!myProfile.name.trim()} style={{ padding:"14px 52px",fontSize:16,opacity:!myProfile.name.trim()?0.4:1 }}>
+            🚀 Rejoindre l'espace
+          </button>
         </div>
-        <button className="btn btn-primary" onClick={go} disabled={!p1.name.trim()||!p2.name.trim()} style={{ padding:"14px 52px",fontSize:16,opacity:(!p1.name.trim()||!p2.name.trim())?0.4:1 }}>
-          🚀 Commencer l'aventure
+      </div>
+    );
+  }
+
+  // New account → full onboarding with two profiles
+  if (step === 0) return (
+    <div style={{ position:"fixed",inset:0,display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse 80% 60% at 50% 0%,rgba(167,139,250,0.2),transparent 65%),var(--bg)` }}>
+      <div style={{ maxWidth:540,width:"100%",textAlign:"center" }} className="fade-up">
+        <div style={{ fontSize:72,marginBottom:14,animation:"float 3s ease-in-out infinite" }}>💑</div>
+        <h1 style={{ fontFamily:"'Fraunces',serif",fontSize:48,marginBottom:10 }} className="glow-text">DuoBudget</h1>
+        <p style={{ color:"var(--text2)",marginBottom:10,fontSize:15,lineHeight:1.7 }}>
+          Votre espace financier à deux. Gérez vos revenus, dépenses et objectifs ensemble.
+        </p>
+        <div style={{ display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap",marginBottom:36 }}>
+          {[["💑","Couple","Finance à deux"],["📊","Stats","Courbes & graphiques"],["⛽","Essence","Prix en temps réel"],["🔒","Sécurisé","Firebase chiffré"]].map(([i,t,s]) => (
+            <div key={t} style={{ background:"rgba(255,255,255,0.04)",border:"1px solid var(--border)",borderRadius:14,padding:"12px 18px",textAlign:"center",minWidth:100 }}>
+              <div style={{ fontSize:22,marginBottom:4 }}>{i}</div>
+              <div style={{ fontWeight:800,fontSize:12 }}>{t}</div>
+              <div style={{ fontSize:10,color:"var(--text3)",marginTop:2 }}>{s}</div>
+            </div>
+          ))}
+        </div>
+        <button className="btn btn-primary" onClick={() => setStep(1)} style={{ padding:"14px 56px",fontSize:16 }}>
+          ✨ Créer nos profils →
         </button>
       </div>
     </div>
   );
+
+  return (
+    <div style={{ position:"fixed",inset:0,display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse 80% 60% at 50% 0%,rgba(167,139,250,0.18),transparent 65%),var(--bg)`,overflowY:"auto" }}>
+      <div style={{ maxWidth:680,width:"100%",textAlign:"center" }} className="fade-up">
+        <div style={{ fontSize:52,marginBottom:8 }}>🧑‍🤝‍🧑</div>
+        <h2 style={{ fontFamily:"'Fraunces',serif",fontSize:34,marginBottom:6 }} className="glow-text">Créez vos profils</h2>
+        <p style={{ color:"var(--text2)",marginBottom:28,fontSize:13 }}>Chaque partenaire a son propre profil. Un compte commun sera créé automatiquement.</p>
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:24 }}>
+          {[
+            { label:"Profil 1",emoji:"💜",state:p1,set:setP1,color:"#a78bfa",defColor:"#a78bfa" },
+            { label:"Profil 2",emoji:"🩷",state:p2,set:setP2,color:"#f472b6",defColor:"#f472b6" },
+          ].map(({ label,emoji,state,set,color,defColor }) => (
+            <div key={label} className="glass" style={{ padding:24,borderRadius:22 }}>
+              <div style={{ fontWeight:800,fontSize:13,marginBottom:14,color }}>{emoji} {label}</div>
+              <div style={{ fontSize:52,marginBottom:10 }}>{state.avatar}</div>
+              <input value={state.name} onChange={e=>set(v=>({...v,name:e.target.value}))}
+                placeholder="Ton prénom…" style={{ marginBottom:10,textAlign:"center",fontSize:14,fontWeight:700 }}/>
+              <div style={{ display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center",marginBottom:10 }}>
+                {AVATARS.slice(0,20).map(a => (
+                  <button key={a} onClick={() => set(v=>({...v,avatar:a}))}
+                    style={{ fontSize:16,background:state.avatar===a?`${color}25`:"rgba(255,255,255,0.05)",border:`2px solid ${state.avatar===a?color:"transparent"}`,borderRadius:8,width:34,height:34,cursor:"pointer",transition:"all .12s" }}>{a}</button>
+                ))}
+              </div>
+              <div style={{ display:"flex",flexWrap:"wrap",gap:5,justifyContent:"center" }}>
+                {colors.map(c => (
+                  <button key={c} onClick={() => set(v=>({...v,color:c}))}
+                    style={{ width:22,height:22,borderRadius:"50%",background:c,border:state.color===c?"3px solid white":"2px solid transparent",cursor:"pointer",boxShadow:state.color===c?`0 0 8px ${c}`:"none" }}/>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display:"flex",gap:12,justifyContent:"center" }}>
+          <button className="btn btn-ghost" onClick={() => setStep(0)} style={{ padding:"12px 28px" }}>← Retour</button>
+          <button className="btn btn-primary" onClick={() => {
+            if (!p1.name.trim()||!p2.name.trim()) return;
+            update(d => { d.profiles = [
+              { id:"p1",name:p1.name.trim(),avatar:p1.avatar,color:p1.color },
+              { id:"p2",name:p2.name.trim(),avatar:p2.avatar,color:p2.color },
+              { id:"common",name:"Compte commun",avatar:"🏦",color:"#60a5fa" },
+            ]; });
+          }} disabled={!p1.name.trim()||!p2.name.trim()} style={{ padding:"14px 44px",fontSize:15,opacity:(!p1.name.trim()||!p2.name.trim())?0.4:1 }}>
+            🚀 Commencer l'aventure !
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
+
+function SetupScreen({ update }) { return <OnboardingScreen update={update} isLinked={false}/>; }
 
 function ProfileSetup({ label, emoji, color, value, onChange }) {
   return (
@@ -3022,6 +3150,11 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
   const [codeLoading, setCodeLoading] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [pwdOld, setPwdOld] = useState(""); const [pwdNew, setPwdNew] = useState(""); const [pwdErr, setPwdErr] = useState(""); const [pwdOk, setPwdOk] = useState(false); const [pwdLoading, setPwdLoading] = useState(false);
+  // Suppression de compte — 3 étapes : 0=bouton, 1=saisie mdp, 2=confirmation finale
+  const [delStep, setDelStep] = useState(0);
+  const [delPwd, setDelPwd] = useState("");
+  const [delErr, setDelErr] = useState("");
+  const [delLoading, setDelLoading] = useState(false);
 
   const genCode = async () => {
     setCodeLoading(true);
@@ -3049,10 +3182,40 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
       await updatePassword(user, pwdNew);
       setPwdOk(true); setPwdOld(""); setPwdNew("");
     } catch (e) {
-      setPwdErr(e.code==="auth/wrong-password"?"Mot de passe actuel incorrect.":"Erreur : "+e.message);
+      setPwdErr(e.code==="auth/wrong-password"||e.code==="auth/invalid-credential"?"Mot de passe actuel incorrect.":"Erreur : "+e.message);
     }
     setPwdLoading(false);
   };
+
+  // Étape 1 — vérifier le mot de passe avant de montrer l'étape finale
+  const verifyBeforeDelete = async () => {
+    if (!delPwd) { setDelErr("Veuillez saisir votre mot de passe."); return; }
+    setDelLoading(true); setDelErr("");
+    try {
+      const cred = EmailAuthProvider.credential(user.email, delPwd);
+      await reauthenticateWithCredential(user, cred);
+      setDelStep(2); // mot de passe OK → confirmation finale
+    } catch (e) {
+      setDelErr(e.code==="auth/wrong-password"||e.code==="auth/invalid-credential"?"Mot de passe incorrect.":"Erreur : "+e.message);
+    }
+    setDelLoading(false);
+  };
+
+  // Étape 2 — suppression effective
+  const doDelete = async () => {
+    setDelLoading(true);
+    try {
+      // Marquer les données comme supprimées (le compte étant supprimé on ne peut plus écrire après)
+      try { await setDoc(getDocRef(user.uid), { _deleted: true, _ts: Date.now() }, { merge: true }); } catch {}
+      await deleteUser(user);
+      // onAuthStateChanged redirige automatiquement vers l'écran de connexion
+    } catch (e) {
+      setDelErr("Erreur lors de la suppression : " + (e.message || e.code));
+      setDelLoading(false);
+    }
+  };
+
+  const resetDel = () => { setDelStep(0); setDelPwd(""); setDelErr(""); };
 
   const pwdStr = getPasswordStrength(pwdNew);
 
@@ -3167,10 +3330,10 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
             </div>
           </div>
 
-          {/* Account info */}
+          {/* Account info + Danger zone */}
           <div className="card">
             <div style={{ fontWeight:700,fontSize:13,marginBottom:14 }}>👤 Mon compte</div>
-            <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
+            <div style={{ display:"flex",flexDirection:"column",gap:10,marginBottom:20 }}>
               {[
                 { label:"Email",    val:user?.email,       icon:"✉️" },
                 { label:"UID",      val:user?.uid?.slice(0,12)+"…", icon:"🔑" },
@@ -3179,9 +3342,72 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
                 <div key={label} style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:11,border:"1px solid var(--border)" }}>
                   <span style={{ fontSize:16 }}>{icon}</span>
                   <span style={{ fontSize:12,color:"var(--text3)",fontWeight:600,flex:1 }}>{label}</span>
-                  <span style={{ fontSize:12,fontWeight:700,color:"var(--text2)" }}>{val}</span>
+                  <span style={{ fontSize:12,fontWeight:700,color:"var(--text2)",overflow:"hidden",textOverflow:"ellipsis",maxWidth:140 }}>{val}</span>
                 </div>
               ))}
+            </div>
+
+            {/* ── Zone de danger ── */}
+            <div style={{ borderTop:"1px solid rgba(248,113,113,0.18)",paddingTop:18 }}>
+              <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:14 }}>
+                <div style={{ width:6,height:6,borderRadius:"50%",background:"var(--red)",boxShadow:"0 0 8px var(--red)",animation:"pulse 2s infinite" }}/>
+                <span style={{ fontSize:10,color:"var(--red)",textTransform:"uppercase",letterSpacing:2,fontWeight:900 }}>Zone de danger</span>
+              </div>
+
+              {/* Étape 0 — bouton initial */}
+              {delStep === 0 && (
+                <button onClick={() => setDelStep(1)}
+                  style={{ width:"100%",padding:"11px 16px",borderRadius:12,border:"1px solid rgba(248,113,113,0.3)",background:"rgba(248,113,113,0.06)",color:"var(--red)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all .2s" }}
+                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(248,113,113,0.14)";e.currentTarget.style.borderColor="rgba(248,113,113,0.5)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(248,113,113,0.06)";e.currentTarget.style.borderColor="rgba(248,113,113,0.3)";}}>
+                  🗑️ Supprimer mon compte
+                </button>
+              )}
+
+              {/* Étape 1 — saisie du mot de passe */}
+              {delStep === 1 && (
+                <div style={{ background:"rgba(248,113,113,0.05)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:14,padding:"16px" }} className="fade-up">
+                  <div style={{ fontWeight:800,fontSize:13,color:"var(--red)",marginBottom:6 }}>🔐 Confirmer votre identité</div>
+                  <div style={{ fontSize:12,color:"var(--text2)",lineHeight:1.65,marginBottom:14 }}>
+                    Saisissez votre mot de passe actuel pour confirmer. La suppression est <strong>irréversible</strong>.
+                  </div>
+                  <input type="password" value={delPwd} onChange={e=>setDelPwd(e.target.value)}
+                    placeholder="Votre mot de passe" autoFocus
+                    onKeyDown={e=>e.key==="Enter"&&verifyBeforeDelete()}
+                    style={{ marginBottom:10,background:"rgba(248,113,113,0.06)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:11 }}/>
+                  {delErr && <div style={{ fontSize:12,color:"var(--red)",fontWeight:700,marginBottom:10 }}>⚠️ {delErr}</div>}
+                  <div style={{ display:"flex",gap:8 }}>
+                    <button onClick={resetDel} style={{ flex:1,padding:"9px",borderRadius:10,border:"1px solid var(--border)",background:"var(--glass)",color:"var(--text2)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13 }}>
+                      Annuler
+                    </button>
+                    <button onClick={verifyBeforeDelete} disabled={delLoading||!delPwd}
+                      style={{ flex:1,padding:"9px",borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.15)",color:"var(--red)",cursor:delLoading||!delPwd?"not-allowed":"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,opacity:!delPwd?.5:1 }}>
+                      {delLoading?"Vérification…":"Continuer →"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Étape 2 — confirmation finale */}
+              {delStep === 2 && (
+                <div style={{ background:"rgba(248,113,113,0.08)",border:"2px solid rgba(248,113,113,0.4)",borderRadius:14,padding:"18px" }} className="fade-up">
+                  <div style={{ fontSize:24,textAlign:"center",marginBottom:10 }}>⚠️</div>
+                  <div style={{ fontWeight:900,fontSize:14,color:"var(--red)",textAlign:"center",marginBottom:8 }}>Suppression définitive</div>
+                  <div style={{ fontSize:12,color:"var(--text2)",lineHeight:1.7,marginBottom:16,textAlign:"center" }}>
+                    Le compte <strong style={{ color:"var(--text)" }}>{user?.email}</strong> et toutes ses données seront <strong>définitivement supprimés</strong>. Cette action est irréversible.
+                  </div>
+                  {delErr && <div style={{ fontSize:12,color:"var(--red)",fontWeight:700,marginBottom:10,textAlign:"center" }}>⚠️ {delErr}</div>}
+                  <div style={{ display:"flex",gap:8 }}>
+                    <button onClick={resetDel} style={{ flex:1,padding:"11px",borderRadius:10,border:"1px solid var(--border)",background:"var(--glass)",color:"var(--text2)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13 }}>
+                      ✋ Annuler
+                    </button>
+                    <button onClick={doDelete} disabled={delLoading}
+                      style={{ flex:1.4,padding:"11px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#f87171,#dc2626)",color:"white",cursor:delLoading?"not-allowed":"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:900,fontSize:13,boxShadow:"0 4px 18px rgba(248,113,113,0.45)",opacity:delLoading?.6:1 }}>
+                      {delLoading?"Suppression…":"🗑️ Supprimer définitivement"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3190,514 +3416,402 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
   );
 }
 
+
 // ═══════════════════════════════════════════════════════════
-//  ESSENCE — Prix carburant via API Claude + web search
+//  ESSENCE — API Gouvernement prix carburants (data.economie.gouv.fr)
 // ═══════════════════════════════════════════════════════════
 function EssencePage() {
-  // ── deux stations ──
-  const STATIONS = [
-    { id:"leclerc", label:"Leclerc",  icon:"🛒", color:"#60a5fa", url:"https://mon-essence.fr/station/saint-dizier/sas-petro-est-leclerc-st-dizier" },
-    { id:"cora",    label:"Cora",     icon:"🏪", color:"#f472b6", url:"https://mon-essence.fr/station/saint-dizier/cora" },
-  ];
-
   const FUEL_META = {
-    SP95:  { label:"SP95",   icon:"⛽", color:"#60a5fa", desc:"Sans plomb 95" },
-    E10:   { label:"E10",    icon:"🌿", color:"#4ade80", desc:"E10 (10% éthanol)" },
-    SP98:  { label:"SP98",   icon:"🔵", color:"#a78bfa", desc:"Sans plomb 98" },
-    Gazole:{ label:"Gazole", icon:"🚛", color:"#fbbf24", desc:"Diesel" },
-    E85:   { label:"E85",    icon:"🌽", color:"#34d399", desc:"Superéthanol E85" },
-    GPL:   { label:"GPL",    icon:"💨", color:"#f87171", desc:"GPL" },
+    gazole: { label:"Gazole", icon:"🚛", color:"#fbbf24" },
+    sp95:   { label:"SP95",   icon:"⛽", color:"#60a5fa" },
+    e10:    { label:"E10",    icon:"🌿", color:"#4ade80" },
+    sp98:   { label:"SP98",   icon:"🔵", color:"#a78bfa" },
+    e85:    { label:"E85",    icon:"🌽", color:"#34d399" },
+    gplc:   { label:"GPL",    icon:"💨", color:"#f87171" },
   };
 
-  const LS_KEY = "duobudget_fuel_history";
+  const LS_PRICES  = "duobudget_fuel_prices_v4";
+  const LS_HISTORY = "duobudget_fuel_history_v4";
 
-  // { leclerc: { SP95: 1.789, ... }, cora: { SP95: 1.799, ... } }
-  const [current, setCurrent]     = useState(null);   // prix actuels
-  const [previous, setPrevious]   = useState(null);   // prix de la session précédente
-  const [loading, setLoading]     = useState(false);
-  const [errors, setErrors]       = useState({});     // { leclerc: "msg", cora: "msg" }
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [activeView, setActiveView] = useState("compare"); // "compare" | "evolution"
+  const [stations, setStations]         = useState([]);
+  const [loading, setLoading]           = useState(false);
+  const [error, setError]               = useState("");
+  const [lastUpdate, setLastUpdate]     = useState(null);
+  const [history, setHistory]           = useState([]);
+  const [activeTab, setActiveTab]       = useState("prices");
+  const [chartFuel, setChartFuel]       = useState("sp95");
 
-
-
-  // ── Charger l'historique depuis localStorage ──
+  // ── Charger cache localStorage ──
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(LS_KEY);
-      if (saved) setPrevious(JSON.parse(saved));
+      const p = localStorage.getItem(LS_PRICES);
+      if (p) { setStations(JSON.parse(p)); setLastUpdate(new Date()); }
+      const h = localStorage.getItem(LS_HISTORY);
+      if (h) setHistory(JSON.parse(h));
     } catch {}
   }, []);
 
-  // ── Fetch une station via l'API Claude + web_search ──
-  const fetchStation = async (station) => {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        system: `Tu es un extracteur de prix carburant. Visite la page indiquée, lis les prix affichés pour chaque carburant disponible et retourne UNIQUEMENT un objet JSON brut, sans markdown, sans backticks, sans texte autour. Format exact: {"SP95":1.789,"E10":1.759,"SP98":null,"Gazole":1.699,"E85":null,"GPL":null,"nom":"Nom de la station"} — utilise null si le carburant n'est pas disponible, un nombre flottant sinon.`,
-        messages: [{ role: "user", content: `Visite cette page et extrait tous les prix carburant affichés : ${station.url}\n\nRetourne UNIQUEMENT le JSON, rien d'autre.` }]
-      })
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    // Récupérer tout le texte de la réponse (ignorer les blocs tool_use)
-    const text = (data.content || [])
-      .filter(b => b.type === "text")
-      .map(b => b.text)
-      .join("")
-      .trim();
-    // Chercher le JSON le plus long (greedy) pour éviter de couper à la première accolade fermante
-    const m = text.match(/\{[\s\S]+\}/);
-    if (!m) throw new Error("Aucun JSON trouvé dans la réponse");
+  // ── Fetch API gouvernement ──
+  const doFetch = useCallback(async () => {
+    setLoading(true); setError("");
     try {
-      return JSON.parse(m[0]);
-    } catch {
-      // Tentative de réparation : retirer les trailing commas
-      const fixed = m[0].replace(/,\s*([\]}])/g, "$1");
-      return JSON.parse(fixed);
-    }
-  };
+      const url = "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=cp%3D'52100'&limit=20&timezone=Europe%2FParis";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erreur réseau " + res.status);
+      const json = await res.json();
+      if (!json.results?.length) throw new Error("Aucune station trouvée pour Saint-Dizier (52100)");
 
-  // ── Fetch les deux stations en parallèle — stable ref ──
-  const currentRef = useRef(null);
-  useEffect(() => { currentRef.current = current; }, [current]);
+      const parsed = json.results.map(r => {
+        const fuels = {};
+        Object.keys(FUEL_META).forEach(k => {
+          const v = parseFloat(r[k + "_prix"]);
+          fuels[k] = isNaN(v) ? null : v;
+        });
+        return {
+          id: r.id || r.adresse,
+          nom: r.nom || r.adresse || "Station",
+          adresse: r.adresse || "",
+          ...fuels,
+        };
+      }).filter(s => Object.keys(FUEL_META).some(k => s[k] != null));
 
-  const doFetchAll = useCallback(async () => {
-    setLoading(true);
-    setErrors({});
-
-    // Sauvegarder l'état actuel comme "précédent" avant de rafraîchir
-    const snapshot = currentRef.current;
-    if (snapshot) {
-      try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot)); } catch {}
-      setPrevious(snapshot);
-    }
-
-    const results = await Promise.allSettled(STATIONS.map(s => fetchStation(s)));
-    const newCurrent = {};
-    const newErrors  = {};
-
-    results.forEach((res, i) => {
-      const sid = STATIONS[i].id;
-      if (res.status === "fulfilled") newCurrent[sid] = res.value;
-      else newErrors[sid] = res.reason?.message || "Erreur inconnue";
-    });
-
-    if (Object.keys(newCurrent).length > 0) {
-      setCurrent(newCurrent);
+      setStations(parsed);
       setLastUpdate(new Date());
+      try { localStorage.setItem(LS_PRICES, JSON.stringify(parsed)); } catch {}
+
+      // Historique : une entrée par station par fetch
+      const ts = new Date().toISOString();
+      const tsFmt = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) +
+                    " " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      const newEntries = parsed.map(s => ({
+        ts, tsFmt,
+        stationId: s.id,
+        stationNom: (s.nom || "Station").slice(0, 22),
+        ...Object.fromEntries(Object.keys(FUEL_META).map(k => [k, s[k]])),
+      }));
+      setHistory(prev => {
+        const cutoff = new Date(Date.now() - 86400000 * 30).toISOString(); // garder 30j
+        const lastHour = new Date(Date.now() - 3600000).toISOString();
+        const cleaned = prev.filter(e => e.ts >= cutoff && e.ts < lastHour);
+        const next = [...cleaned, ...newEntries].slice(-600);
+        try { localStorage.setItem(LS_HISTORY, JSON.stringify(next)); } catch {}
+        return next;
+      });
+    } catch (e) {
+      setError(e.message || "Erreur inconnue");
     }
-    setErrors(newErrors);
     setLoading(false);
   }, []);
 
-  // Premier chargement + intervalle 30 min
   useEffect(() => {
-    doFetchAll();
-    const t = setInterval(doFetchAll, 30 * 60 * 1000);
+    doFetch();
+    const t = setInterval(doFetch, 30 * 60 * 1000);
     return () => clearInterval(t);
-  }, [doFetchAll]);
+  }, [doFetch]);
 
-  // ── Helpers tendance ──
-  const getTrend = (stationId, fuelKey) => {
-    const cur  = current?.[stationId]?.[fuelKey];
-    const prev = previous?.[stationId]?.[fuelKey];
-    if (cur == null || prev == null) return null;
-    const diff = cur - prev;
-    if (Math.abs(diff) < 0.0005) return { type:"stable", diff:0 };
-    return { type: diff > 0 ? "up" : "down", diff };
-  };
+  // ── Données graphique linéaire ──
+  const chartData = useMemo(() => {
+    if (history.length === 0) return [];
+    const byTs = {};
+    history.forEach(e => {
+      if (!byTs[e.ts]) byTs[e.ts] = { ts: e.ts, tsFmt: e.tsFmt };
+      if (e[chartFuel] != null) byTs[e.ts][e.stationNom] = e[chartFuel];
+    });
+    return Object.values(byTs).sort((a, b) => a.ts.localeCompare(b.ts)).slice(-60);
+  }, [history, chartFuel]);
 
-  // Badge tendance JSX
-  const TrendBadge = ({ stationId, fuelKey, compact }) => {
-    const t = getTrend(stationId, fuelKey);
-    if (!t) return <span style={{ fontSize:11, color:"var(--text3)" }}>—</span>;
-    const isUp = t.type === "up";
-    const isStable = t.type === "stable";
-    const color = isStable ? "var(--text3)" : isUp ? "var(--red)" : "var(--green)";
-    const bg    = isStable ? "rgba(255,255,255,0.04)" : isUp ? "rgba(248,113,113,0.12)" : "rgba(74,222,128,0.12)";
-    const border= isStable ? "var(--border)" : isUp ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.3)";
-    const arrow = isStable ? "→" : isUp ? "▲" : "▼";
-    const label = isStable ? "Stable" : `${isUp?"+":""}${(t.diff*100).toFixed(1)} c€/L`;
-    if (compact) return (
-      <span style={{ fontWeight:800, fontSize:12, color }}>{arrow} {label}</span>
-    );
+  const chartLines = useMemo(() => {
+    const names = new Set();
+    chartData.forEach(d => Object.keys(d).filter(k => k !== "ts" && k !== "tsFmt").forEach(k => names.add(k)));
+    const COLORS = ["#60a5fa", "#f472b6", "#4ade80", "#fbbf24", "#a78bfa", "#f87171"];
+    return [...names].map((n, i) => ({ key: n, color: COLORS[i % COLORS.length] }));
+  }, [chartData]);
+
+  const avgPrices = useMemo(() => {
+    const res = {};
+    Object.keys(FUEL_META).forEach(k => {
+      const vals = stations.map(s => s[k]).filter(v => v != null);
+      res[k] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    });
+    return res;
+  }, [stations]);
+
+  const bestStation = useMemo(() => {
+    const res = {};
+    Object.keys(FUEL_META).forEach(k => {
+      const withVal = stations.filter(s => s[k] != null).sort((a, b) => a[k] - b[k]);
+      res[k] = withVal[0] || null;
+    });
+    return res;
+  }, [stations]);
+
+  const fmtUpd = d => d
+    ? "Mis à jour le " + d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) +
+      " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  const FuelTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
     return (
-      <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 9px", borderRadius:20, border:`1px solid ${border}`, background:bg, color, fontWeight:800, fontSize:11 }}>
-        {arrow} {label}
-        {!isStable && previous?.[stationId]?.[fuelKey] != null && (
-          <span style={{ fontSize:10, opacity:.7, fontWeight:600 }}>
-            (était {previous[stationId][fuelKey].toFixed(3)})
-          </span>
-        )}
-      </span>
+      <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px", fontSize: 12 }}>
+        <div style={{ fontWeight: 800, marginBottom: 6, color: "var(--text2)" }}>{label}</div>
+        {payload.map(p => (
+          <div key={p.dataKey} style={{ color: p.color, fontWeight: 700, marginBottom: 3 }}>
+            {p.name} : {p.value?.toFixed(3)} €/L
+          </div>
+        ))}
+      </div>
     );
   };
-
-  // ── Carburants disponibles dans au moins une station ──
-  const availFuels = Object.keys(FUEL_META).filter(k =>
-    STATIONS.some(s => current?.[s.id]?.[k] != null)
-  );
-
-  // ── Meilleur prix par carburant ──
-  const bestStation = (fuelKey) => {
-    const prices = STATIONS.map(s => ({ sid:s.id, price:current?.[s.id]?.[fuelKey] })).filter(x => x.price != null);
-    if (prices.length === 0) return null;
-    return prices.reduce((a,b) => b.price < a.price ? b : a).sid;
-  };
-
-  const hasAnyData = current && Object.keys(current).length > 0;
 
   return (
-    <div className="fade-up">
+    <div className="fade-up" style={{ maxWidth: 1100, margin: "0 auto" }}>
 
-      {/* ── HEADER ── */}
-      <div style={{ background:"linear-gradient(135deg,rgba(251,191,36,0.1),rgba(251,146,60,0.06))", border:"1px solid rgba(251,191,36,0.25)", borderRadius:20, padding:"22px 26px", marginBottom:20, position:"relative", overflow:"hidden" }}>
-        <div style={{ position:"absolute", top:-30, right:-30, fontSize:120, opacity:.05, transform:"rotate(-15deg)", userSelect:"none" }}>⛽</div>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:14 }}>
-          <div>
-            <div style={{ display:"flex", alignItems:"center", gap:13, marginBottom:10 }}>
-              <div style={{ width:46, height:46, borderRadius:14, background:"rgba(251,191,36,0.15)", border:"1px solid rgba(251,191,36,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>⛽</div>
-              <div>
-                <div style={{ fontFamily:"'Fraunces',serif", fontSize:22, fontWeight:700, color:"var(--yellow)" }}>Prix Carburants</div>
-                <div style={{ fontSize:12, color:"var(--text3)" }}>Saint-Dizier (52100) · 2 stations comparées</div>
-              </div>
-            </div>
-            {/* Chips stations */}
-            <div style={{ display:"flex", gap:8 }}>
-              {STATIONS.map(s => (
-                <a key={s.id} href={s.url} target="_blank" rel="noreferrer"
-                  style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px", borderRadius:20, background:`${s.color}12`, border:`1px solid ${s.color}30`, color:s.color, fontSize:12, fontWeight:700, textDecoration:"none", transition:"all .2s" }}
-                  onMouseEnter={e=>{e.currentTarget.style.background=`${s.color}22`;}}
-                  onMouseLeave={e=>{e.currentTarget.style.background=`${s.color}12`;}}>
-                  {s.icon} {s.label} ↗
-                </a>
-              ))}
-            </div>
-          </div>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            {lastUpdate && (
-              <div style={{ textAlign:"right", fontSize:12, color:"var(--text3)" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                  <div style={{ width:7, height:7, borderRadius:"50%", background:"var(--green)", animation:"pulse 2s infinite" }}/>
-                  <span style={{ color:"var(--green)", fontWeight:700, fontSize:11 }}>LIVE</span>
-                </div>
-                <div style={{ marginTop:2 }}>Maj {pad(lastUpdate.getHours())}:{pad(lastUpdate.getMinutes())}</div>
-              </div>
-            )}
-            <button onClick={doFetchAll} disabled={loading}
-              style={{ display:"flex", alignItems:"center", gap:7, padding:"10px 18px", borderRadius:12, border:"1px solid rgba(251,191,36,0.4)", background:"rgba(251,191,36,0.1)", color:"var(--yellow)", cursor:loading?"not-allowed":"pointer", fontSize:13, fontWeight:700, fontFamily:"'Outfit',sans-serif", transition:"all .2s", opacity:loading?.6:1 }}>
-              <span className={loading?"spin":""} style={{ fontSize:16 }}>🔄</span>
-              {loading ? "Chargement…" : "Actualiser"}
-            </button>
+      {/* ── Header ── */}
+      <div className="card" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ width: 52, height: 52, borderRadius: 16, background: "linear-gradient(135deg,#fbbf24,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, boxShadow: "0 6px 20px rgba(251,191,36,0.4)", flexShrink: 0 }}>⛽</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 2 }}>Prix Carburants — Saint-Dizier (52100)</div>
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>
+            {loading ? "⟳ Actualisation…"
+              : error ? "⚠️ Erreur"
+              : stations.length > 0 ? `✅ ${stations.length} station${stations.length > 1 ? "s" : ""} · ${fmtUpd(lastUpdate)}`
+              : "En attente…"}
           </div>
         </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["prices", "💰", "Prix"], ["chart", "📈", "Courbes"]].map(([id, ic, lb]) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              style={{ padding: "8px 14px", borderRadius: 10, border: activeTab === id ? "1px solid rgba(167,139,250,0.5)" : "1px solid var(--border)", background: activeTab === id ? "rgba(167,139,250,0.15)" : "var(--glass)", color: activeTab === id ? "var(--purple)" : "var(--text2)", cursor: "pointer", fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 13 }}>
+              {ic} {lb}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-primary" onClick={doFetch} disabled={loading} style={{ padding: "9px 18px", fontSize: 13 }}>
+          {loading ? "⟳ Chargement…" : "🔄 Actualiser"}
+        </button>
       </div>
 
-      {/* ── ERREURS ── */}
-      {Object.entries(errors).map(([sid, msg]) => {
-        const s = STATIONS.find(x => x.id === sid);
-        return (
-          <div key={sid} className="alert-banner alert-warning" style={{ marginBottom:10,flexDirection:"column",alignItems:"flex-start" }}>
-            <div style={{ fontWeight:700 }}>⚠️ {s?.icon} {s?.label} : Impossible de charger les prix</div>
-            <div style={{ fontSize:11,opacity:.8,marginTop:4 }}>{msg}</div>
-            <div style={{ fontSize:11,color:"var(--yellow)",opacity:.7,marginTop:4 }}>
-              💡 Cette fonction utilise l'IA Claude pour lire les prix en temps réel. Assurez-vous que l'application est lancée depuis claude.ai.
-            </div>
+      {/* ── Erreur ── */}
+      {error && (
+        <div style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
+          <div style={{ fontWeight: 800, color: "var(--red)", marginBottom: 6 }}>⚠️ Impossible de charger les prix</div>
+          <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 8 }}>{error}</div>
+          <div style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1.6 }}>
+            💡 Données issues de <strong>data.economie.gouv.fr</strong> (API officielle du gouvernement, gratuite et publique). Vérifiez votre connexion internet.
           </div>
-        );
-      })}
-
-      {/* ── VUE TABS ── */}
-      {hasAnyData && (
-        <div style={{ display:"flex", gap:3, background:"rgba(255,255,255,0.04)", borderRadius:13, padding:3, marginBottom:18 }}>
-          {[{id:"compare",label:"⚖️ Comparatif stations"},{id:"evolution",label:"📈 Évolution des prix"}].map(t => (
-            <button key={t.id} onClick={() => setActiveView(t.id)} style={{
-              flex:1, padding:"9px 10px", borderRadius:10, border:"none", cursor:"pointer",
-              background: activeView===t.id ? "var(--glass3)" : "transparent",
-              color: activeView===t.id ? "var(--text)" : "var(--text3)",
-              fontFamily:"'Outfit',sans-serif", fontWeight:700, fontSize:13, transition:"all .2s",
-              boxShadow: activeView===t.id ? "0 2px 8px rgba(0,0,0,0.3)" : "none",
-            }}>{t.label}</button>
-          ))}
+          <button className="btn btn-primary" onClick={doFetch} style={{ marginTop: 12, fontSize: 12, padding: "8px 18px" }}>🔄 Réessayer</button>
         </div>
       )}
 
-      {/* ── LOADING SKELETON ── */}
-      {loading && !hasAnyData && (
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-          {STATIONS.map(s => (
-            <div key={s.id} style={{ background:"var(--glass)", border:`1px solid ${s.color}22`, borderRadius:20, padding:24 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-                <div style={{ width:44, height:44, borderRadius:13, background:`${s.color}18`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, animation:"pulse 1.5s infinite" }}>{s.icon}</div>
-                <div style={{ fontSize:16, fontWeight:800, color:s.color }}>{s.label}</div>
-              </div>
-              {[1,2,3,4].map(i => <div key={i} style={{ height:38, background:"rgba(255,255,255,0.04)", borderRadius:10, marginBottom:8, animation:"pulse 1.5s infinite", animationDelay:`${i*0.15}s` }}/>)}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════
-          VUE COMPARATIF
-      ══════════════════════════════════════════ */}
-      {hasAnyData && activeView === "compare" && (
-        <>
-          {/* ── Bandeau meilleur prix global ── */}
-          {availFuels.length > 0 && (() => {
-            const bests = availFuels.map(k => {
-              const best = bestStation(k);
-              return { k, best, price: best ? current[best][k] : null };
-            }).filter(x => x.price != null);
-            const overall = bests.reduce((a,b) => b.price < a.price ? b : a, bests[0]);
-            const s = overall ? STATIONS.find(x => x.id === overall.best) : null;
-            return s ? (
-              <div style={{ background:"linear-gradient(135deg,rgba(74,222,128,0.1),rgba(34,211,238,0.06))", border:"1px solid rgba(74,222,128,0.3)", borderRadius:16, padding:"14px 20px", marginBottom:18, display:"flex", alignItems:"center", gap:14 }}>
-                <span style={{ fontSize:28 }}>🏆</span>
-                <div>
-                  <div style={{ fontSize:11, color:"var(--green)", fontWeight:800, textTransform:"uppercase", letterSpacing:.8 }}>Meilleur prix toutes stations</div>
-                  <div style={{ fontFamily:"'Fraunces',serif", fontSize:18, fontWeight:900, marginTop:3 }}>
-                    <span style={{ color:s.color }}>{s.icon} {s.label}</span>
-                    <span style={{ color:"var(--text3)", fontSize:13, fontWeight:600, margin:"0 8px" }}>·</span>
-                    <span style={{ color:FUEL_META[overall.k].color }}>{FUEL_META[overall.k].icon} {overall.k}</span>
-                    <span style={{ color:"var(--text3)", fontSize:13, fontWeight:600, margin:"0 8px" }}>à</span>
-                    <span style={{ color:"var(--green)" }}>{overall.price.toFixed(3)} €/L</span>
-                  </div>
-                </div>
-              </div>
-            ) : null;
-          })()}
-
-          {/* ── Grande table comparative ── */}
-          <div className="card" style={{ padding:0, overflow:"hidden" }}>
-            <div style={{ padding:"18px 22px 14px", borderBottom:"1px solid var(--border)" }}>
-              <div style={{ fontWeight:800, fontSize:15, display:"flex", alignItems:"center", gap:10 }}>
-                <span>⚖️</span> Comparatif des prix par carburant
-              </div>
-            </div>
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr style={{ background:"rgba(255,255,255,0.02)" }}>
-                    <th style={{ padding:"12px 18px", textAlign:"left", fontSize:11, color:"var(--text3)", fontWeight:800, textTransform:"uppercase", letterSpacing:.8 }}>Carburant</th>
-                    {STATIONS.map(s => (
-                      <th key={s.id} colSpan={2} style={{ padding:"12px 18px", textAlign:"center", fontSize:12, color:s.color, fontWeight:800 }}>
-                        {s.icon} {s.label}
-                      </th>
-                    ))}
-                    <th style={{ padding:"12px 18px", textAlign:"center", fontSize:11, color:"var(--text3)", fontWeight:800, textTransform:"uppercase", letterSpacing:.8 }}>Écart</th>
-                  </tr>
-                  <tr style={{ background:"rgba(255,255,255,0.015)", borderBottom:"1px solid var(--border)" }}>
-                    <th style={{ padding:"6px 18px 10px" }}/>
-                    {STATIONS.map(s => (
-                      <>
-                        <th key={`${s.id}-price`} style={{ padding:"6px 12px 10px", textAlign:"center", fontSize:10, color:"var(--text3)", fontWeight:700 }}>Prix</th>
-                        <th key={`${s.id}-trend`} style={{ padding:"6px 12px 10px", textAlign:"center", fontSize:10, color:"var(--text3)", fontWeight:700 }}>Tendance</th>
-                      </>
-                    ))}
-                    <th style={{ padding:"6px 12px 10px" }}/>
-                  </tr>
-                </thead>
-                <tbody>
-                  {availFuels.map((fuelKey, ri) => {
-                    const meta = FUEL_META[fuelKey];
-                    const best = bestStation(fuelKey);
-                    const prices = STATIONS.map(s => current?.[s.id]?.[fuelKey]);
-                    const diff = prices[0] != null && prices[1] != null ? Math.abs(prices[0] - prices[1]) : null;
-                    return (
-                      <tr key={fuelKey} style={{ borderTop: ri > 0 ? "1px solid rgba(255,255,255,0.04)" : "none", transition:"background .18s" }}
-                        onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.025)"}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        {/* Carburant */}
-                        <td style={{ padding:"14px 18px" }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                            <div style={{ width:36, height:36, borderRadius:10, background:`${meta.color}14`, border:`1px solid ${meta.color}25`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>{meta.icon}</div>
-                            <div>
-                              <div style={{ fontWeight:800, fontSize:14, color:meta.color }}>{meta.label}</div>
-                              <div style={{ fontSize:10, color:"var(--text3)" }}>{meta.desc}</div>
-                            </div>
-                          </div>
-                        </td>
-                        {/* Prix + tendance par station */}
-                        {STATIONS.map(s => {
-                          const price = current?.[s.id]?.[fuelKey];
-                          const isBest = best === s.id && price != null;
-                          return (
-                            <>
-                              <td key={`${s.id}-price`} style={{ padding:"14px 12px", textAlign:"center" }}>
-                                {price != null ? (
-                                  <div style={{ display:"inline-flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-                                    <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                                      <span style={{ fontFamily:"'Fraunces',serif", fontSize:20, fontWeight:900, color:isBest?"var(--green)":s.color }}>
-                                        {price.toFixed(3)}
-                                      </span>
-                                      <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600 }}>€/L</span>
-                                    </div>
-                                    {isBest && <span style={{ fontSize:9, background:"rgba(74,222,128,0.15)", color:"var(--green)", border:"1px solid rgba(74,222,128,0.3)", borderRadius:20, padding:"1px 7px", fontWeight:800 }}>✓ MOINS CHER</span>}
-                                  </div>
-                                ) : (
-                                  <span style={{ fontSize:12, color:"var(--text3)" }}>N/D</span>
-                                )}
-                              </td>
-                              <td key={`${s.id}-trend`} style={{ padding:"14px 12px", textAlign:"center" }}>
-                                <TrendBadge stationId={s.id} fuelKey={fuelKey} />
-                              </td>
-                            </>
-                          );
-                        })}
-                        {/* Écart entre stations */}
-                        <td style={{ padding:"14px 12px", textAlign:"center" }}>
-                          {diff != null ? (
-                            <span style={{ fontWeight:800, fontSize:12, color: diff > 0.01 ? "var(--orange)" : "var(--text3)" }}>
-                              {diff < 0.001 ? "=" : `${(diff*100).toFixed(1)} c€/L`}
-                            </span>
-                          ) : <span style={{ color:"var(--text3)", fontSize:12 }}>—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* ── Cartes station individuelle (plein 50L, 100km) ── */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginTop:14 }}>
-            {STATIONS.map(s => {
-              const sd = current?.[s.id];
-              if (!sd) return null;
-              const stFuels = Object.entries(FUEL_META).filter(([k]) => sd[k] != null);
-              return (
-                <div key={s.id} style={{ background:`${s.color}08`, border:`1.5px solid ${s.color}25`, borderRadius:18, padding:20 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:16, paddingBottom:12, borderBottom:`1px solid ${s.color}18` }}>
-                    <div style={{ width:40, height:40, borderRadius:12, background:`${s.color}18`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>{s.icon}</div>
-                    <div>
-                      <div style={{ fontWeight:900, fontSize:16, color:s.color }}>{s.label}</div>
-                      <div style={{ fontSize:10, color:"var(--text3)" }}>{sd.nom || "Saint-Dizier"}</div>
-                    </div>
-                  </div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {stFuels.map(([k, meta]) => {
-                      const price = sd[k];
-                      return (
-                        <div key={k} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px", background:"rgba(255,255,255,0.025)", borderRadius:10 }}>
-                          <span style={{ fontSize:16 }}>{meta.icon}</span>
-                          <span style={{ fontWeight:700, fontSize:13, color:meta.color, flex:1 }}>{meta.label}</span>
-                          <span style={{ fontFamily:"'Fraunces',serif", fontWeight:800, fontSize:15 }}>{price.toFixed(3)} €/L</span>
-                          <span style={{ fontSize:11, color:"var(--text3)", minWidth:70, textAlign:"right" }}>Plein: {(price*50).toFixed(2)} €</span>
-                          <TrendBadge stationId={s.id} fuelKey={k} compact />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {/* ══════════════════════════════════════════
-          VUE ÉVOLUTION
-      ══════════════════════════════════════════ */}
-      {hasAnyData && activeView === "evolution" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          {previous ? (
+      {/* ══════════════ TAB PRIX ══════════════ */}
+      {activeTab === "prices" && (
+        <div>
+          {stations.length > 0 && (
             <>
-              <div className="alert-banner alert-success" style={{ marginBottom:4 }}>
-                📊 Comparaison avec les prix observés lors de la session précédente
+              {/* Grille carburants */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12, marginBottom: 16 }}>
+                {Object.entries(FUEL_META).map(([k, meta]) => {
+                  const avg = avgPrices[k];
+                  if (!avg) return null;
+                  const best = bestStation[k];
+                  return (
+                    <div key={k} style={{ background: `${meta.color}09`, border: `1.5px solid ${meta.color}22`, borderRadius: 16, padding: "16px 14px", position: "relative", overflow: "hidden" }}>
+                      <div style={{ position: "absolute", top: -10, right: -10, fontSize: 50, opacity: .06 }}>{meta.icon}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
+                        <span style={{ fontSize: 18 }}>{meta.icon}</span>
+                        <span style={{ fontWeight: 800, fontSize: 13, color: meta.color }}>{meta.label}</span>
+                      </div>
+                      <div style={{ fontFamily: "'Fraunces',serif", fontSize: 27, fontWeight: 900, marginBottom: 2 }}>
+                        {avg.toFixed(3)}<span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)" }}> €/L</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text3)" }}>Moy. {stations.length} stations</div>
+                      {best && (
+                        <div style={{ fontSize: 10, color: meta.color, fontWeight: 700, marginTop: 5, borderTop: `1px solid ${meta.color}18`, paddingTop: 5 }}>
+                          📍 Moins cher : {best.nom.slice(0, 18)}<br/>{best[k]?.toFixed(3)} €/L
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              {availFuels.map(fuelKey => {
-                const meta = FUEL_META[fuelKey];
-                const hasDiff = STATIONS.some(s => getTrend(s.id, fuelKey) !== null);
-                return (
-                  <div key={fuelKey} className="card" style={{ padding:0, overflow:"hidden" }}>
-                    <div style={{ padding:"14px 20px", background:`${meta.color}08`, borderBottom:`1px solid ${meta.color}18`, display:"flex", alignItems:"center", gap:12 }}>
-                      <div style={{ width:36, height:36, borderRadius:10, background:`${meta.color}14`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>{meta.icon}</div>
-                      <span style={{ fontWeight:900, fontSize:16, color:meta.color }}>{meta.label}</span>
-                      <span style={{ fontSize:12, color:"var(--text3)" }}>— {meta.desc}</span>
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:0 }}>
-                      {STATIONS.map((s, si) => {
-                        const cur  = current?.[s.id]?.[fuelKey];
-                        const prev = previous?.[s.id]?.[fuelKey];
-                        const trend = getTrend(s.id, fuelKey);
-                        if (cur == null && prev == null) return null;
-                        return (
-                          <div key={s.id} style={{ padding:"18px 22px", borderRight: si === 0 ? "1px solid var(--border)" : "none" }}>
-                            <div style={{ fontWeight:800, fontSize:13, color:s.color, marginBottom:12 }}>{s.icon} {s.label}</div>
-                            <div style={{ display:"flex", alignItems:"flex-end", gap:14, marginBottom:12 }}>
-                              {/* Prix actuel */}
-                              <div>
-                                <div style={{ fontSize:9, color:"var(--text3)", textTransform:"uppercase", letterSpacing:.8, marginBottom:4 }}>Actuel</div>
-                                <div style={{ fontFamily:"'Fraunces',serif", fontSize:28, fontWeight:900, color:cur!=null?"var(--text)":"var(--text3)" }}>
-                                  {cur != null ? cur.toFixed(3) : "—"}
-                                </div>
-                                {cur != null && <div style={{ fontSize:10, color:"var(--text3)", marginTop:2 }}>€/L</div>}
-                              </div>
-                              {/* Flèche */}
-                              {trend && (
-                                <div style={{ fontSize:24, marginBottom:8, color: trend.type==="up"?"var(--red)":trend.type==="down"?"var(--green)":"var(--text3)" }}>
-                                  {trend.type==="up" ? "↑" : trend.type==="down" ? "↓" : "→"}
-                                </div>
-                              )}
-                              {/* Prix précédent */}
-                              {prev != null && (
-                                <div style={{ opacity:.65 }}>
-                                  <div style={{ fontSize:9, color:"var(--text3)", textTransform:"uppercase", letterSpacing:.8, marginBottom:4 }}>Précédent</div>
-                                  <div style={{ fontFamily:"'Fraunces',serif", fontSize:22, fontWeight:700, color:"var(--text3)" }}>{prev.toFixed(3)}</div>
-                                  <div style={{ fontSize:10, color:"var(--text3)", marginTop:2 }}>€/L</div>
-                                </div>
-                              )}
-                            </div>
-                            {/* Badge tendance détaillé */}
-                            {trend ? (
-                              <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:20, fontWeight:800, fontSize:12,
-                                background: trend.type==="stable"?"rgba(255,255,255,0.04)":trend.type==="up"?"rgba(248,113,113,0.12)":"rgba(74,222,128,0.12)",
-                                border: `1px solid ${trend.type==="stable"?"var(--border)":trend.type==="up"?"rgba(248,113,113,0.3)":"rgba(74,222,128,0.3)"}`,
-                                color: trend.type==="stable"?"var(--text3)":trend.type==="up"?"var(--red)":"var(--green)",
-                              }}>
-                                {trend.type==="up" ? "📈 Hausse" : trend.type==="down" ? "📉 Baisse" : "➡️ Stable"}
-                                {trend.type !== "stable" && <span style={{ opacity:.8 }}>{trend.type==="up"?"+":""}{(trend.diff*100).toFixed(1)} c€/L</span>}
-                                {trend.type !== "stable" && cur != null && prev != null && (
-                                  <span style={{ opacity:.6 }}>· plein 50L: {trend.type==="up"?"+":""}{((cur-prev)*50).toFixed(2)} €</span>
-                                )}
-                              </div>
-                            ) : (
-                              <div style={{ fontSize:11, color:"var(--text3)" }}>Pas d'historique disponible</div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+
+              {/* Tableau détail */}
+              <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 14 }}>
+                <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", fontWeight: 800, fontSize: 14 }}>📋 Détail par station</div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: "rgba(255,255,255,0.025)" }}>
+                        <th style={{ padding: "10px 16px", textAlign: "left", color: "var(--text3)", fontSize: 11, textTransform: "uppercase", letterSpacing: .8 }}>Station</th>
+                        {Object.entries(FUEL_META).map(([k, m]) => (
+                          <th key={k} style={{ padding: "10px 12px", textAlign: "center", color: m.color, fontSize: 11 }}>{m.icon} {m.label}</th>
+                        ))}
+                        <th style={{ padding: "10px 12px", textAlign: "center", color: "var(--text3)", fontSize: 11 }}>Plein 50L</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stations.map((s, i) => (
+                        <tr key={s.id || i} style={{ borderTop: "1px solid var(--border)" }}
+                          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          <td style={{ padding: "12px 16px" }}>
+                            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>{s.nom}</div>
+                            <div style={{ fontSize: 10, color: "var(--text3)" }}>{s.adresse}</div>
+                          </td>
+                          {Object.keys(FUEL_META).map(k => {
+                            const isBest = s[k] != null && s[k] === bestStation[k]?.[k] && stations.filter(x => x[k] != null).length > 1;
+                            return (
+                              <td key={k} style={{ padding: "12px", textAlign: "center" }}>
+                                {s[k] != null ? (
+                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                    <span style={{ fontFamily: "'Fraunces',serif", fontWeight: 800, fontSize: 14, color: isBest ? "var(--green)" : "var(--text)" }}>{s[k].toFixed(3)}</span>
+                                    {isBest && <span style={{ fontSize: 9, color: "var(--green)", fontWeight: 800, background: "rgba(74,222,128,0.1)", borderRadius: 5, padding: "1px 4px" }}>✓ Moins cher</span>}
+                                  </div>
+                                ) : <span style={{ color: "var(--text3)" }}>—</span>}
+                              </td>
+                            );
+                          })}
+                          <td style={{ padding: "12px", textAlign: "center" }}>
+                            {s.sp95 != null
+                              ? <span style={{ fontFamily: "'Fraunces',serif", fontWeight: 800, fontSize: 13 }}>{(s.sp95 * 50).toFixed(2)} €</span>
+                              : <span style={{ color: "var(--text3)" }}>—</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Simulateur */}
+              <FuelSimulator avgPrices={avgPrices} FUEL_META={FUEL_META} />
             </>
-          ) : (
-            <div className="card empty-state">
-              <div className="empty-icon">📊</div>
-              <div style={{ fontSize:15, fontWeight:700, marginBottom:6 }}>Pas encore d'historique</div>
-              <div style={{ fontSize:13, marginBottom:18 }}>L'évolution des prix sera visible à partir de la deuxième actualisation.</div>
-              <button className="btn btn-primary" onClick={doFetchAll} disabled={loading}>🔄 Actualiser maintenant</button>
+          )}
+          {!loading && stations.length === 0 && !error && (
+            <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text3)" }}>
+              <div style={{ fontSize: 52, marginBottom: 12 }}>⛽</div>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Chargement des prix en cours…</div>
+              <button className="btn btn-primary" onClick={doFetch}>🔄 Actualiser</button>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Footer ── */}
-      {hasAnyData && (
-        <div style={{ marginTop:16, padding:"11px 16px", background:"rgba(255,255,255,0.02)", border:"1px solid var(--border)", borderRadius:12, display:"flex", alignItems:"center", gap:10 }}>
-          <span>ℹ️</span>
-          <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>
-            Sources : <strong style={{ color:"var(--text2)" }}>mon-essence.fr</strong> ·
-            {STATIONS.map((s,i) => <><a key={s.id} href={s.url} target="_blank" rel="noreferrer" style={{ color:s.color, fontWeight:700, textDecoration:"none", marginLeft:4 }}>{s.icon} {s.label}</a>{i<STATIONS.length-1?" ·":""}</>)} ·
-            Actualisation auto toutes les 30 min
+      {/* ══════════════ TAB COURBES ══════════════ */}
+      {activeTab === "chart" && (
+        <div>
+          {/* Sélecteur carburant */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontWeight: 700, fontSize: 12, color: "var(--text3)" }}>Carburant :</span>
+            {Object.entries(FUEL_META).map(([k, m]) => (
+              <button key={k} onClick={() => setChartFuel(k)}
+                style={{ padding: "6px 13px", borderRadius: 9, border: chartFuel === k ? `1px solid ${m.color}` : "1px solid var(--border)", background: chartFuel === k ? `${m.color}18` : "var(--glass)", color: chartFuel === k ? m.color : "var(--text3)", cursor: "pointer", fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 12 }}>
+                {m.icon} {m.label}
+              </button>
+            ))}
           </div>
+
+          {/* Graphique linéaire évolution */}
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>
+              📈 Évolution — {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 16 }}>
+              {chartData.length} points · chaque actualisation ajoute un point toutes les 30 min
+            </div>
+            {chartData.length >= 2 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="tsFmt" tick={{ fill: "var(--text3)", fontSize: 10 }} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
+                  <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--text3)", fontSize: 10 }} tickLine={false} axisLine={false}
+                    tickFormatter={v => v?.toFixed(3) + "€"} />
+                  <Tooltip content={<FuelTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                  {chartLines.map(l => (
+                    <Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color} strokeWidth={2.5}
+                      dot={{ r: 4, fill: l.color, strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} name={l.key} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text3)" }}>
+                <div style={{ fontSize: 44, marginBottom: 10 }}>📊</div>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Historique en cours de constitution</div>
+                <div style={{ fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
+                  Les courbes s'affichent après plusieurs actualisations.<br />
+                  Revenez demain pour voir l'évolution !
+                </div>
+                <button className="btn btn-primary" onClick={doFetch} disabled={loading}>🔄 Actualiser maintenant</button>
+              </div>
+            )}
+          </div>
+
+          {/* Barres comparatif actuel */}
+          {stations.length > 0 && avgPrices[chartFuel] != null && (
+            <div className="card">
+              <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 14 }}>
+                📊 Comparatif stations — {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label} aujourd'hui
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart
+                  data={stations.filter(s => s[chartFuel] != null).map(s => ({ nom: (s.nom || "Station").slice(0, 18), prix: s[chartFuel] }))}
+                  margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="nom" tick={{ fill: "var(--text3)", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
+                  <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--text3)", fontSize: 10 }} tickLine={false} axisLine={false}
+                    tickFormatter={v => v.toFixed(3)} />
+                  <Tooltip formatter={(v) => [v?.toFixed(3) + " €/L", "Prix"]}
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12 }} />
+                  <Bar dataKey="prix" radius={[8, 8, 0, 0]} fill={FUEL_META[chartFuel]?.color || "#a78bfa"} maxBarSize={80} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginTop: 16, padding: "10px 14px", fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
+        Source : <strong style={{ color: "var(--text2)" }}>data.economie.gouv.fr</strong> — API officielle du gouvernement français · Actualisation automatique toutes les 30 min
+      </div>
+    </div>
+  );
+}
+
+function FuelSimulator({ avgPrices, FUEL_META }) {
+  const [liters, setLiters] = useState(50);
+  const [fuel, setFuel]     = useState("sp95");
+  const price = avgPrices[fuel];
+  const total = price ? (price * liters).toFixed(2) : null;
+  const per100 = price ? (price * 6).toFixed(2) : null; // ~6L/100km
+
+  return (
+    <div className="card" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+      <div style={{ fontSize: 22 }}>🧮</div>
+      <div style={{ fontWeight: 800, fontSize: 14 }}>Simulateur de plein</div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 700, marginBottom: 5 }}>Carburant</div>
+          <select value={fuel} onChange={e => setFuel(e.target.value)}
+            style={{ background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", color: "var(--text)", fontFamily: "'Outfit',sans-serif", fontSize: 13, cursor: "pointer" }}>
+            {Object.entries(FUEL_META).map(([k, m]) => avgPrices[k] != null && <option key={k} value={k}>{m.icon} {m.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 700, marginBottom: 5 }}>Litres</div>
+          <input type="number" value={liters} onChange={e => setLiters(Math.max(1, +e.target.value))} min={1} max={200}
+            style={{ width: 80, background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px" }} />
+        </div>
+      </div>
+      {total && (
+        <div style={{ marginLeft: "auto", textAlign: "right" }}>
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>Coût estimé</div>
+          <div style={{ fontFamily: "'Fraunces',serif", fontSize: 30, fontWeight: 900, color: "var(--purple)" }}>{total} €</div>
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>
+            pour {liters}L · {FUEL_META[fuel]?.label} à {price?.toFixed(3)} €/L
+          </div>
+          {per100 && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>≈ {per100} € / 100 km (conso 6L)</div>}
         </div>
       )}
     </div>
