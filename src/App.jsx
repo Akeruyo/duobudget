@@ -573,6 +573,10 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .btn{min-height:44px;}
   .nav-item{min-height:46px;}
   .filter-chip{padding:9px 16px !important;font-size:13px !important;}
+  /* Fuel simulator stacks on mobile */
+  .fuel-sim-grid{grid-template-columns:1fr !important;}
+  /* Station table scrolls horizontally */
+  .station-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 }
 /* iPhone notch / safe area */
 @supports(padding-top: env(safe-area-inset-top)){
@@ -650,6 +654,14 @@ function useFavicon() {
     link.type = 'image/svg+xml';
     document.head.appendChild(link);
     document.title = "DuoBudget 💑";
+    // Fix mobile viewport - prevent unwanted zoom
+    let vp = document.querySelector('meta[name="viewport"]');
+    if (!vp) {
+      vp = document.createElement('meta');
+      vp.name = 'viewport';
+      document.head.appendChild(vp);
+    }
+    vp.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
   }, []);
 }
 
@@ -987,12 +999,12 @@ export default function App() {
     { id:"expenses",  icon:"💳", label:"Dépenses",        desc:"Toutes vos transactions du mois" },
     { id:"bills",     icon:"📋", label:"Factures",        desc:"Charges récurrentes à payer", badge:unpaidBills },
     { id:"stats",     icon:"📊", label:"Statistiques",    desc:"Analyses et tendances sur plusieurs mois" },
-    { id:"essence",   icon:"⛽", label:"Essence",          desc:"Prix carburants — Saint-Dizier Leclerc" },
+    { id:"essence",   icon:"⛽", label:"Carburants",      desc:"Prix carburants en temps réel" },
     { id:"settings",  icon:"⚙️", label:"Réglages",        desc:"Gérer profils, catégories, thème" },
   ];
 
   const navigate = id => { setPage(id); setSidebarOpen(false); };
-  const pageTitles = { dashboard:"Tableau de bord",incomes:"Revenus",expenses:"Dépenses",bills:"Factures",stats:"Statistiques",settings:"Réglages",essence:"⛽ Essence — Saint-Dizier" };
+  const pageTitles = { dashboard:"Tableau de bord",incomes:"Revenus",expenses:"Dépenses",bills:"Factures",stats:"Statistiques",settings:"Réglages",essence:"⛽ Prix des carburants" };
   const syncLabel = { synced:"Synchronisé ✓",saving:"Sauvegarde…",error:"Erreur sync !" };
   const syncColor = { synced:"var(--green)",saving:"var(--yellow)",error:"var(--red)" };
 
@@ -1336,28 +1348,34 @@ function DashboardRecentTx({ transactions, catMap, profMap }) {
       ) : filtered.length===0 ? (
         <div style={{ padding:"20px",textAlign:"center",color:"var(--text3)",fontSize:13 }}>Aucun résultat pour « {search} »</div>
       ) : (
-        <div style={{ display:"flex",flexDirection:"column",gap:7 }}>
+        <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
           {filtered.map(tx => {
             const cat = catMap[tx.categoryId]||{ icon:"❓",color:"#888",name:"Autre" };
             const prof = profMap[tx.profileId]||{ avatar:"❓",name:"?",color:"#888" };
             return (
-              <div key={tx.id} style={{ display:"flex",alignItems:"center",gap:14,padding:"13px 14px",borderRadius:14,background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.06)",transition:"all .15s" }}
-                onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.borderColor="rgba(255,255,255,0.1)";}}
+              <div key={tx.id}
+                style={{ display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:16,background:"rgba(255,255,255,0.025)",border:`1px solid rgba(255,255,255,0.06)`,transition:"all .15s",position:"relative" }}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.borderColor=`${cat.color}30`;}}
                 onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.025)";e.currentTarget.style.borderColor="rgba(255,255,255,0.06)";}}>
-                <div style={{ width:48,height:48,borderRadius:14,flexShrink:0,background:`${cat.color}14`,border:`1.5px solid ${cat.color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:23,position:"relative" }}>
+                {/* Left color stripe */}
+                <div style={{ position:"absolute",left:0,top:0,bottom:0,width:3,borderRadius:"16px 0 0 16px",background:cat.color,opacity:.7 }}/>
+                {/* Category icon — no overlapping avatar, cleaner */}
+                <div style={{ width:46,height:46,borderRadius:14,flexShrink:0,background:`${cat.color}14`,border:`1.5px solid ${cat.color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,marginLeft:6 }}>
                   {cat.icon}
-                  <div style={{ position:"absolute",bottom:-3,right:-3,width:18,height:18,borderRadius:"50%",background:prof.color||"#444",border:"2px solid #0e0c1e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9 }}>{prof.avatar}</div>
                 </div>
+                {/* Middle info */}
                 <div style={{ flex:1,minWidth:0 }}>
-                  <div style={{ fontWeight:700,fontSize:15,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:5 }}>{tx.label}</div>
-                  <div style={{ display:"flex",alignItems:"center",gap:7,flexWrap:"wrap" }}>
-                    <span style={{ display:"inline-flex",alignItems:"center",gap:3,background:`${cat.color}12`,border:`1px solid ${cat.color}22`,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:700,color:cat.color }}>{cat.icon} {cat.name}</span>
-                    <span style={{ display:"inline-flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:600,color:"var(--text3)" }}>🕐 {smartDate(tx.timestamp)}</span>
+                  <div style={{ fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:4 }}>{tx.label}</div>
+                  <div style={{ display:"flex",alignItems:"center",gap:5,flexWrap:"wrap" }}>
+                    <span style={{ display:"inline-flex",alignItems:"center",gap:3,background:`${cat.color}12`,borderRadius:20,padding:"2px 8px",fontSize:11,fontWeight:700,color:cat.color }}>{cat.name}</span>
+                    <span style={{ display:"inline-flex",alignItems:"center",gap:3,background:`${prof.color}12`,borderRadius:20,padding:"2px 8px",fontSize:11,fontWeight:600,color:prof.color }}>{prof.avatar} {prof.name}</span>
+                    <span style={{ fontSize:10,color:"var(--text3)",fontWeight:600 }}>🕐 {smartDate(tx.timestamp)}</span>
                   </div>
                 </div>
-                <div style={{ textAlign:"right",flexShrink:0 }}>
-                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:800,fontSize:18,color:"var(--red)" }}>-{fmt(tx.amount)}</div>
-                  {tx.auto && <div style={{ fontSize:9.5,color:"var(--purple)",fontWeight:800,marginTop:2,letterSpacing:.5 }}>AUTO</div>}
+                {/* Right amount */}
+                <div style={{ textAlign:"right",flexShrink:0,marginLeft:4 }}>
+                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:17,color:"var(--red)",whiteSpace:"nowrap" }}>-{fmt(tx.amount)}</div>
+                  {tx.auto && <div style={{ fontSize:9,color:"var(--purple)",fontWeight:800,marginTop:1,letterSpacing:.5 }}>AUTO</div>}
                 </div>
               </div>
             );
@@ -3636,7 +3654,8 @@ function EssencePage() {
   const [chartFuel, setChartFuel]     = useState("sp95");
   const [citySearch, setCitySearch]   = useState("Saint-Dizier");
   const [cityInput, setCityInput]     = useState("Saint-Dizier");
-  const [countdown, setCountdown]     = useState(600); // 10min in seconds
+  const [radius, setRadius]           = useState(10); // km
+  const [countdown, setCountdown]     = useState(600);
   const intervalRef = useRef(null);
 
   // Charger cache
@@ -3658,31 +3677,60 @@ function EssencePage() {
     return () => clearInterval(t);
   }, []);
 
-  const doFetch = useCallback(async (city = citySearch) => {
+  const doFetch = useCallback(async (city = citySearch, km = radius) => {
     setLoading(true); setError(""); setCountdown(600);
     try {
       const BASE = "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
       const isCP = /^\d{5}$/.test(city.trim());
+      let url, results = [];
 
-      // ODS v2 ODSQL: string literals MUST use double-quotes, not single-quotes
-      // CP search: where=cp="52100"  →  encodeURIComponent gives cp%3D%2252100%22
-      // City name: q= parameter (full-text, no ODSQL parsing, no quoting needed)
-      let url;
       if (isCP) {
+        // CP exact match — known to work
         const w = encodeURIComponent(`cp="${city.trim()}"`);
-        url = `${BASE}?where=${w}&limit=30&timezone=Europe%2FParis`;
+        url = `${BASE}?where=${w}&limit=50&timezone=Europe%2FParis`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Erreur API ${res.status}`);
+        const json = await res.json();
+        results = json.results || [];
+
+        // If radius > 0, also try geo around the first result's coordinates
+        if (results.length > 0 && km > 0) {
+          const first = results[0];
+          const geo = first.geom?.coordinates || first.coordonnees?.coordinates;
+          if (geo) {
+            const [lng, lat] = geo;
+            const geoW = encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${km*1000}m)`);
+            const geoUrl = `${BASE}?where=${geoW}&limit=50&timezone=Europe%2FParis`;
+            const geoRes = await fetch(geoUrl);
+            if (geoRes.ok) {
+              const geoJson = await geoRes.json();
+              const geoResults = geoJson.results || [];
+              // Merge, deduplicate by id
+              const seen = new Set(results.map(r=>r.id||r.adresse));
+              geoResults.forEach(r => { if (!seen.has(r.id||r.adresse)) { seen.add(r.id||r.adresse); results.push(r); }});
+            }
+          }
+        }
       } else {
-        // q= does full-text search — safe, no wildcards, no quote issues
-        url = `${BASE}?q=${encodeURIComponent(city.trim())}&limit=30&timezone=Europe%2FParis`;
+        // City name: use exact ville= match (ODS v2 double-quoted)
+        const cityNorm = city.trim().toUpperCase();
+        const w = encodeURIComponent(`ville="${cityNorm}"`);
+        url = `${BASE}?where=${w}&limit=50&timezone=Europe%2FParis`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Erreur API ${res.status}`);
+        const json = await res.json();
+        results = json.results || [];
+
+        // Fallback: try uppercase without accent normalization if no results
+        if (!results.length) {
+          const w2 = encodeURIComponent(`ville like "${cityNorm}%"`);
+          const url2 = `${BASE}?where=${w2}&limit=50&timezone=Europe%2FParis`;
+          const res2 = await fetch(url2);
+          if (res2.ok) { const j2 = await res2.json(); results = j2.results || []; }
+        }
       }
 
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Erreur API ${res.status} — Essayez avec le code postal (ex: 52100)`);
-      const json = await res.json();
-
-      // Résultats
-      let results = json.results || [];
-      if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez un code postal (ex: 52100) ou un autre nom de ville.`);
+      if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez le code postal (ex: 52100) ou vérifiez l'orthographe.`);
 
       const parsed = results.map(r => {
         const fuels = {};
@@ -3690,12 +3738,17 @@ function EssencePage() {
           const v = parseFloat(r[k + "_prix"]);
           fuels[k] = isNaN(v) ? null : v;
         });
+        // Real station name from enseignes array or nom field
+        const rawNom = Array.isArray(r.enseignes) && r.enseignes.length
+          ? r.enseignes.join(" / ")
+          : (r.nom && r.nom !== "Station" ? r.nom : null);
+        const stationNom = rawNom || `Station ${r.cp || ""}`.trim();
         return {
           id: r.id || r.adresse,
-          nom: r.enseignes?.[0] || r.nom || "Station",
-          adresse: [r.adresse, r.ville].filter(Boolean).join(", "),
-          cp: r.cp || "",
+          nom: stationNom,
+          adresse: r.adresse || "",
           ville: r.ville || city,
+          cp: r.cp || "",
           ...fuels,
         };
       }).filter(s => Object.keys(FUEL_META).some(k => s[k] != null));
@@ -3737,6 +3790,7 @@ function EssencePage() {
     const c = cityInput.trim();
     if (!c) return;
     setCitySearch(c);
+    doFetch(c, radius);
   };
 
   // Graphique
@@ -3792,45 +3846,54 @@ function EssencePage() {
 
       {/* ── Header card ── */}
       <div className="card" style={{ marginBottom:16,background:"linear-gradient(135deg,rgba(251,191,36,0.06),rgba(167,139,250,0.04))",borderColor:"rgba(251,191,36,0.15)" }}>
-        <div style={{ display:"flex",alignItems:"center",gap:14,flexWrap:"wrap" }}>
-          <div style={{ width:54,height:54,borderRadius:17,background:"linear-gradient(135deg,#f59e0b,#fbbf24)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,boxShadow:"0 6px 22px rgba(251,191,36,0.4)",flexShrink:0 }}>⛽</div>
+        {/* Top row: icon + title + status */}
+        <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:14,flexWrap:"wrap" }}>
+          <div style={{ width:48,height:48,borderRadius:15,background:"linear-gradient(135deg,#f59e0b,#fbbf24)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,boxShadow:"0 6px 20px rgba(251,191,36,0.4)",flexShrink:0 }}>⛽</div>
           <div style={{ flex:1,minWidth:0 }}>
-            <div style={{ fontWeight:900,fontSize:18,marginBottom:2 }}>Prix Carburants</div>
-            <div style={{ fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap" }}>
-              {loading ? <><span style={{ color:"var(--yellow)" }}>⟳</span> Actualisation…</>
+            <div style={{ fontWeight:900,fontSize:17,marginBottom:2 }}>Prix des carburants</div>
+            <div style={{ fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:7,flexWrap:"wrap" }}>
+              {loading ? <><span style={{ color:"var(--yellow)",animation:"spin .7s linear infinite",display:"inline-block" }}>⟳</span> Actualisation…</>
                 : error ? <span style={{ color:"var(--red)" }}>⚠️ Erreur</span>
-                : stations.length > 0 ? <><span style={{ color:"var(--green)" }}>✅</span> {stations.length} station{stations.length>1?"s":""} · {fmtUpd(lastUpdate)}</>
+                : stations.length > 0 ? <><span style={{ color:"var(--green)" }}>●</span> {stations.length} station{stations.length>1?"s":""} · {fmtUpd(lastUpdate)}</>
                 : "En attente…"}
-              {!loading && <span style={{ color:"var(--text3)",fontSize:11 }}>· Actualisation dans {mm}:{ss2}</span>}
+              {!loading && <span>· Actu dans <strong style={{ color:"var(--yellow)" }}>{mm}:{ss2}</strong></span>}
             </div>
           </div>
-          {/* City search */}
-          <div style={{ display:"flex",gap:8,alignItems:"center",flex:1,minWidth:220,maxWidth:380 }}>
-            <div style={{ flex:1,position:"relative" }}>
-              <span style={{ position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none" }}>🔍</span>
-              <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
-                onKeyDown={e=>e.key==="Enter"&&handleSearch()}
-                placeholder="Code postal (52100) ou ville…"
-                style={{ paddingLeft:34,fontSize:13,borderRadius:11,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)" }}/>
-            </div>
-            <button className="btn btn-primary" onClick={handleSearch} disabled={loading||!cityInput.trim()} style={{ padding:"10px 16px",fontSize:13,whiteSpace:"nowrap",flexShrink:0 }}>
-              Chercher
-            </button>
-          </div>
-          {/* Tabs + refresh */}
-          <div style={{ display:"flex",gap:6,alignItems:"center",flexShrink:0 }}>
-            {[["prices","💰","Prix"],["chart","📈","Courbes"]].map(([id,ic,lb])=>(
+          {/* Tabs */}
+          <div style={{ display:"flex",gap:5,flexShrink:0 }}>
+            {[["prices","💰 Prix"],["chart","📈 Courbes"]].map(([id,lb])=>(
               <button key={id} onClick={()=>setActiveTab(id)}
-                style={{ padding:"8px 13px",borderRadius:10,border:activeTab===id?"1px solid rgba(167,139,250,0.5)":"1px solid var(--border)",background:activeTab===id?"rgba(167,139,250,0.15)":"var(--glass)",color:activeTab===id?"var(--purple)":"var(--text2)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
-                {ic} {lb}
+                style={{ padding:"8px 14px",borderRadius:10,border:activeTab===id?"1px solid rgba(167,139,250,0.5)":"1px solid var(--border)",background:activeTab===id?"rgba(167,139,250,0.18)":"var(--glass)",color:activeTab===id?"var(--purple)":"var(--text2)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
+                {lb}
               </button>
             ))}
-            <button className="btn btn-ghost btn-sm tip" data-tip="Forcer l'actualisation maintenant"
-              onClick={()=>doFetch(citySearch)} disabled={loading}
-              style={{ padding:"9px 12px" }}>
-              {loading?"⟳":"🔄"}
+            <button onClick={()=>doFetch(citySearch,radius)} disabled={loading}
+              style={{ padding:"8px 12px",borderRadius:10,border:"1px solid var(--border)",background:"var(--glass)",color:"var(--text2)",cursor:"pointer",fontSize:14 }}>
+              {loading ? "⟳" : "🔄"}
             </button>
           </div>
+        </div>
+
+        {/* Search row: city + radius */}
+        <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap" }}>
+          <div style={{ flex:1,minWidth:180,position:"relative" }}>
+            <span style={{ position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none" }}>🔍</span>
+            <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&handleSearch()}
+              placeholder="Code postal (52100) ou ville…"
+              style={{ paddingLeft:34,fontSize:13,borderRadius:11,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)" }}/>
+          </div>
+          <div style={{ display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.04)",border:"1px solid var(--border)",borderRadius:11,padding:"0 10px",flexShrink:0,height:42 }}>
+            <span style={{ fontSize:12,color:"var(--text3)",fontWeight:700,whiteSpace:"nowrap" }}>📍 Rayon</span>
+            <select value={radius} onChange={e=>setRadius(+e.target.value)}
+              style={{ background:"transparent",border:"none",color:"var(--yellow)",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,cursor:"pointer",padding:"0 4px",outline:"none",width:"auto" }}>
+              {[2,5,10,20,30,50].map(v=><option key={v} value={v}>{v} km</option>)}
+            </select>
+          </div>
+          <button className="btn btn-primary" onClick={handleSearch} disabled={loading||!cityInput.trim()}
+            style={{ padding:"11px 20px",fontSize:13,whiteSpace:"nowrap",flexShrink:0 }}>
+            Chercher
+          </button>
         </div>
       </div>
 
@@ -3844,29 +3907,45 @@ function EssencePage() {
       {/* ══ TAB PRIX ══ */}
       {activeTab==="prices" && stations.length>0 && (
         <div>
-          {/* Cartes synthèse par carburant */}
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:12,marginBottom:16 }}>
+          {/* Cartes par carburant — station la moins chère */}
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10,marginBottom:16 }}>
             {Object.entries(FUEL_META).map(([k,meta])=>{
+              const stationsWithFuel = stations.filter(s=>s[k]!=null);
+              if (!stationsWithFuel.length) return null;
+              const cheapest = stationsWithFuel.reduce((a,b)=>a[k]<b[k]?a:b);
               const avg = avgPrices[k];
-              if (!avg) return null;
-              const best = bestStation[k];
+              const diff = avg ? ((cheapest[k]-avg)*100).toFixed(1) : null;
               return (
-                <div key={k} style={{ background:`linear-gradient(145deg,${meta.color}0a,${meta.color}04)`,border:`1.5px solid ${meta.color}20`,borderRadius:18,padding:"16px 14px",position:"relative",overflow:"hidden" }}>
-                  <div style={{ position:"absolute",top:-12,right:-12,fontSize:54,opacity:.06 }}>{meta.icon}</div>
-                  <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:12 }}>
-                    <div style={{ width:34,height:34,borderRadius:10,background:`${meta.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17 }}>{meta.icon}</div>
-                    <span style={{ fontWeight:900,fontSize:14,color:meta.color }}>{meta.label}</span>
+                <div key={k} style={{ background:`linear-gradient(145deg,${meta.color}0d,${meta.color}05)`,border:`1.5px solid ${meta.color}25`,borderRadius:18,padding:"14px",position:"relative",overflow:"hidden" }}>
+                  <div style={{ position:"absolute",top:-14,right:-14,fontSize:58,opacity:.05 }}>{meta.icon}</div>
+                  {/* Header */}
+                  <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:10 }}>
+                    <div style={{ width:32,height:32,borderRadius:9,background:`${meta.color}1a`,border:`1px solid ${meta.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0 }}>{meta.icon}</div>
+                    <span style={{ fontWeight:900,fontSize:13,color:meta.color }}>{meta.label}</span>
                   </div>
-                  <div style={{ fontFamily:"'Fraunces',serif",fontSize:28,fontWeight:900,letterSpacing:-.5,marginBottom:3 }}>
-                    {avg.toFixed(3)}<span style={{ fontSize:13,fontWeight:400,color:"var(--text3)" }}>€/L</span>
+                  {/* Best price - big */}
+                  <div style={{ fontFamily:"'Fraunces',serif",fontSize:30,fontWeight:900,color:"var(--text)",letterSpacing:-.5,lineHeight:1,marginBottom:2 }}>
+                    {cheapest[k].toFixed(3)}<span style={{ fontSize:12,fontWeight:400,color:"var(--text3)" }}>€/L</span>
                   </div>
-                  <div style={{ fontSize:10,color:"var(--text3)",fontWeight:600 }}>Moy. {stations.length} stations</div>
-                  {best && (
-                    <div style={{ marginTop:8,paddingTop:8,borderTop:`1px solid ${meta.color}15`,fontSize:10,color:meta.color,fontWeight:700,lineHeight:1.4 }}>
-                      📍 {best.nom.slice(0,18)}<br/>
-                      <span style={{ fontFamily:"'Fraunces',serif",fontSize:13 }}>{best[k]?.toFixed(3)} €/L</span>
+                  {diff!==null && (
+                    <div style={{ fontSize:10,color:parseFloat(diff)<0?"var(--green)":"var(--text3)",fontWeight:700,marginBottom:8 }}>
+                      {parseFloat(diff)<0 ? `▼ ${Math.abs(diff)}cts sous la moy.` : `Moy. ${avg?.toFixed(3)}€/L`}
                     </div>
                   )}
+                  {/* Station info */}
+                  <div style={{ paddingTop:8,borderTop:`1px solid ${meta.color}18` }}>
+                    <div style={{ fontWeight:800,fontSize:12,color:"var(--text)",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                      📍 {cheapest.nom}
+                    </div>
+                    <div style={{ fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                      {cheapest.adresse}
+                    </div>
+                    {cheapest.cp && <span style={{ fontSize:9,color:meta.color,fontWeight:700,marginTop:3,display:"inline-block",background:`${meta.color}15`,borderRadius:5,padding:"1px 5px" }}>{cheapest.cp}</span>}
+                  </div>
+                  {/* Badge: cheapest of N stations */}
+                  <div style={{ position:"absolute",top:10,right:10,background:`${meta.color}20`,border:`1px solid ${meta.color}35`,borderRadius:20,padding:"2px 7px",fontSize:9,color:meta.color,fontWeight:900 }}>
+                    🏆 Moins cher
+                  </div>
                 </div>
               );
             })}
@@ -4031,140 +4110,184 @@ function EssencePage() {
 }
 function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
   const availableFuels = Object.keys(FUEL_META).filter(k => avgPrices[k] != null || stations.some(s => s[k] != null));
-  const [fuel, setFuel]     = useState(availableFuels[0] || "gazole");
-  const [liters, setLiters] = useState(50);
+  const [fuel, setFuel]         = useState(availableFuels[0] || "gazole");
+  const [liters, setLiters]     = useState(50);
   const [stationId, setStationId] = useState("__avg__");
+  const [plate, setPlate]       = useState("");
+  const [conso, setConso]       = useState(null);   // L/100km from SIV API
+  const [consoLoading, setConsoLoading] = useState(false);
+  const [consoError, setConsoError]     = useState("");
+  const [manualConso, setManualConso]   = useState(7); // fallback manual
 
-  // Stations that have the selected fuel
   const eligibleStations = stations.filter(s => s[fuel] != null);
   const selectedStation  = stationId === "__avg__" ? null : eligibleStations.find(s => s.id === stationId);
   const price = selectedStation ? selectedStation[fuel] : avgPrices[fuel];
+  const bestS = eligibleStations.length > 0 ? eligibleStations.reduce((a,b) => a[fuel] < b[fuel] ? a : b) : null;
 
-  // Best station for selected fuel
-  const bestS = eligibleStations.length > 0
-    ? eligibleStations.reduce((a,b) => a[fuel] < b[fuel] ? a : b)
-    : null;
-
-  const total   = price != null ? (price * liters)       : null;
-  const per100  = price != null ? (price * 6.5)          : null; // 6.5L/100 moyen
-  const saving  = (bestS && selectedStation && bestS.id !== selectedStation.id)
-    ? ((selectedStation[fuel] - bestS[fuel]) * liters) : null;
-
+  const total  = price != null ? price * liters : null;
+  const effectiveConso = conso ?? manualConso;
+  const per100 = price != null ? (price * effectiveConso) : null;
+  const saving = bestS && selectedStation && bestS.id !== selectedStation.id ? (selectedStation[fuel] - bestS[fuel]) * liters : null;
   const m = FUEL_META[fuel] || {};
+
+  // Lookup vehicle consumption by plate via DVLA-like lookup
+  // We use a public API to fetch vehicle data (SIV France via a CORS proxy)
+  const lookupPlate = async () => {
+    const p = plate.replace(/[\s-]/g,"").toUpperCase();
+    if (!p) return;
+    setConsoLoading(true); setConsoError("");
+    try {
+      // Use api.apiplaqueimmat.fr (public, free)
+      const res = await fetch(`https://api.apiplaqueimmat.fr/vehicule?immat=${p}`);
+      if (!res.ok) throw new Error("Plaque non trouvée");
+      const data = await res.json();
+      // Field varies: consommation_mixte, conso_mixte, mixed_consumption
+      const raw = data?.consommation_mixte || data?.conso_mixte || data?.consumption_mixed;
+      if (raw && parseFloat(raw) > 0) {
+        setConso(parseFloat(raw));
+        setManualConso(parseFloat(raw));
+      } else {
+        throw new Error("Consommation non renseignée pour ce véhicule");
+      }
+    } catch(e) {
+      setConsoError(e.message || "Impossible de récupérer les données");
+    }
+    setConsoLoading(false);
+  };
 
   return (
     <div style={{ borderRadius:18,overflow:"hidden",border:`1px solid ${m.color||"var(--border)"}28`,marginBottom:14,background:"rgba(255,255,255,0.02)" }}>
       {/* Header */}
-      <div style={{ padding:"14px 20px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}12,transparent)`,borderBottom:`1px solid ${m.color||"var(--border)"}20`,display:"flex",alignItems:"center",gap:10 }}>
-        <div style={{ width:36,height:36,borderRadius:11,background:`${m.color||"#a78bfa"}1a`,border:`1.5px solid ${m.color||"#a78bfa"}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>🧮</div>
+      <div style={{ padding:"14px 20px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}10,transparent)`,borderBottom:`1px solid ${m.color||"var(--border)"}20`,display:"flex",alignItems:"center",gap:10 }}>
+        <div style={{ width:38,height:38,borderRadius:12,background:`${m.color||"#a78bfa"}1a`,border:`1.5px solid ${m.color||"#a78bfa"}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>🧮</div>
         <div>
           <div style={{ fontWeight:900,fontSize:15 }}>Simulateur de plein</div>
-          <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>Estimez le coût de votre plein à {citySearch}</div>
+          <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>à {citySearch} · {conso?`Conso réelle ${conso}L/100`:`Conso estimée ${manualConso}L/100`}</div>
         </div>
       </div>
 
-      <div style={{ padding:"18px 20px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
-        {/* LEFT — Controls */}
+      <div className="fuel-sim-grid" style={{ padding:"16px 20px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:18 }}>
+        {/* LEFT */}
         <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
-          {/* Fuel selector */}
+          {/* Fuel pills */}
           <div>
-            <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:8 }}>Carburant</div>
-            <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+            <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:7 }}>Carburant</div>
+            <div style={{ display:"flex",gap:5,flexWrap:"wrap" }}>
               {availableFuels.map(k => {
-                const fm = FUEL_META[k];
-                const sel = fuel === k;
-                return (
-                  <button key={k} onClick={()=>{ setFuel(k); setStationId("__avg__"); }}
-                    style={{ padding:"6px 12px",borderRadius:10,border:sel?`1.5px solid ${fm.color}`:"1px solid var(--border)",
-                      background:sel?`${fm.color}1a`:"var(--glass)",color:sel?fm.color:"var(--text3)",
-                      cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:sel?800:600,fontSize:12,
-                      transition:"all .15s",boxShadow:sel?`0 0 14px ${fm.color}30`:"none" }}>
-                    {fm.icon} {fm.label}
-                  </button>
-                );
+                const fm = FUEL_META[k]; const sel = fuel===k;
+                return <button key={k} onClick={()=>{setFuel(k);setStationId("__avg__");}}
+                  style={{ padding:"6px 11px",borderRadius:10,border:sel?`1.5px solid ${fm.color}`:"1px solid var(--border)",background:sel?`${fm.color}1a`:"var(--glass)",color:sel?fm.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:sel?800:600,fontSize:11,transition:"all .15s",boxShadow:sel?`0 0 12px ${fm.color}30`:"none" }}>
+                  {fm.icon} {fm.label}
+                </button>;
               })}
             </div>
           </div>
 
-          {/* Station selector */}
+          {/* Station */}
           {eligibleStations.length > 0 && (
             <div>
-              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:8 }}>Station</div>
+              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:7 }}>Station</div>
               <select value={stationId} onChange={e=>setStationId(e.target.value)}
-                style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:`1px solid ${m.color||"var(--border)"}40`,borderRadius:11,padding:"9px 12px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:13,cursor:"pointer" }}>
+                style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:`1px solid ${m.color||"var(--border)"}35`,borderRadius:11,padding:"9px 12px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:12,cursor:"pointer" }}>
                 <option value="__avg__">📊 Prix moyen ({eligibleStations.length} stations)</option>
                 {eligibleStations.map(s=>(
-                  <option key={s.id} value={s.id}>
-                    {s.nom} — {s[fuel]?.toFixed(3)}€/L{bestS?.id===s.id?" ⭐":""}
-                  </option>
+                  <option key={s.id} value={s.id}>{s.nom} — {s[fuel]?.toFixed(3)}€{bestS?.id===s.id?" ⭐":""}</option>
                 ))}
               </select>
-              {bestS && (
-                <div style={{ marginTop:6,fontSize:11,color:"var(--green)",fontWeight:700,display:"flex",alignItems:"center",gap:5 }}>
-                  <span>⭐</span> Moins cher : {bestS.nom} à <strong>{bestS[fuel]?.toFixed(3)} €/L</strong>
-                </div>
-              )}
+              {bestS && <div style={{ marginTop:5,fontSize:11,color:"var(--green)",fontWeight:700 }}>⭐ {bestS.nom} · {bestS[fuel]?.toFixed(3)}€/L</div>}
             </div>
           )}
 
           {/* Liters slider */}
           <div>
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7 }}>
               <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800 }}>Volume</div>
-              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:18,color:m.color||"var(--purple)" }}>{liters} L</div>
+              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:20,color:m.color||"var(--purple)" }}>{liters}L</div>
             </div>
             <input type="range" min={5} max={120} step={5} value={liters} onChange={e=>setLiters(+e.target.value)}
               style={{ width:"100%",accentColor:m.color||"var(--purple)",height:5,cursor:"pointer" }}/>
-            <div style={{ display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--text3)",marginTop:4 }}>
-              <span>5 L</span>
-              <div style={{ display:"flex",gap:8 }}>
-                {[20,35,50,70].map(v=>(
-                  <button key={v} onClick={()=>setLiters(v)}
-                    style={{ background:liters===v?`${m.color||"#a78bfa"}22`:"rgba(255,255,255,0.04)",border:`1px solid ${liters===v?(m.color||"#a78bfa")+"44":"rgba(255,255,255,0.08)"}`,
-                      borderRadius:7,padding:"2px 8px",fontSize:10,color:liters===v?(m.color||"var(--purple)"):"var(--text3)",
-                      cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700 }}>
-                    {v}L
-                  </button>
-                ))}
-              </div>
-              <span>120 L</span>
+            <div style={{ display:"flex",gap:5,marginTop:7,flexWrap:"wrap" }}>
+              {[20,35,50,70,100].map(v=>(
+                <button key={v} onClick={()=>setLiters(v)}
+                  style={{ flex:1,minWidth:30,background:liters===v?`${m.color||"#a78bfa"}22`:"rgba(255,255,255,0.04)",border:`1px solid ${liters===v?(m.color||"#a78bfa")+"44":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"4px 2px",fontSize:11,color:liters===v?(m.color||"var(--purple)"):"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700 }}>
+                  {v}L
+                </button>
+              ))}
             </div>
+          </div>
+
+          {/* Plate lookup */}
+          <div>
+            <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:7 }}>Consommation véhicule</div>
+            <div style={{ display:"flex",gap:6 }}>
+              <div style={{ flex:1,position:"relative" }}>
+                <span style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:12,pointerEvents:"none" }}>🚗</span>
+                <input value={plate} onChange={e=>setPlate(e.target.value.toUpperCase())}
+                  onKeyDown={e=>e.key==="Enter"&&lookupPlate()}
+                  placeholder="Ex: AB-123-CD"
+                  style={{ paddingLeft:30,fontSize:12,letterSpacing:1,fontWeight:700,textTransform:"uppercase",borderRadius:10,border:`1px solid rgba(255,255,255,0.1)`,background:"rgba(255,255,255,0.05)",height:38 }}/>
+              </div>
+              <button onClick={lookupPlate} disabled={consoLoading||!plate.trim()}
+                style={{ padding:"8px 12px",borderRadius:10,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.12)",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12,flexShrink:0 }}>
+                {consoLoading?"⟳":"Chercher"}
+              </button>
+            </div>
+            {conso && <div style={{ marginTop:5,fontSize:11,color:"var(--green)",fontWeight:700 }}>✅ Conso réelle : {conso}L/100km</div>}
+            {consoError && (
+              <div style={{ marginTop:5,fontSize:10,color:"var(--orange)" }}>
+                ⚠️ {consoError}
+                <div style={{ display:"flex",alignItems:"center",gap:6,marginTop:5 }}>
+                  <span style={{ color:"var(--text3)" }}>Saisir manuellement :</span>
+                  <input type="number" value={manualConso} onChange={e=>setManualConso(+e.target.value)} min={1} max={30} step={0.1}
+                    style={{ width:60,fontSize:12,padding:"3px 8px",borderRadius:8,textAlign:"center",height:30 }}/>
+                  <span style={{ color:"var(--text3)",fontSize:11 }}>L/100</span>
+                </div>
+              </div>
+            )}
+            {!conso && !consoError && (
+              <div style={{ marginTop:5,display:"flex",alignItems:"center",gap:6 }}>
+                <span style={{ fontSize:10,color:"var(--text3)" }}>Conso manuelle :</span>
+                <input type="number" value={manualConso} onChange={e=>setManualConso(Math.max(1,+e.target.value))} min={1} max={30} step={0.1}
+                  style={{ width:65,fontSize:12,padding:"3px 8px",borderRadius:8,textAlign:"center",height:30,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)",color:"var(--text)" }}/>
+                <span style={{ fontSize:10,color:"var(--text3)" }}>L/100km</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* RIGHT — Result */}
-        <div style={{ display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",gap:10,padding:"16px",borderRadius:16,background:`linear-gradient(135deg,${m.color||"#a78bfa"}0e,${m.color||"#a78bfa"}05)`,border:`1px solid ${m.color||"#a78bfa"}20` }}>
+        <div style={{ display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",gap:10,padding:"20px 16px",borderRadius:16,background:`linear-gradient(145deg,${m.color||"#a78bfa"}0e,${m.color||"#a78bfa"}05)`,border:`1px solid ${m.color||"#a78bfa"}22` }}>
           {price != null ? (
             <>
-              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.2,fontWeight:800 }}>Coût estimé</div>
-              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:52,color:m.color||"var(--purple)",lineHeight:1,textShadow:`0 0 40px ${m.color||"#a78bfa"}50` }}>
-                {total?.toFixed(2)}<span style={{ fontSize:28 }}>€</span>
+              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.5,fontWeight:800 }}>Coût du plein</div>
+              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:54,color:m.color||"var(--purple)",lineHeight:1,textShadow:`0 0 40px ${m.color||"#a78bfa"}50` }}>
+                {total?.toFixed(2)}<span style={{ fontSize:26 }}>€</span>
               </div>
-              <div style={{ fontSize:12,color:"var(--text3)",textAlign:"center",lineHeight:1.6 }}>
-                {liters}L de {m.label} · <strong style={{ color:"var(--text)" }}>{price.toFixed(3)} €/L</strong>
+              <div style={{ fontSize:11,color:"var(--text3)",textAlign:"center",lineHeight:1.7 }}>
+                {liters}L · {m.label} · <strong style={{ color:"var(--text)" }}>{price.toFixed(3)}€/L</strong>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,width:"100%",marginTop:4 }}>
-                <div style={{ textAlign:"center",padding:"9px",background:"rgba(255,255,255,0.04)",borderRadius:11,border:"1px solid rgba(255,255,255,0.07)" }}>
-                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:3 }}>≈ / 100km</div>
-                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,color:"var(--text)" }}>{per100?.toFixed(2)}€</div>
-                  <div style={{ fontSize:9,color:"var(--text3)" }}>conso 6.5L</div>
-                </div>
-                <div style={{ textAlign:"center",padding:"9px",background:"rgba(255,255,255,0.04)",borderRadius:11,border:"1px solid rgba(255,255,255,0.07)" }}>
-                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:3 }}>Prix/L</div>
-                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,color:m.color||"var(--purple)" }}>{price.toFixed(3)}€</div>
-                  <div style={{ fontSize:9,color:"var(--text3)" }}>à la pompe</div>
-                </div>
+                {[
+                  { label:"/ 100 km",value:`${per100?.toFixed(2)}€`,sub:`${effectiveConso}L/100` },
+                  { label:"Prix/L",value:`${price.toFixed(3)}€`,sub:"à la pompe" },
+                ].map(s=>(
+                  <div key={s.label} style={{ textAlign:"center",padding:"10px",background:"rgba(255,255,255,0.04)",borderRadius:11,border:"1px solid rgba(255,255,255,0.07)" }}>
+                    <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:3 }}>{s.label}</div>
+                    <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,color:"var(--text)" }}>{s.value}</div>
+                    <div style={{ fontSize:9,color:"var(--text3)" }}>{s.sub}</div>
+                  </div>
+                ))}
               </div>
-              {saving != null && saving > 0.01 && (
-                <div style={{ width:"100%",padding:"7px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:10,fontSize:11,color:"var(--green)",fontWeight:700,textAlign:"center" }}>
-                  💸 {fmt(saving)} économisés en allant à {bestS?.nom}
+              {saving!=null && saving>0.01 && (
+                <div style={{ width:"100%",padding:"8px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:10,fontSize:11,color:"var(--green)",fontWeight:700,textAlign:"center" }}>
+                  💸 Économisez {saving.toFixed(2)}€ en allant à {bestS?.nom}
                 </div>
               )}
             </>
           ) : (
             <div style={{ textAlign:"center",padding:20 }}>
-              <div style={{ fontSize:36,marginBottom:8 }}>{m.icon||"⛽"}</div>
-              <div style={{ fontSize:13,color:"var(--text3)",fontWeight:600 }}>Prix {m.label} non disponible<br/>dans cette localisation</div>
+              <div style={{ fontSize:40,marginBottom:8 }}>{m.icon||"⛽"}</div>
+              <div style={{ fontSize:13,color:"var(--text3)",fontWeight:600 }}>Prix non disponible<br/>pour cette zone</div>
             </div>
           )}
         </div>
