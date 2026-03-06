@@ -291,9 +291,9 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;}
 
 /* ── TOPBAR RIGHT WIDGET ── */
-.topbar-clock{display:flex;align-items:center;gap:0;background:linear-gradient(135deg,rgba(167,139,250,0.12),rgba(244,114,182,0.08));border:1px solid rgba(167,139,250,0.2);border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.07);}
-.topbar-clock-date{padding:7px 12px;text-align:right;line-height:1.25;border-right:1px solid rgba(255,255,255,0.07);}
-.topbar-clock-time{padding:7px 14px;display:flex;align-items:baseline;gap:1px;font-family:'Fraunces',serif;}
+.topbar-clock{display:flex;align-items:center;gap:0;background:linear-gradient(135deg,rgba(167,139,250,0.14),rgba(244,114,182,0.09));border:1px solid rgba(167,139,250,0.25);border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);flex-shrink:0;}
+.topbar-clock-date{padding:10px 18px;text-align:right;line-height:1.3;border-right:1px solid rgba(255,255,255,0.08);min-width:148px;}
+.topbar-clock-time{padding:10px 18px;display:flex;align-items:baseline;gap:2px;font-family:'Fraunces',serif;}
 .topbar-action-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:11px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;border:none;white-space:nowrap;}
 
 /* ── PROFILE PHOTO ── */
@@ -342,13 +342,14 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 /* ── NAV ── */
 .nav-section-label{font-size:9px;font-weight:900;letter-spacing:2.2px;text-transform:uppercase;color:var(--text3);padding:0 18px;margin:20px 0 7px;display:flex;align-items:center;gap:8px;}
 .nav-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);margin-left:4px;}
-.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;margin:2px 10px;border-radius:14px;cursor:pointer;transition:all .2s;font-size:13.5px;font-weight:600;color:var(--text2);position:relative;user-select:none;border:1px solid transparent;}
-.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.07);}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;margin:2px 10px;border-radius:14px;cursor:pointer;transition:all .2s cubic-bezier(.4,0,.2,1);font-size:13.5px;font-weight:600;color:var(--text2);position:relative;user-select:none;border:1px solid transparent;}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.08);}
+.nav-item:hover .nav-icon-wrap{background:rgba(255,255,255,0.13);transform:scale(1.08);}
 .nav-item.active{color:#fff;background:linear-gradient(135deg,rgba(167,139,250,0.2),rgba(244,114,182,0.1));border-color:rgba(167,139,250,0.3);box-shadow:0 2px 20px rgba(167,139,250,0.14),inset 0 1px 0 rgba(255,255,255,0.07);}
-.nav-item.active .nav-icon-wrap{background:var(--grad-main);box-shadow:0 4px 12px rgba(167,139,250,0.4);}
-.nav-icon-wrap{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.05);transition:all .2s;flex-shrink:0;}
-.nav-item:hover .nav-icon-wrap{background:rgba(255,255,255,0.1);}
-.nav-icon{font-size:16px;}
+.nav-item.active .nav-icon-wrap{background:var(--grad-main);box-shadow:0 4px 14px rgba(167,139,250,0.45);transform:scale(1);}
+.nav-icon-wrap{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.06);transition:all .2s cubic-bezier(.4,0,.2,1);flex-shrink:0;border:1px solid rgba(255,255,255,0.06);}
+.nav-item.active .nav-icon-wrap{border-color:transparent;}
+.nav-icon{font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;}
 .nav-badge{margin-left:auto;background:rgba(248,113,113,0.18);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:900;border:1px solid rgba(248,113,113,0.3);}
 
 /* ── CARDS ── */
@@ -538,9 +539,14 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .bnav-icon{font-size:22px;}
   .bnav-icon-wrap{padding:4px 12px;border-radius:10px;transition:all .18s;}
   .topbar{
-    padding-left:calc(16px + env(safe-area-inset-left));
-    padding-right:calc(16px + env(safe-area-inset-right));
+    height:calc(56px + env(safe-area-inset-top)) !important;
+    padding-left:calc(14px + env(safe-area-inset-left));
+    padding-right:calc(14px + env(safe-area-inset-right));
   }
+  /* Compact clock on mobile */
+  .topbar-clock-date{display:none;}
+  .topbar-clock{border-radius:12px;}
+  .topbar-clock-time{padding:8px 14px;}
   /* Transaction rows on mobile */
   .expense-row{padding:16px 14px !important;}
   .expense-row:hover{padding-left:18px !important;}
@@ -553,16 +559,20 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .profile-cards-grid{grid-template-columns:1fr !important;}
   /* Stats KPI */
   .stat-kpi-card{padding:16px !important;}
+  /* Bigger text for mobile readability */
+  .stat-num{font-size:clamp(18px,4vw,28px);}
 }
 @media(max-width:520px){
   .grid-2{grid-template-columns:1fr !important;}
   .grid-3{grid-template-columns:1fr 1fr !important;}
   .grid-4{grid-template-columns:1fr 1fr !important;}
   .modal-box{padding:20px;border-radius:20px;}
-  /* Full width profile cards */
   .profile-card{margin-bottom:2px;}
-  /* Smaller transaction icon on mobile */
   .expense-row .tx-icon{width:48px !important;height:48px !important;font-size:22px !important;}
+  /* Bigger touch targets */
+  .btn{min-height:44px;}
+  .nav-item{min-height:46px;}
+  .filter-chip{padding:9px 16px !important;font-size:13px !important;}
 }
 /* iPhone notch / safe area */
 @supports(padding-top: env(safe-area-inset-top)){
@@ -584,34 +594,45 @@ function GlobalTooltip() {
       clearTimeout(timer);
       timer = setTimeout(() => {
         const rect = el.getBoundingClientRect();
-        const below = rect.top < 80; // near top → show below
+        const TIP_H = 38, TIP_W = 240, GAP = 10;
+        // Would showing above go off-screen?
+        const canAbove = rect.top - TIP_H - GAP > 0;
+        const canBelow = rect.bottom + TIP_H + GAP < window.innerHeight;
+        const below = !canAbove || (!canAbove && canBelow);
+        // X: centre on element, clamp to viewport
+        let x = rect.left + rect.width / 2;
+        x = Math.max(TIP_W / 2 + 6, Math.min(window.innerWidth - TIP_W / 2 - 6, x));
         setTip({
           text: el.dataset.tip,
-          x: rect.left + rect.width / 2,
-          y: below ? rect.bottom + 10 : rect.top - 10,
+          x,
+          y: below ? rect.bottom + GAP : rect.top - GAP,
           below,
         });
-      }, 60);
+      }, 100);
     };
     const hide = () => { clearTimeout(timer); setTip(null); };
     document.addEventListener('mouseover', show, true);
-    document.addEventListener('mouseout', hide, true);
-    document.addEventListener('click', hide, true);
+    document.addEventListener('mouseout',  hide,  true);
+    document.addEventListener('scroll',    hide,  true);
+    document.addEventListener('click',     hide,  true);
     return () => {
       clearTimeout(timer);
       document.removeEventListener('mouseover', show, true);
-      document.removeEventListener('mouseout', hide, true);
-      document.removeEventListener('click', hide, true);
+      document.removeEventListener('mouseout',  hide, true);
+      document.removeEventListener('scroll',    hide, true);
+      document.removeEventListener('click',     hide, true);
     };
   }, []);
   if (!tip) return null;
   return (
-    <div className={`gtip ${tip.below ? "tip-below" : "tip-above"}`}
+    <div className={`gtip ${tip.below ? 'tip-below' : 'tip-above'}`}
       style={{
+        position: 'fixed',
         left: tip.x,
-        top: tip.below ? tip.y : undefined,
-        bottom: tip.below ? undefined : `calc(100vh - ${tip.y}px)`,
         transform: 'translateX(-50%)',
+        zIndex: 999999,
+        pointerEvents: 'none',
+        ...(tip.below ? { top: tip.y } : { bottom: `calc(100vh - ${tip.y}px)` }),
       }}>
       {tip.text}
     </div>
@@ -1575,40 +1596,45 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
                 </div>
               </>
             )}
-            {isCurMonth && totalIncome>0 && dayOfMonth<daysInMonth && (
-              <div style={{ marginTop:14,background:"rgba(251,191,36,0.04)",borderRadius:14,border:"1px solid rgba(251,191,36,0.2)",overflow:"hidden" }}>
-                <div style={{ padding:"10px 16px 0",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+            {isCurMonth && totalIncome > 0 && (
+              <div style={{ marginTop:14,borderRadius:16,border:"1px solid rgba(167,139,250,0.2)",overflow:"hidden",background:"rgba(167,139,250,0.03)" }}>
+                <div style={{ padding:"11px 16px",background:"rgba(167,139,250,0.07)",borderBottom:"1px solid rgba(167,139,250,0.12)",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
                   <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-                    <span style={{ fontSize:16 }}>📈</span>
-                    <span style={{ fontSize:12,fontWeight:700,color:"var(--yellow)" }}>Projection fin de mois</span>
+                    <span style={{ fontSize:16 }}>📋</span>
+                    <div>
+                      <div style={{ fontSize:12,fontWeight:800,color:"var(--purple)" }}>Bilan fin de mois</div>
+                      <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>Dépenses réelles + factures à régler</div>
+                    </div>
                   </div>
-                  <div style={{ display:"flex",alignItems:"center",gap:6,background:"rgba(251,191,36,0.1)",borderRadius:20,padding:"2px 9px",border:"1px solid rgba(251,191,36,0.25)" }}>
-                    <span style={{ fontSize:10,color:"var(--text3)",fontWeight:600 }}>{daysInMonth - dayOfMonth} jours restants</span>
+                  <div style={{ background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.22)",borderRadius:20,padding:"3px 10px",fontSize:10,color:"var(--purple)",fontWeight:700,flexShrink:0 }}>
+                    {daysInMonth - dayOfMonth} j restants
                   </div>
                 </div>
-                <div style={{ padding:"8px 16px 14px" }}>
-                  <div style={{ fontSize:10,color:"var(--text3)",lineHeight:1.6,marginBottom:10 }}>
-                    Si vous continuez à ce rythme ({fmt(Math.round(totalExp/dayOfMonth))}/jour), vos dépenses totales estimées à fin {new Date().toLocaleDateString("fr-FR",{month:"long"})} seront :
-                  </div>
-                  <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8 }}>
-                    <div style={{ textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"9px 6px" }}>
-                      <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:4 }}>Moy. / jour</div>
-                      <div style={{ fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:700,color:"var(--yellow)" }}>{fmt(Math.round(totalExp/dayOfMonth))}</div>
-                    </div>
-                    <div style={{ textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"9px 6px" }}>
-                      <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:4 }}>Dép. projetées</div>
-                      <div style={{ fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:700,color:projectedExp>totalIncome?"var(--red)":"var(--orange)" }}>-{fmt(Math.round(projectedExp))}</div>
-                    </div>
-                    <div style={{ textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"9px 6px" }}>
-                      <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:4 }}>Solde estimé</div>
-                      <div style={{ fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:700,color:totalIncome-projectedExp>=0?"var(--green)":"var(--red)" }}>{fmt(Math.round(totalIncome-projectedExp))}</div>
-                    </div>
-                  </div>
-                  {projectedExp > totalIncome && (
-                    <div style={{ marginTop:8,padding:"6px 10px",background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:9,fontSize:11,color:"var(--red)",fontWeight:600 }}>
-                      ⚠️ À ce rythme, votre budget sera dépassé de {fmt(Math.round(projectedExp-totalIncome))} fin de mois.
-                    </div>
-                  )}
+                <div style={{ padding:"12px 16px 14px" }}>
+                  {(() => {
+                    const unpaidTotal = data.bills.filter(b => !b.paid?.[selMonth] && b.amount>0).reduce((s,b)=>s+b.amount,0);
+                    const projTotal   = totalExp + unpaidTotal;
+                    const projBalance = totalIncome - projTotal;
+                    const isOver      = projTotal > totalIncome;
+                    return (<>
+                      <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10 }}>
+                        {[
+                          { icon:"💸",label:"Dépensé",        val:`-${fmt(totalExp)}`,           color:"var(--red)",   bg:"rgba(248,113,113,0.06)",  bd:"rgba(248,113,113,0.14)" },
+                          { icon:"📋",label:"Factures restantes", val:unpaidTotal>0?`-${fmt(unpaidTotal)}`:"Tout réglé ✓", color:unpaidTotal>0?"var(--orange)":"var(--green)", bg:unpaidTotal>0?"rgba(251,146,60,0.06)":"rgba(74,222,128,0.06)", bd:unpaidTotal>0?"rgba(251,146,60,0.15)":"rgba(74,222,128,0.15)" },
+                          { icon:"⚖️",label:"Solde estimé",   val:fmt(projBalance),              color:projBalance>=0?"var(--green)":"var(--red)", bg:projBalance>=0?"rgba(74,222,128,0.06)":"rgba(248,113,113,0.06)", bd:projBalance>=0?"rgba(74,222,128,0.14)":"rgba(248,113,113,0.14)" },
+                        ].map(s=>(
+                          <div key={s.label} style={{ textAlign:"center",padding:"11px 6px",background:s.bg,borderRadius:12,border:`1px solid ${s.bd}` }}>
+                            <div style={{ fontSize:18,marginBottom:4 }}>{s.icon}</div>
+                            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,fontWeight:800,marginBottom:5 }}>{s.label}</div>
+                            <div style={{ fontFamily:"'Fraunces',serif",fontSize:15,fontWeight:900,color:s.color }}>{s.val}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ padding:"7px 12px",borderRadius:10,fontSize:11,fontWeight:700,background:isOver?"rgba(248,113,113,0.08)":"rgba(74,222,128,0.06)",border:`1px solid ${isOver?"rgba(248,113,113,0.2)":"rgba(74,222,128,0.18)"}`,color:isOver?"var(--red)":"var(--green)" }}>
+                        {isOver ? `⚠️ Budget dépassé de ${fmt(projTotal-totalIncome)} si toutes les factures sont réglées.` : `✅ Il vous restera ${fmt(projBalance)} après paiement de toutes les factures.`}
+                      </div>
+                    </>);
+                  })()}
                 </div>
               </div>
             )}
@@ -1762,19 +1788,25 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
 
 function LiveClock() {
   const [now, setNow] = useState(new Date());
-  useEffect(() => { const t = setInterval(() => setNow(new Date()),1000); return () => clearInterval(t); }, []);
-  const weekday = now.toLocaleDateString("fr-FR",{ weekday:"long" });
-  const dateStr = now.toLocaleDateString("fr-FR",{ day:"numeric",month:"long" });
-  const hh=pad(now.getHours()),mm=pad(now.getMinutes()),ss=pad(now.getSeconds());
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  const weekday = now.toLocaleDateString("fr-FR", { weekday:"long" });
+  const day     = now.toLocaleDateString("fr-FR", { day:"numeric" });
+  const month   = now.toLocaleDateString("fr-FR", { month:"long" });
+  const year    = now.getFullYear();
+  const hh = pad(now.getHours()), mm = pad(now.getMinutes()), ss = pad(now.getSeconds());
   return (
     <div className="topbar-clock">
       <div className="topbar-clock-date">
-        <div style={{ fontSize:9,color:"rgba(237,233,248,0.4)",textTransform:"uppercase",letterSpacing:1.2,fontWeight:800 }}>{weekday}</div>
-        <div style={{ fontSize:11.5,color:"rgba(237,233,248,0.7)",fontWeight:700,marginTop:1 }}>{dateStr}</div>
+        <div style={{ fontSize:10,color:"rgba(237,233,248,0.42)",textTransform:"uppercase",letterSpacing:2,fontWeight:900,marginBottom:3 }}>
+          {weekday}
+        </div>
+        <div style={{ fontSize:14,color:"rgba(237,233,248,0.88)",fontWeight:800,lineHeight:1,letterSpacing:-.2 }}>
+          {day} {month} <span style={{ color:"rgba(237,233,248,0.38)",fontWeight:600,fontSize:12 }}>{year}</span>
+        </div>
       </div>
       <div className="topbar-clock-time">
-        <span style={{ fontSize:20,fontWeight:700,color:"var(--text)",letterSpacing:-1 }}>{hh}:{mm}</span>
-        <span style={{ fontSize:12,fontWeight:700,color:"var(--purple)",minWidth:20,animation:"pulse 1s steps(1) infinite" }}>:{ss}</span>
+        <span style={{ fontSize:28,fontWeight:900,color:"var(--text)",letterSpacing:-2,lineHeight:1 }}>{hh}:{mm}</span>
+        <span style={{ fontSize:15,fontWeight:800,color:"var(--purple)",minWidth:26,lineHeight:1,animation:"pulse 1s steps(1) infinite",alignSelf:"flex-end",paddingBottom:1 }}>:{ss}</span>
       </div>
     </div>
   );
@@ -1890,12 +1922,28 @@ function Incomes({ data, update, selMonth, mdata, setModal }) {
                   </div>
                 )}
 
-                {/* ── BOUTON MODIFIER PLEINE LARGEUR ── */}
-                <button className="btn btn-primary tip"
+                {/* ── BOUTON MODIFIER PLEINE LARGEUR — couleur du profil ── */}
+                <button className="tip"
                   data-tip={`Modifier le revenu de ${p.name} pour ${monthLabel(selMonth)}`}
-                  style={{ width:"100%",justifyContent:"center",padding:"13px",fontSize:14,letterSpacing:.3,borderRadius:13,boxShadow:`0 4px 18px rgba(167,139,250,0.35)` }}
+                  style={{
+                    width:"100%",justifyContent:"center",padding:"14px",fontSize:14,
+                    letterSpacing:.3,borderRadius:14,cursor:"pointer",
+                    fontFamily:"'Outfit',sans-serif",fontWeight:800,
+                    border:"none",transition:"all .25s cubic-bezier(.4,0,.2,1)",
+                    display:"flex",alignItems:"center",gap:8,
+                    background: p.id==="common"
+                      ? `linear-gradient(135deg,#60a5fa,#a78bfa)`
+                      : i===0
+                        ? `linear-gradient(135deg,${p.color},${p.color}bb)`
+                        : `linear-gradient(135deg,${p.color}bb,${p.color})`,
+                    color:"white",
+                    boxShadow:`0 4px 18px ${p.color}45`,
+                  }}
+                  onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 8px 28px ${p.color}60`;}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=`0 4px 18px ${p.color}45`;}}
                   onClick={() => setModal({ type:"editIncome",profileId:p.id,selMonth })}>
-                  ✏️ Modifier le revenu de {p.name}
+                  <div style={{ width:26,height:26,borderRadius:8,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14 }}>✏️</div>
+                  Modifier le revenu de <strong>{p.name}</strong>
                 </button>
               </div>
             </div>
@@ -2467,40 +2515,37 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
           )}
         </div>
 
-        {/* Info grid — compte + échéance améliorée */}
-        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"12px 14px",marginBottom:14,border:"1px solid var(--border)" }}>
-          {/* Compte */}
-          <div>
-            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontWeight:700 }}>Compte</div>
-            <div style={{ display:"flex",alignItems:"center",gap:7 }}>
-              <div style={{ width:28,height:28,borderRadius:8,background:prof?`${prof.color}20`:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15 }}>{prof?.avatar||"🏦"}</div>
-              <div style={{ fontWeight:700,fontSize:13,color:prof?.color||"var(--text)" }}>{prof?.name||"—"}</div>
+          {/* Info grid — compte + échéance redesignée */}
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14 }}>
+            {/* Compte */}
+            <div style={{ background:"rgba(255,255,255,0.03)",borderRadius:14,padding:"12px 14px",border:"1px solid var(--border)" }}>
+              <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:8,fontWeight:800 }}>Compte</div>
+              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                <div style={{ width:32,height:32,borderRadius:9,background:prof?`${prof.color}22`:"rgba(255,255,255,0.06)",border:`1.5px solid ${prof?.color||"var(--border)"}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>{prof?.avatar||"🏦"}</div>
+                <div style={{ fontWeight:800,fontSize:14,color:prof?.color||"var(--text)" }}>{prof?.name||"—"}</div>
+              </div>
+            </div>
+
+            {/* Échéance redesignée — plus grande et visuelle */}
+            <div style={{ background:dueInfo?`${dueInfo.badgeBg}`:"rgba(255,255,255,0.03)",borderRadius:14,padding:"12px 14px",border:`1.5px solid ${dueInfo&&!isPaid?dueInfo.badgeBorder:"var(--border)"}` }}>
+              <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:8,fontWeight:800 }}>Échéance</div>
+              {dueInfo ? (
+                <div>
+                  <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:6 }}>
+                    <span style={{ fontSize:20,lineHeight:1 }}>{dueInfo.icon}</span>
+                    <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:17,color:isPaid?"var(--text3)":dueInfo.badgeColor,lineHeight:1.1 }}>{dueInfo.label}</div>
+                  </div>
+                  {!isPaid && (
+                    <div style={{ display:"inline-flex",alignItems:"center",gap:4,background:dueInfo.badgeBg,border:`1px solid ${dueInfo.badgeBorder}`,color:dueInfo.badgeColor,borderRadius:20,padding:"4px 11px",fontSize:12,fontWeight:900,letterSpacing:.2 }}>
+                      {dueInfo.badge}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontWeight:600,fontSize:13,color:"var(--text3)",marginTop:4 }}>— Pas d'échéance</div>
+              )}
             </div>
           </div>
-
-          {/* Échéance — redesignée */}
-          <div>
-            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontWeight:700 }}>Échéance</div>
-            {dueInfo ? (
-              <div>
-                <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:5 }}>
-                  <span style={{ fontSize:14 }}>{dueInfo.icon}</span>
-                  <div>
-                    <div style={{ fontWeight:800,fontSize:13,color:isPaid?"var(--text3)":dueInfo.badgeColor,lineHeight:1.2 }}>{dueInfo.label}</div>
-                    <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>{dueInfo.time}</div>
-                  </div>
-                </div>
-                {!isPaid && (
-                  <span style={{ display:"inline-flex",alignItems:"center",gap:3,background:dueInfo.badgeBg,border:`1px solid ${dueInfo.badgeBorder}`,color:dueInfo.badgeColor,borderRadius:20,padding:"3px 9px",fontSize:10,fontWeight:800 }}>
-                    {dueInfo.badge}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div style={{ fontWeight:600,fontSize:12,color:"var(--text3)" }}>— Pas d'échéance</div>
-            )}
-          </div>
-        </div>
 
         {/* Actions */}
         <div style={{ display:"flex",gap:8,alignItems:"center" }}>
@@ -2639,7 +2684,7 @@ function Stats({ data, selMonth, mdata, allMonths }) {
                   <div style={{ fontWeight:800,fontSize:14 }}>📊 Revenus vs Dépenses — 12 mois</div>
                 </div>
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={timelineData} margin={{ top:4,right:4,left:0,bottom:0 }}>
+                  <AreaChart data={timelineData.filter(d=>d.revenus>0||d.dépenses>0)} margin={{ top:4,right:4,left:0,bottom:0 }}>
                     <defs>
                       <linearGradient id="gR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/><stop offset="95%" stopColor="#4ade80" stopOpacity={0}/></linearGradient>
                       <linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.3}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/></linearGradient>
@@ -2688,11 +2733,13 @@ function Stats({ data, selMonth, mdata, allMonths }) {
               <div className="card">
                 <div style={{ fontWeight:800,fontSize:14,marginBottom:12 }}>📊 Solde mensuel</div>
                 <ResponsiveContainer width="100%" height={150}>
-                  <BarChart data={timelineData} margin={{ top:4,right:4,left:0,bottom:0 }}>
+                  <BarChart data={timelineData.filter(d=>d.revenus>0||d.dépenses>0)} margin={{ top:4,right:4,left:0,bottom:0 }}>
                     <XAxis dataKey="month" tick={{ fill:"rgba(237,233,248,0.35)",fontSize:9 }} axisLine={false} tickLine={false}/>
                     <YAxis tick={{ fill:"rgba(237,233,248,0.35)",fontSize:9 }} axisLine={false} tickLine={false} width={62} tickFormatter={v=>fmtCompact(v)}/>
                     <Tooltip content={<CT/>}/>
-                    <Bar dataKey="solde" name="Solde" radius={[5,5,0,0]}>{timelineData.map((e,i) => <Cell key={i} fill={e.solde>=0?"#4ade80":"#f87171"}/>)}</Bar>
+                    <Bar dataKey="solde" name="Solde" radius={[5,5,0,0]} maxBarSize={40}>
+                      {timelineData.filter(d=>d.revenus>0||d.dépenses>0).map((e,i) => <Cell key={i} fill={e.solde>0?"#4ade80":e.solde<0?"#f87171":"rgba(255,255,255,0.1)"}/>)}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -3600,23 +3647,19 @@ function EssencePage() {
   const doFetch = useCallback(async (city = citySearch) => {
     setLoading(true); setError(""); setCountdown(600);
     try {
-      // Chercher par nom de commune (insensible à la casse)
-      const encoded = encodeURIComponent(`search(nom_departement, "${city}") OR search(ville, "${city}")`);
-      const url = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=ville%20like%20'${encodeURIComponent(city)}'&limit=30&timezone=Europe%2FParis&order_by=nom`;
+      const isCP = /^\d{5}$/.test(city.trim());
+      // ODS v2 syntax: double-quoted strings, LIKE needs % wildcards
+      const whereClause = isCP
+        ? `cp="${city.trim()}"`
+        : `ville like "%${city.trim()}%" or nom like "%${city.trim()}%"`;
+      const url = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=${encodeURIComponent(whereClause)}&limit=30&timezone=Europe%2FParis&order_by=nom`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur réseau " + res.status);
       const json = await res.json();
 
-      // Fallback: chercher par CP si le nom ne donne rien
+      // Parse results
       let results = json.results || [];
-      if (results.length === 0 && /^\d{5}$/.test(city.trim())) {
-        const url2 = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=cp%3D'${city.trim()}'&limit=30&timezone=Europe%2FParis`;
-        const res2 = await fetch(url2);
-        const json2 = await res2.json();
-        results = json2.results || [];
-      }
-
-      if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez un autre nom de ville ou un code postal.`);
+      if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez un autre nom ou code postal.`);
 
       const parsed = results.map(r => {
         const fuels = {};
