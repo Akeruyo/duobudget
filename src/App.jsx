@@ -3682,77 +3682,143 @@ function EssencePage() {
     try {
       const BASE = "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
       const isCP = /^\d{5}$/.test(city.trim());
-      let url, results = [];
+      let results = [];
+
+      // ── Helper: ODS geo search around a lat/lng point ──
+      const geoSearch = async (lat, lng, kmRadius) => {
+        const w = encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${Math.round(kmRadius*1000)}m)`);
+        const r = await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
+        if (!r.ok) return [];
+        const j = await r.json();
+        return j.results || [];
+      };
 
       if (isCP) {
-        // CP exact match — known to work
+        // 1. Fetch by CP
         const w = encodeURIComponent(`cp="${city.trim()}"`);
-        url = `${BASE}?where=${w}&limit=50&timezone=Europe%2FParis`;
-        const res = await fetch(url);
+        const res = await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
         if (!res.ok) throw new Error(`Erreur API ${res.status}`);
         const json = await res.json();
         results = json.results || [];
 
-        // If radius > 0, also try geo around the first result's coordinates
-        if (results.length > 0 && km > 0) {
-          const first = results[0];
-          const geo = first.geom?.coordinates || first.coordonnees?.coordinates;
+        // 2. If radius > 0, expand with geo search from first result's centroid
+        if (km > 0 && results.length > 0) {
+          const geo = results[0].geom?.coordinates || results[0].coordonnees?.coordinates;
           if (geo) {
             const [lng, lat] = geo;
-            const geoW = encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${km*1000}m)`);
-            const geoUrl = `${BASE}?where=${geoW}&limit=50&timezone=Europe%2FParis`;
-            const geoRes = await fetch(geoUrl);
-            if (geoRes.ok) {
-              const geoJson = await geoRes.json();
-              const geoResults = geoJson.results || [];
-              // Merge, deduplicate by id
-              const seen = new Set(results.map(r=>r.id||r.adresse));
-              geoResults.forEach(r => { if (!seen.has(r.id||r.adresse)) { seen.add(r.id||r.adresse); results.push(r); }});
-            }
+            const geoResults = await geoSearch(lat, lng, km);
+            const seen = new Set(results.map(r => r.id || r.adresse));
+            geoResults.forEach(r => {
+              if (!seen.has(r.id || r.adresse)) { seen.add(r.id || r.adresse); results.push(r); }
+            });
           }
         }
       } else {
-        // City name: use exact ville= match (ODS v2 double-quoted)
-        const cityNorm = city.trim().toUpperCase();
-        const w = encodeURIComponent(`ville="${cityNorm}"`);
-        url = `${BASE}?where=${w}&limit=50&timezone=Europe%2FParis`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Erreur API ${res.status}`);
-        const json = await res.json();
-        results = json.results || [];
+        // City name search:
+        // Step 1 — Geocode the city via Nominatim to get coordinates
+        let centerLat = null, centerLng = null;
+        try {
+          const nomUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city.trim())}&countrycodes=fr&format=json&limit=1`;
+          const nomRes = await fetch(nomUrl, { headers: { "Accept-Language": "fr" } });
+          if (nomRes.ok) {
+            const nomJson = await nomRes.json();
+            if (nomJson.length > 0) { centerLat = parseFloat(nomJson[0].lat); centerLng = parseFloat(nomJson[0].lon); }
+          }
+        } catch { /* Nominatim optionnel */ }
 
-        // Fallback: try uppercase without accent normalization if no results
-        if (!results.length) {
-          const w2 = encodeURIComponent(`ville like "${cityNorm}%"`);
-          const url2 = `${BASE}?where=${w2}&limit=50&timezone=Europe%2FParis`;
-          const res2 = await fetch(url2);
-          if (res2.ok) { const j2 = await res2.json(); results = j2.results || []; }
+        if (centerLat && centerLng) {
+          // Step 2a — Geo distance search (honours the radius selector)
+          results = await geoSearch(centerLat, centerLng, Math.max(km, 5)); // min 5km pour avoir des résultats
+        } else {
+          // Step 2b — Fallback: exact ville= match
+          const cityNorm = city.trim().toUpperCase();
+          const w = encodeURIComponent(`ville="${cityNorm}"`);
+          const res = await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
+          if (!res.ok) throw new Error(`Erreur API ${res.status}`);
+          const json = await res.json();
+          results = json.results || [];
+          // like fallback
+          if (!results.length) {
+            const w2 = encodeURIComponent(`ville like "${cityNorm}%"`);
+            const res2 = await fetch(`${BASE}?where=${w2}&limit=100&timezone=Europe%2FParis`);
+            if (res2.ok) { const j2 = await res2.json(); results = j2.results || []; }
+          }
         }
       }
 
       if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez le code postal (ex: 52100) ou vérifiez l'orthographe.`);
 
-      // ── Parse stations (noms de base depuis l'API gouvernementale) ──
+      // ── Extracteur de marque intelligent ──
+      // Détecte les enseignes françaises à partir des champs nom/enseignes de l'API
+      const BRANDS = [
+        [/e\.?\s*leclerc|leclerc|petro est|sodibrag/i,           "E. Leclerc"],
+        [/intermarche|intermarché|jeandeline|vert.bois/i,        "Intermarché"],
+        [/carrefour\s*(market|contact|express|city)?/i,          (m) => "Carrefour" + (m[1] ? " " + m[1].trim() : "")],
+        [/auchan/i,                                               "Auchan"],
+        [/totalenergies|total\s*access/i,                        "TotalEnergies"],
+        [/total/i,                                               "Total"],
+        [/esso\s*(express|champagne|service|aerodrome)?/i,       (m) => "Esso" + (m[1] ? " " + m[1].trim() : "")],
+        [/\bshell\b/i,                                           "Shell"],
+        [/\bbp\b/i,                                              "BP"],
+        [/\bcora\b/i,                                            "Cora"],
+        [/super\s*u\b/i,                                         "Super U"],
+        [/hyper\s*u\b/i,                                         "Hyper U"],
+        [/u\s*express/i,                                         "U Express"],
+        [/géant casino|geant casino/i,                           "Géant Casino"],
+        [/casino\s*(supermarche|supermarché)?/i,                 "Casino"],
+        [/\bnetto\b/i,                                           "Netto"],
+        [/simply\s*(market)?/i,                                  "Simply Market"],
+        [/colruyt/i,                                             "Colruyt"],
+        [/\blidl\b/i,                                            "Lidl"],
+        [/champion/i,                                            "Champion"],
+        [/\bvito\b/i,                                            "Vito"],
+        [/\bspar\b/i,                                            "Spar"],
+        [/\bwex\b/i,                                             "WEX"],
+        [/dyneff/i,                                              "Dyneff"],
+        [/\bgalec\b/i,                                           "E. Leclerc"],
+        [/\bsodia\b/i,                                           "E. Leclerc"],
+      ];
+
+      const extractBrand = (nom, enseignes, ville) => {
+        let ens = enseignes;
+        if (typeof ens === "string") { try { ens = JSON.parse(ens); } catch { ens = ens ? [ens] : []; } }
+        const ensStr = Array.isArray(ens) ? ens.filter(Boolean).join(" ") : (ens || "");
+        const combined = `${nom || ""} ${ensStr}`.trim();
+
+        if (!combined || /^station\s*$/i.test(combined)) return null;
+
+        for (const [re, result] of BRANDS) {
+          const m = combined.match(re);
+          if (m) {
+            const brand = typeof result === "function" ? result(m) : result;
+            const v = ville ? ville.replace(/^\w/, c => c.toUpperCase()) : "";
+            return v ? `${brand} — ${v}` : brand;
+          }
+        }
+        // No brand detected: use the raw nom if it's not just an address
+        if (combined && !/^\d/.test(combined) && !/^route|^rue|^avenue|^chemin|^impasse|^allée|^bd |^boulevard/i.test(combined)) {
+          return combined;
+        }
+        return null; // Fall back to address display
+      };
+
+      // ── Parse stations ──
       const parsed = results.map(r => {
         const fuels = {};
         Object.keys(FUEL_META).forEach(k => {
           const v = parseFloat(r[k + "_prix"]);
           fuels[k] = isNaN(v) ? null : v;
         });
-        // Nom de base : enseignes > nom > début d'adresse
-        let ens = r.enseignes;
-        if (typeof ens === "string") { try { ens = JSON.parse(ens); } catch { ens = ens ? [ens] : []; } }
-        const ensNom = Array.isArray(ens) ? ens.filter(Boolean).join(" / ") : "";
-        const rawNom = ensNom || (r.nom && !/^station$/i.test(r.nom.trim()) ? r.nom.trim() : "");
-        const baseNom = rawNom || (r.adresse ? r.adresse.split(",")[0].trim() : `Station ${r.cp||""}`.trim());
-        // Coordonnées pour enrichissement OSM
         const geo = r.geom?.coordinates || r.coordonnees?.coordinates;
         const lat = geo ? geo[1] : null;
         const lng = geo ? geo[0] : null;
+        const brand = extractBrand(r.nom, r.enseignes, r.ville || city);
+        const adresse = r.adresse || "";
+        const nomFinal = brand || adresse.split(",")[0].trim() || `Station ${r.cp || ""}`.trim();
         return {
-          id: r.id || r.adresse,
-          nom: baseNom,
-          adresse: r.adresse || "",
+          id: r.id || adresse,
+          nom: nomFinal,
+          adresse,
           ville: r.ville || city,
           cp: r.cp || "",
           lat, lng,
@@ -3762,33 +3828,41 @@ function EssencePage() {
 
       if (!parsed.length) throw new Error(`Aucun prix disponible pour "${city}".`);
 
-      // ── Enrichissement OSM : vrais noms de marques via Overpass ──
-      // Une seule requête pour toute la zone → on matche par proximité
+      // ── Enrichissement OSM (optionnel, améliore les stations sans enseigne) ──
       let enriched = parsed;
       const withGeo = parsed.filter(s => s.lat && s.lng);
       if (withGeo.length > 0) {
+        // Tente plusieurs endpoints Overpass publics
+        const OVERPASS_ENDPOINTS = [
+          "https://overpass-api.de/api/interpreter",
+          "https://overpass.kuro.mu/api/interpreter",
+          "https://overpass.openstreetmap.ru/api/interpreter",
+        ];
         try {
           const lats = withGeo.map(s => s.lat), lngs = withGeo.map(s => s.lng);
+          const pad = 0.02; // ~2km margin
           const bbox = [
-            (Math.min(...lats) - 0.01).toFixed(5),
-            (Math.min(...lngs) - 0.01).toFixed(5),
-            (Math.max(...lats) + 0.01).toFixed(5),
-            (Math.max(...lngs) + 0.01).toFixed(5),
+            (Math.min(...lats)-pad).toFixed(5), (Math.min(...lngs)-pad).toFixed(5),
+            (Math.max(...lats)+pad).toFixed(5), (Math.max(...lngs)+pad).toFixed(5),
           ].join(",");
-          const ovQuery = `[out:json][timeout:10];(node[amenity=fuel](${bbox});way[amenity=fuel](${bbox}););out center;`;
-          const ovRes = await fetch("https://overpass-api.de/api/interpreter", {
-            method:"POST",
-            body: "data=" + encodeURIComponent(ovQuery),
-          });
-          if (ovRes.ok) {
-            const ovData = await ovRes.json();
-            const osmNodes = (ovData.elements || []).map(el => ({
+          const ovQ = `[out:json][timeout:8];(node[amenity=fuel](${bbox});way[amenity=fuel](${bbox}););out center tags;`;
+
+          let ovData = null;
+          for (const ep of OVERPASS_ENDPOINTS) {
+            try {
+              const r = await fetch(ep, { method:"POST", body:"data="+encodeURIComponent(ovQ), signal: AbortSignal.timeout(6000) });
+              if (r.ok) { ovData = await r.json(); break; }
+            } catch { /* essaie le suivant */ }
+          }
+
+          if (ovData?.elements?.length) {
+            const osmNodes = ovData.elements.map(el => ({
               lat: el.lat ?? el.center?.lat,
               lng: el.lon ?? el.center?.lon,
-              name: el.tags?.name || el.tags?.brand || el.tags?.operator || "",
-            })).filter(n => n.lat && n.lng && n.name);
+              // Priority: brand > name > operator
+              name: el.tags?.brand || el.tags?.name || el.tags?.operator || "",
+            })).filter(n => n.lat && n.lng && n.name && n.name.length > 2);
 
-            // Match chaque station gouvernementale avec le nœud OSM le plus proche (< 150m)
             const deg2rad = d => d * Math.PI / 180;
             const haversine = (la1,lo1,la2,lo2) => {
               const R=6371000, dLa=deg2rad(la2-la1), dLo=deg2rad(lo2-lo1);
@@ -3798,15 +3872,20 @@ function EssencePage() {
 
             enriched = parsed.map(s => {
               if (!s.lat || !s.lng) return s;
-              let best = null, bestDist = 150; // max 150m
-              osmNodes.forEach(n => {
-                const d = haversine(s.lat, s.lng, n.lat, n.lng);
-                if (d < bestDist) { bestDist = d; best = n; }
-              });
-              return best ? { ...s, nom: best.name } : s;
+              let best = null, bestDist = 120; // 120m max
+              osmNodes.forEach(n => { const d = haversine(s.lat,s.lng,n.lat,n.lng); if (d < bestDist) { bestDist=d; best=n; } });
+              if (!best) return s;
+              // Only replace if OSM name looks like a real brand (not just an address)
+              const osmName = best.name;
+              if (osmName && !/^\d/.test(osmName) && osmName.length > 2) {
+                const v = s.ville ? s.ville.replace(/^\w/, c => c.toUpperCase()) : "";
+                const osmBrandized = extractBrand(osmName, null, null) || osmName;
+                return { ...s, nom: v ? `${osmBrandized} — ${v}` : osmBrandized };
+              }
+              return s;
             });
           }
-        } catch { /* OSM optionnel — pas critique */ }
+        } catch { /* OSM optionnel */ }
       }
 
       const ts = new Date().toISOString();
