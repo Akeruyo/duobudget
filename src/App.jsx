@@ -11,8 +11,11 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   fetchSignInMethodsForEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs } from "firebase/firestore";
 
 // ═══════════════════════════════════════════════════════════
 //  FIRESTORE SYNC — Anti-boucle corrigé
@@ -31,6 +34,43 @@ const firestoreSave = async (uid, data) => {
     await setDoc(getDocRef(uid), { budget: data, _ts: Date.now() }, { merge: true });
     return true;
   } catch (e) { console.error("Save error", e); return false; }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  PARTNER LINKING
+// ═══════════════════════════════════════════════════════════
+const getUserMetaRef = (uid) => doc(db, "userMeta", uid);
+const getInviteRef   = (code) => doc(db, "inviteCodes", code.toUpperCase());
+
+const generateInviteCode = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+};
+
+const saveInviteCode = async (uid, code) => {
+  try { await setDoc(getInviteRef(code), { ownerUID: uid, createdAt: Date.now() }); return true; }
+  catch { return false; }
+};
+
+const getLinkedUID = async (uid) => {
+  try {
+    const snap = await getDoc(getUserMetaRef(uid));
+    return snap.exists() ? (snap.data().linkedUID || null) : null;
+  } catch { return null; }
+};
+
+const setLinkedUID = async (uid, linkedUID) => {
+  try { await setDoc(getUserMetaRef(uid), { linkedUID }, { merge: true }); return true; }
+  catch { return false; }
+};
+
+const resolveInviteCode = async (code) => {
+  try {
+    const snap = await getDoc(getInviteRef(code.trim().toUpperCase()));
+    return snap.exists() ? snap.data().ownerUID : null;
+  } catch { return null; }
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -254,6 +294,19 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .content-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;}
 .content-grid.wide{grid-template-columns:1fr !important;}
 
+/* Tooltip classique pour filter chips */
+.filter-bar{position:relative;overflow:visible !important;}
+.filter-chip{position:relative;}
+
+/* ── STATS CARDS ── */
+.stat-kpi-card{border-radius:20px;padding:22px;position:relative;overflow:hidden;transition:all .25s cubic-bezier(.4,0,.2,1);}
+.stat-kpi-card::before{content:'';position:absolute;inset:0;opacity:.08;background:radial-gradient(circle at 20% 20%,white,transparent 70%);}
+.stat-kpi-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.4)!important;}
+
+/* ── BILL SECTION HEADERS ── */
+.bill-section-hdr{display:flex;align-items:center;gap:10px;margin:18px 0 10px;font-size:10px;font-weight:900;letter-spacing:2px;text-transform:uppercase;}
+.bill-section-hdr::after{content:'';flex:1;height:1px;background:currentColor;opacity:.18;}
+
 /* ── TOOLTIP SYSTEM ── */
 .tip{position:relative;}
 .tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) scale(.92);background:linear-gradient(135deg,#1e1b3a,#2a2450);color:var(--text);font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:600;white-space:nowrap;padding:7px 13px;border-radius:10px;border:1px solid rgba(167,139,250,0.3);box-shadow:0 8px 32px rgba(0,0,0,0.6);pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;z-index:99999;}
@@ -261,10 +314,12 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .tip:hover::after,.tip:hover::before{opacity:1;transform:translateX(-50%) scale(1);}
 .tip-right::after{left:auto;right:0;transform:translateX(0) scale(.92);}.tip-right:hover::after{transform:translateX(0) scale(1);}.tip-right::before{left:auto;right:14px;transform:none;}
 .tip-left::after{left:0;transform:translateX(0) scale(.92);}.tip-left:hover::after{transform:translateX(0) scale(1);}
-
-/* Tooltip classique pour filter chips — position absolue visible */
-.filter-bar{position:relative;overflow:visible !important;}
-.filter-chip{position:relative;}
+/* Tooltip below the element — for items near the top of the page */
+.tip-below::after{bottom:auto;top:calc(100% + 10px);}
+.tip-below::before{bottom:auto;top:calc(100% + 3px);border-top-color:transparent;border-bottom-color:#2a2450;}
+.tip-below:hover::after,.tip-below:hover::before{opacity:1;transform:translateX(-50%) scale(1);}
+/* Profile grid ensures tooltips overflow */
+.profile-cards-grid{overflow:visible !important;}
 
 /* ── NAV ── */
 .nav-section-label{font-size:9px;font-weight:900;letter-spacing:2.2px;text-transform:uppercase;color:var(--text3);padding:0 18px;margin:20px 0 7px;display:flex;align-items:center;gap:8px;}
@@ -444,7 +499,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .grid-4{grid-template-columns:1fr 1fr !important;}
   .page-content{
     padding:14px;
-    padding-bottom:calc(80px + env(safe-area-inset-bottom));
+    padding-bottom:calc(84px + env(safe-area-inset-bottom));
     padding-left:calc(14px + env(safe-area-inset-left));
     padding-right:calc(14px + env(safe-area-inset-right));
   }
@@ -459,11 +514,11 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     padding-right:env(safe-area-inset-right);
     z-index:250;
   }
-  .bnav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 10px;border-radius:12px;cursor:pointer;transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;min-width:52px;position:relative;}
+  .bnav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 8px;border-radius:12px;cursor:pointer;transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;min-width:48px;position:relative;}
   .bnav-item.active{color:var(--purple);}
   .bnav-item.active .bnav-icon-wrap{background:rgba(167,139,250,0.18);border-radius:12px;}
   .bnav-icon{font-size:22px;}
-  .bnav-icon-wrap{padding:4px 14px;border-radius:10px;transition:all .18s;}
+  .bnav-icon-wrap{padding:4px 12px;border-radius:10px;transition:all .18s;}
   .topbar{
     padding-left:calc(16px + env(safe-area-inset-left));
     padding-right:calc(16px + env(safe-area-inset-right));
@@ -476,6 +531,10 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .income-card .stat-num{font-size:22px !important;}
   /* Bill actions always visible on mobile */
   .bill-hover-actions{opacity:1 !important;transform:translateX(0) !important;}
+  /* Profile cards mobile — 1 col */
+  .profile-cards-grid{grid-template-columns:1fr !important;}
+  /* Stats KPI */
+  .stat-kpi-card{padding:16px !important;}
 }
 @media(max-width:520px){
   .grid-2{grid-template-columns:1fr !important;}
@@ -514,17 +573,19 @@ function getPasswordStrength(pwd) {
   return { score, ...levels[score] };
 }
 
-function AuthScreen() {
-  const [view, setView] = useState("login");
+function AuthScreen({ onLinked }) {
+  const [view, setView] = useState("login"); // login | register | join | reset
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const emailRef = useRef();
 
-  const switchView = (v) => { setView(v); setError(""); setResetSent(false); setPassword(""); setShowPwd(false); setTimeout(() => emailRef.current?.focus(), 80); };
+  const switchView = (v) => { setView(v); setError(""); setInfo(""); setResetSent(false); setPassword(""); setInviteCode(""); setShowPwd(false); setTimeout(() => emailRef.current?.focus(), 80); };
   useEffect(() => { emailRef.current?.focus(); }, []);
 
   const AUTH_ERRORS = {
@@ -537,8 +598,18 @@ function AuthScreen() {
   const submit = async () => {
     setError(""); setLoading(true);
     try {
-      if (view === "login") await signInWithEmailAndPassword(auth, email, password);
-      else await createUserWithEmailAndPassword(auth, email, password);
+      if (view === "login") {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else if (view === "register") {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else if (view === "join") {
+        if (!inviteCode.trim()) { setError("Veuillez saisir le code de votre partenaire."); setLoading(false); return; }
+        const ownerUID = await resolveInviteCode(inviteCode);
+        if (!ownerUID) { setError("Code invalide ou expiré. Vérifiez avec votre partenaire."); setLoading(false); return; }
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await setLinkedUID(cred.user.uid, ownerUID);
+        if (onLinked) onLinked(ownerUID);
+      }
     } catch (e) { setError(AUTH_ERRORS[e.code] || "Une erreur est survenue."); }
     setLoading(false);
   };
@@ -552,90 +623,136 @@ function AuthScreen() {
       let methods = [];
       try { methods = await fetchSignInMethodsForEmail(auth, trimmed); } catch {}
       if (!methods || methods.length === 0) { setError("Aucun compte n'est associé à cette adresse."); setLoading(false); return; }
-      await sendPasswordResetEmail(auth, trimmed);
+      await sendPasswordResetEmail(auth, trimmed, {
+        url: window.location.origin,
+        handleCodeInApp: false,
+      });
       setResetSent(true);
     } catch (e) { setError(AUTH_ERRORS[e.code] || `Erreur inattendue (${e.code || e.message})`); }
     setLoading(false);
   };
 
   const pwdStrength = getPasswordStrength(password);
-  const isLogin = view === "login";
 
-  if (view === "reset") {
-    return (
-      <div className="auth-shell"><style>{CSS}</style>
-        <div className="auth-card scale-in" style={{ maxWidth:400 }}>
-          <button className="reset-back-btn" onClick={() => switchView("login")}>← Retour à la connexion</button>
-          {resetSent ? (
-            <div style={{ textAlign:"center",padding:"10px 0 20px" }} className="fade-up">
-              <div style={{ width:80,height:80,borderRadius:"50%",background:"radial-gradient(circle,rgba(74,222,128,0.2),rgba(74,222,128,0.05))",border:"2px solid rgba(74,222,128,0.4)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 30px rgba(74,222,128,0.2)",margin:"0 auto 24px",animation:"scaleIn .4s cubic-bezier(.34,1.56,.64,1) both" }}>
-                <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path className="check-anim" d="M8 18l7 7 13-13" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
-              <div style={{ fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:700,marginBottom:10 }}>Email envoyé !</div>
-              <p style={{ fontSize:14,color:"var(--text2)",lineHeight:1.6,marginBottom:6 }}>Un lien de réinitialisation a été envoyé à</p>
-              <div style={{ display:"inline-block",background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:10,padding:"6px 14px",fontSize:13,fontWeight:700,color:"var(--purple)",marginBottom:20 }}>{email}</div>
-              <button className="btn btn-primary" onClick={() => switchView("login")} style={{ width:"100%",justifyContent:"center",padding:"13px",fontSize:14 }}>🔑 Retour à la connexion</button>
+  if (view === "reset") return (
+    <div className="auth-shell"><style>{CSS}</style>
+      <div className="auth-card scale-in" style={{ maxWidth:400 }}>
+        <button className="reset-back-btn" onClick={() => switchView("login")}>← Retour à la connexion</button>
+        {resetSent ? (
+          <div style={{ textAlign:"center",padding:"10px 0 20px" }} className="fade-up">
+            <div style={{ width:80,height:80,borderRadius:"50%",background:"radial-gradient(circle,rgba(74,222,128,0.2),rgba(74,222,128,0.05))",border:"2px solid rgba(74,222,128,0.4)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 30px rgba(74,222,128,0.2)",margin:"0 auto 24px",animation:"scaleIn .4s cubic-bezier(.34,1.56,.64,1) both" }}>
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path className="check-anim" d="M8 18l7 7 13-13" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
-          ) : (
-            <>
-              <div style={{ textAlign:"center",marginBottom:28 }}>
-                <div style={{ width:64,height:64,borderRadius:20,margin:"0 auto 16px",background:"linear-gradient(135deg,rgba(167,139,250,0.2),rgba(244,114,182,0.2))",border:"1px solid rgba(167,139,250,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28 }}>🔐</div>
-                <div style={{ fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:700,marginBottom:8 }}>Mot de passe oublié ?</div>
-                <p style={{ fontSize:13,color:"var(--text2)",lineHeight:1.6 }}>Entrez votre email pour recevoir un lien de réinitialisation.</p>
-              </div>
-              <div className="auth-field">
-                <label>Adresse email</label><span className="field-icon">✉️</span>
-                <input ref={emailRef} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@email.com" onKeyDown={e => e.key==="Enter" && sendReset()}/>
-              </div>
-              {error && <div className="alert-banner alert-danger" style={{ marginBottom:16 }}>⚠️ {error}</div>}
-              <button className="btn btn-primary" onClick={sendReset} disabled={loading||!email.trim()} style={{ width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:4 }}>
-                {loading ? <><span className="spin" style={{ display:"inline-block",fontSize:16 }}>⟳</span> Envoi…</> : "📨 Envoyer le lien"}
-              </button>
-            </>
-          )}
-        </div>
+            <div style={{ fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:700,marginBottom:10 }}>Email envoyé !</div>
+            <p style={{ fontSize:14,color:"var(--text2)",lineHeight:1.6,marginBottom:6 }}>Un lien de réinitialisation a été envoyé à</p>
+            <div style={{ display:"inline-block",background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:10,padding:"6px 14px",fontSize:13,fontWeight:700,color:"var(--purple)",marginBottom:20 }}>{email}</div>
+            <p style={{ fontSize:12,color:"var(--text3)",lineHeight:1.6,marginBottom:20 }}>Vérifiez vos spams si vous ne le voyez pas sous 5 minutes.</p>
+            <button className="btn btn-primary" onClick={() => switchView("login")} style={{ width:"100%",justifyContent:"center",padding:"13px",fontSize:14 }}>🔑 Retour à la connexion</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ textAlign:"center",marginBottom:28 }}>
+              <div style={{ width:64,height:64,borderRadius:20,margin:"0 auto 16px",background:"linear-gradient(135deg,rgba(167,139,250,0.2),rgba(244,114,182,0.2))",border:"1px solid rgba(167,139,250,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28 }}>🔐</div>
+              <div style={{ fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:700,marginBottom:8 }}>Réinitialiser</div>
+              <p style={{ fontSize:13,color:"var(--text2)",lineHeight:1.6 }}>Entrez votre email pour recevoir un lien de réinitialisation DuoBudget.</p>
+            </div>
+            <div className="auth-field">
+              <label>Adresse email</label><span className="field-icon">✉️</span>
+              <input ref={emailRef} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@email.com" onKeyDown={e => e.key==="Enter" && sendReset()}/>
+            </div>
+            {error && <div className="alert-banner alert-danger" style={{ marginBottom:16 }}>⚠️ {error}</div>}
+            <button className="btn btn-primary" onClick={sendReset} disabled={loading||!email.trim()} style={{ width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:4 }}>
+              {loading ? <><span className="spin" style={{ display:"inline-block",fontSize:16 }}>⟳</span> Envoi…</> : "📨 Envoyer le lien"}
+            </button>
+          </>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+
+  const tabs = [
+    { id:"login",    icon:"🔑", label:"Connexion" },
+    { id:"register", icon:"✨", label:"Créer un compte" },
+    { id:"join",     icon:"💑", label:"Rejoindre" },
+  ];
 
   return (
     <div className="auth-shell"><style>{CSS}</style>
       <div className="auth-card scale-in">
-        <div style={{ textAlign:"center",marginBottom:28 }}>
+        {/* Header */}
+        <div style={{ textAlign:"center",marginBottom:26 }}>
           <div style={{ width:72,height:72,borderRadius:22,margin:"0 auto 16px",background:"var(--grad-main)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:"0 8px 32px rgba(167,139,250,0.4),0 0 0 1px rgba(255,255,255,0.08)",animation:"float 3s ease-in-out infinite" }}>💑</div>
           <div className="glow-text" style={{ fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:700,lineHeight:1 }}>DuoBudget</div>
-          <div style={{ fontSize:12,color:"var(--text3)",marginTop:6,letterSpacing:.3 }}>{isLogin?"Bon retour 👋 Connectez-vous à votre espace":"Créez votre espace financier à deux"}</div>
+          <div style={{ fontSize:11,color:"var(--text3)",marginTop:5,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600 }}>Finance à deux</div>
         </div>
-        <div style={{ display:"flex",gap:3,marginBottom:26,background:"rgba(255,255,255,0.04)",borderRadius:14,padding:4 }}>
-          {[["login","🔑","Connexion"],["register","✨","Créer un compte"]].map(([v,icon,label]) => (
-            <button key={v} onClick={() => switchView(v)} style={{ flex:1,padding:"10px 8px",borderRadius:11,border:"none",cursor:"pointer",background:view===v?"var(--grad-main)":"transparent",color:view===v?"white":"var(--text3)",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,transition:"all .25s",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:view===v?"0 4px 14px rgba(167,139,250,0.35)":"none" }}>
-              <span>{icon}</span>{label}
+
+        {/* Tab bar */}
+        <div style={{ display:"flex",gap:3,marginBottom:24,background:"rgba(255,255,255,0.04)",borderRadius:14,padding:4 }}>
+          {tabs.map(({ id,icon,label }) => (
+            <button key={id} onClick={() => switchView(id)} style={{ flex:1,padding:"9px 6px",borderRadius:11,border:"none",cursor:"pointer",background:view===id?"var(--grad-main)":"transparent",color:view===id?"white":"var(--text3)",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:11,transition:"all .25s",display:"flex",alignItems:"center",justifyContent:"center",gap:4,boxShadow:view===id?"0 4px 14px rgba(167,139,250,0.35)":"none" }}>
+              <span style={{ fontSize:14 }}>{icon}</span>
+              <span style={{ whiteSpace:"nowrap" }}>{label}</span>
             </button>
           ))}
         </div>
-        <div className="auth-field">
-          <label>Adresse email</label><span className="field-icon">✉️</span>
-          <input ref={emailRef} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@email.com" autoComplete="email" onKeyDown={e => e.key==="Enter" && submit()}/>
-        </div>
-        <div className="auth-field" style={{ marginBottom:view==="register"?6:4 }}>
-          <label>Mot de passe</label><span className="field-icon">🔒</span>
-          <input type={showPwd?"text":"password"} value={password} onChange={e => setPassword(e.target.value)} placeholder={isLogin?"••••••••":"Minimum 6 caractères"} autoComplete={isLogin?"current-password":"new-password"} onKeyDown={e => e.key==="Enter" && submit()} style={{ paddingRight:44 }}/>
-          <button className="eye-btn" onClick={() => setShowPwd(v => !v)} type="button" tabIndex={-1}>{showPwd?"🙈":"👁️"}</button>
-        </div>
-        {view==="register" && password.length>0 && (
-          <div style={{ marginBottom:16 }}>
-            <div className="pwd-strength">{[1,2,3,4,5].map(i => <div key={i} className="pwd-strength-bar" style={{ background:i<=pwdStrength.score?pwdStrength.color:"rgba(255,255,255,0.07)" }}/>)}</div>
-            {pwdStrength.label && <div style={{ fontSize:11,color:pwdStrength.color,marginTop:5,fontWeight:600,textAlign:"right" }}>{pwdStrength.label}</div>}
+
+        {/* Join explanation */}
+        {view === "join" && (
+          <div style={{ background:"rgba(167,139,250,0.07)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:14,padding:"12px 16px",marginBottom:18,fontSize:12,color:"var(--text2)",lineHeight:1.6 }}>
+            💑 <strong style={{ color:"var(--purple)" }}>Rejoindre un espace partagé</strong><br/>
+            Votre partenaire doit partager son <strong>code d'invitation</strong> depuis Réglages → Compte. Entrez-le ci-dessous pour accéder aux mêmes données.
           </div>
         )}
-        {isLogin && <div style={{ textAlign:"right",marginBottom:20,marginTop:4 }}><button onClick={() => switchView("reset")} style={{ background:"none",border:"none",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,padding:0 }}>Mot de passe oublié ?</button></div>}
-        {error && <div className="alert-banner alert-danger" style={{ marginBottom:16 }}>⚠️ {error}</div>}
-        <button className="btn btn-primary" onClick={submit} disabled={loading||!email||!password||(view==="register"&&pwdStrength.score<1)} style={{ width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:view==="register"?4:0 }}>
-          {loading?<><span className="spin" style={{ display:"inline-block",fontSize:16 }}>⟳</span> En cours…</>:isLogin?"🔑 Se connecter":"🚀 Créer mon compte"}
+
+        {/* Email field */}
+        <div className="auth-field">
+          <label>{view==="join"?"Votre adresse email":"Adresse email"}</label>
+          <span className="field-icon">✉️</span>
+          <input ref={emailRef} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@email.com" autoComplete="email" onKeyDown={e => e.key==="Enter" && submit()}/>
+        </div>
+
+        {/* Password field */}
+        <div className="auth-field" style={{ marginBottom:view!=="login"?6:4 }}>
+          <label>Mot de passe</label><span className="field-icon">🔒</span>
+          <input type={showPwd?"text":"password"} value={password} onChange={e => setPassword(e.target.value)} placeholder={view==="login"?"••••••••":"Minimum 6 caractères"} autoComplete={view==="login"?"current-password":"new-password"} onKeyDown={e => e.key==="Enter" && submit()} style={{ paddingRight:44 }}/>
+          <button className="eye-btn" onClick={() => setShowPwd(v => !v)} type="button" tabIndex={-1}>{showPwd?"🙈":"👁️"}</button>
+        </div>
+
+        {/* Password strength */}
+        {view !== "login" && password.length>0 && (
+          <div style={{ marginBottom:14 }}>
+            <div className="pwd-strength">{[1,2,3,4,5].map(i => <div key={i} className="pwd-strength-bar" style={{ background:i<=pwdStrength.score?pwdStrength.color:"rgba(255,255,255,0.07)" }}/>)}</div>
+            {pwdStrength.label && <div style={{ fontSize:11,color:pwdStrength.color,marginTop:4,fontWeight:600,textAlign:"right" }}>{pwdStrength.label}</div>}
+          </div>
+        )}
+
+        {/* Invite code for join */}
+        {view === "join" && (
+          <div className="auth-field">
+            <label>Code d'invitation partenaire</label>
+            <span className="field-icon">🔗</span>
+            <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())} placeholder="Ex: AB3XK7" maxLength={6} style={{ letterSpacing:4,fontWeight:800,fontSize:18,textAlign:"center",textTransform:"uppercase" }} onKeyDown={e => e.key==="Enter" && submit()}/>
+          </div>
+        )}
+
+        {/* Forgot password */}
+        {view==="login" && <div style={{ textAlign:"right",marginBottom:18,marginTop:4 }}><button onClick={() => switchView("reset")} style={{ background:"none",border:"none",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,padding:0 }}>Mot de passe oublié ?</button></div>}
+
+        {/* Errors/Info */}
+        {error && <div className="alert-banner alert-danger" style={{ marginBottom:14 }}>⚠️ {error}</div>}
+        {info  && <div className="alert-banner alert-success" style={{ marginBottom:14 }}>✅ {info}</div>}
+
+        {/* Submit */}
+        <button className="btn btn-primary" onClick={submit} disabled={loading||!email||!password||(view!=="login"&&pwdStrength.score<1)} style={{ width:"100%",justifyContent:"center",padding:"14px",fontSize:15 }}>
+          {loading ? <><span className="spin" style={{ display:"inline-block",fontSize:16 }}>⟳</span> En cours…</> :
+            view==="login"  ? "🔑 Se connecter" :
+            view==="join"   ? "🤝 Rejoindre l'espace" :
+            "🚀 Créer mon compte"}
         </button>
+
         <div className="auth-divider">Sécurisé par Firebase</div>
         <div className="auth-features">
-          {[["🔒","Chiffrement E2E"],["☁️","Sync temps réel"],["📱","PC & Mobile"]].map(([icon,label]) => (
+          {[["🔒","Chiffrement E2E"],["☁️","Sync temps réel"],["📱","PC & Mobile"],["💑","Espace partagé"]].map(([icon,label]) => (
             <div key={label} className="auth-feature-pill"><span>{icon}</span>{label}</div>
           ))}
         </div>
@@ -653,6 +770,7 @@ export default function App() {
   const [selMonth, setSelMonth] = useState(curMonthKey());
   const [modal, setModal] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeUID, setActiveUID] = useState(null); // UID whose data we're operating on
 
   const saveTimer = useRef(null);
   const isSaving = useRef(false);
@@ -661,32 +779,37 @@ export default function App() {
   useEffect(() => { const unsub = onAuthStateChanged(auth, u => setUser(u||null)); return unsub; }, []);
 
   useEffect(() => {
-    if (!user) { setReady(false); return; }
+    if (!user) { setReady(false); setActiveUID(null); return; }
     let unsub; let remoteTs = 0;
-    firestoreLoad(user.uid).then(saved => {
-      if (saved) { const { data:processed } = processDueBills(saved); setData(processed); remoteTs = saved._ts||0; }
-      setReady(true);
-      unsub = onSnapshot(getDocRef(user.uid), snap => {
-        if (!snap.exists()) return;
-        const remote = snap.data().budget; const ts = snap.data()._ts||0;
-        if (ts > remoteTs && !isSaving.current) { remoteTs = ts; const { data:processed } = processDueBills(remote); setData(processed); }
+    // Resolve active UID (own or partner's)
+    getLinkedUID(user.uid).then(async (linkedUID) => {
+      const uid = linkedUID || user.uid;
+      setActiveUID(uid);
+      firestoreLoad(uid).then(saved => {
+        if (saved) { const { data:processed } = processDueBills(saved); setData(processed); remoteTs = saved._ts||0; }
+        setReady(true);
+        unsub = onSnapshot(getDocRef(uid), snap => {
+          if (!snap.exists()) return;
+          const remote = snap.data().budget; const ts = snap.data()._ts||0;
+          if (ts > remoteTs && !isSaving.current) { remoteTs = ts; const { data:processed } = processDueBills(remote); setData(processed); }
+        });
       });
     });
     return () => unsub && unsub();
   }, [user]);
 
   useEffect(() => {
-    if (!ready || !user) return;
+    if (!ready || !user || !activeUID) return;
     const ver = ++localVersion.current; setSyncStatus("saving");
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       if (ver !== localVersion.current) return;
       isSaving.current = true;
-      const ok = await firestoreSave(user.uid, data);
+      const ok = await firestoreSave(activeUID, data);
       isSaving.current = false; setSyncStatus(ok?"synced":"error");
     }, 600);
     return () => clearTimeout(saveTimer.current);
-  }, [data, ready, user]);
+  }, [data, ready, user, activeUID]);
 
   useEffect(() => {
     if (!ready) return;
@@ -849,7 +972,7 @@ export default function App() {
             {page==="bills"     && <Bills     data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal}/>}
             {page==="stats"     && <Stats     data={data} selMonth={selMonth} mdata={mdata} allMonths={allMonths}/>}
             {page==="essence"   && <EssencePage/>}
-            {page==="settings"  && <SettingsPage data={data} update={update} setModal={setModal} user={user}/>}
+            {page==="settings"  && <SettingsPage data={data} update={update} setModal={setModal} user={user} activeUID={activeUID}/>}
           </div>
         </div>
 
@@ -1065,7 +1188,7 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
       )}
 
       {/* ══ PROFILE CARDS AMÉLIORÉES — toujours remplies ══ */}
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20 }}>
+      <div className="profile-cards-grid" style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20,overflow:"visible" }}>
         {data.profiles.map((p,i) => {
           const inc   = incomes[p.id]||0;
           const spent = transactions.filter(t=>t.profileId===p.id).reduce((s,t)=>s+t.amount,0);
@@ -1079,7 +1202,7 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
 
           return (
             <div key={p.id}
-              className="profile-card tip"
+              className="profile-card tip tip-below"
               data-tip={`Cliquer pour filtrer · ${p.name} · Revenu: ${fmt(inc)} · Dépenses: ${fmt(spent)}`}
               onClick={() => setBalanceView(sel?"global":p.id)}
               style={{
@@ -1220,9 +1343,40 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
               </>
             )}
             {isCurMonth && totalIncome>0 && dayOfMonth<daysInMonth && (
-              <div style={{ marginTop:14,padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:10,border:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                <span style={{ fontSize:12,color:"var(--text3)" }}>📅 Projection fin de mois</span>
-                <span style={{ fontSize:13,fontWeight:700,color:projectedExp>totalIncome?"var(--red)":"var(--orange)" }}>-{fmt(projectedExp)}</span>
+              <div style={{ marginTop:14,background:"rgba(251,191,36,0.04)",borderRadius:14,border:"1px solid rgba(251,191,36,0.2)",overflow:"hidden" }}>
+                <div style={{ padding:"10px 16px 0",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+                  <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                    <span style={{ fontSize:16 }}>📈</span>
+                    <span style={{ fontSize:12,fontWeight:700,color:"var(--yellow)" }}>Projection fin de mois</span>
+                  </div>
+                  <div style={{ display:"flex",alignItems:"center",gap:6,background:"rgba(251,191,36,0.1)",borderRadius:20,padding:"2px 9px",border:"1px solid rgba(251,191,36,0.25)" }}>
+                    <span style={{ fontSize:10,color:"var(--text3)",fontWeight:600 }}>{daysInMonth - dayOfMonth} jours restants</span>
+                  </div>
+                </div>
+                <div style={{ padding:"8px 16px 14px" }}>
+                  <div style={{ fontSize:10,color:"var(--text3)",lineHeight:1.6,marginBottom:10 }}>
+                    Si vous continuez à ce rythme ({fmt(Math.round(totalExp/dayOfMonth))}/jour), vos dépenses totales estimées à fin {new Date().toLocaleDateString("fr-FR",{month:"long"})} seront :
+                  </div>
+                  <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8 }}>
+                    <div style={{ textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"9px 6px" }}>
+                      <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:4 }}>Moy. / jour</div>
+                      <div style={{ fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:700,color:"var(--yellow)" }}>{fmt(Math.round(totalExp/dayOfMonth))}</div>
+                    </div>
+                    <div style={{ textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"9px 6px" }}>
+                      <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:4 }}>Dép. projetées</div>
+                      <div style={{ fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:700,color:projectedExp>totalIncome?"var(--red)":"var(--orange)" }}>-{fmt(Math.round(projectedExp))}</div>
+                    </div>
+                    <div style={{ textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"9px 6px" }}>
+                      <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,marginBottom:4 }}>Solde estimé</div>
+                      <div style={{ fontFamily:"'Fraunces',serif",fontSize:13,fontWeight:700,color:totalIncome-projectedExp>=0?"var(--green)":"var(--red)" }}>{fmt(Math.round(totalIncome-projectedExp))}</div>
+                    </div>
+                  </div>
+                  {projectedExp > totalIncome && (
+                    <div style={{ marginTop:8,padding:"6px 10px",background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:9,fontSize:11,color:"var(--red)",fontWeight:600 }}>
+                      ⚠️ À ce rythme, votre budget sera dépassé de {fmt(Math.round(projectedExp-totalIncome))} fin de mois.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1884,6 +2038,8 @@ function Bills({ data, update, selMonth, mdata, setModal }) {
     return bills;
   }, [data.bills,search,filterStatus,selMonth]);
 
+  const overdueList  = useMemo(() => allBillsFiltered.filter(b=>!b.paid?.[selMonth]&&b.dueDate&&new Date(b.dueDate)<new Date()).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate)), [allBillsFiltered,selMonth]);
+  const pendingList  = useMemo(() => allBillsFiltered.filter(b=>!b.paid?.[selMonth]&&!(b.dueDate&&new Date(b.dueDate)<new Date())).sort((a,b)=>{ if(!a.dueDate)return 1; if(!b.dueDate)return -1; return new Date(a.dueDate)-new Date(b.dueDate); }), [allBillsFiltered,selMonth]);
   const unpaid = useMemo(() => allBillsFiltered.filter(b=>!b.paid?.[selMonth]).sort((a,b)=>{ if(!a.dueDate)return 1; if(!b.dueDate)return -1; return new Date(a.dueDate)-new Date(b.dueDate); }), [allBillsFiltered,selMonth]);
   const paid        = useMemo(() => allBillsFiltered.filter(b=>b.paid?.[selMonth]), [allBillsFiltered,selMonth]);
   const totalUnpaid = useMemo(() => data.bills.filter(b=>!b.paid?.[selMonth]).reduce((s,b)=>s+(b.amount||0),0), [data.bills,selMonth]);
@@ -1947,15 +2103,32 @@ function Bills({ data, update, selMonth, mdata, setModal }) {
           </div>
         ) : (
           <>
-            {unpaid.length>0 && (
-              <div style={{ marginBottom:20 }}>
-                <div style={{ fontSize:11,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:10 }}>⏳ En attente ({unpaid.length})</div>
-                {unpaid.map((b,i) => <BillRow key={b.id} bill={b} selMonth={selMonth} onToggle={toggle} onDelete={del} profiles={data.profiles} idx={i} setModal={setModal}/>)}
+            {overdueList.length>0 && (
+              <div style={{ marginBottom:16 }}>
+                <div className="bill-section-hdr" style={{ color:"var(--red)" }}>
+                  <span>⚠️</span><span>En retard de paiement ({overdueList.length})</span>
+                </div>
+                <div style={{ background:"rgba(248,113,113,0.04)",borderRadius:14,border:"1px solid rgba(248,113,113,0.12)",padding:"2px 0",marginBottom:4 }}>
+                  <div style={{ padding:"8px 14px 4px",fontSize:11,color:"var(--red)",fontWeight:600,opacity:.8 }}>
+                    💳 Ces prélèvements automatiques ont dépassé leur date d'échéance. Marquez-les comme payés une fois débités.
+                  </div>
+                </div>
+                {overdueList.map((b,i) => <BillRow key={b.id} bill={b} selMonth={selMonth} onToggle={toggle} onDelete={del} profiles={data.profiles} idx={i} setModal={setModal}/>)}
+              </div>
+            )}
+            {pendingList.length>0 && (
+              <div style={{ marginBottom:16 }}>
+                <div className="bill-section-hdr" style={{ color:"var(--yellow)" }}>
+                  <span>⏳</span><span>En attente ({pendingList.length})</span>
+                </div>
+                {pendingList.map((b,i) => <BillRow key={b.id} bill={b} selMonth={selMonth} onToggle={toggle} onDelete={del} profiles={data.profiles} idx={i} setModal={setModal}/>)}
               </div>
             )}
             {paid.length>0 && (
               <div>
-                <div style={{ fontSize:11,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:10 }}>✅ Réglées ({paid.length})</div>
+                <div className="bill-section-hdr" style={{ color:"var(--green)" }}>
+                  <span>✅</span><span>Réglées ({paid.length})</span>
+                </div>
                 {paid.map((b,i) => <BillRow key={b.id} bill={b} selMonth={selMonth} onToggle={toggle} onDelete={del} profiles={data.profiles} idx={i} setModal={setModal}/>)}
               </div>
             )}
@@ -2014,11 +2187,26 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
   const dueDate   = bill.dueDate ? new Date(bill.dueDate) : null;
   const isOverdue = dueDate&&dueDate<new Date()&&!isPaid;
 
-  const fmtFull = iso => {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleDateString("fr-FR",{ day:"2-digit",month:"long",year:"numeric" }) + " à " + d.toLocaleTimeString("fr-FR",{ hour:"2-digit",minute:"2-digit" });
+  // Compute due date details
+  const getDueInfo = () => {
+    if (!dueDate) return null;
+    const now = new Date();
+    const diffMs = dueDate - now;
+    const diffDays = Math.ceil(diffMs / 86400000);
+    const dayNum = dueDate.getDate();
+    const monthName = dueDate.toLocaleDateString("fr-FR", { month:"long" });
+    const yearStr = dueDate.getFullYear() !== now.getFullYear() ? ` ${dueDate.getFullYear()}` : "";
+    const timeStr = dueDate.toLocaleTimeString("fr-FR",{ hour:"2-digit",minute:"2-digit" });
+    if (isOverdue && !isPaid) {
+      const daysLate = Math.abs(diffDays);
+      return { label:`${dayNum} ${monthName}${yearStr}`, time:timeStr, badge:`${daysLate} j de retard`, badgeColor:"var(--red)", badgeBg:"rgba(248,113,113,0.12)", badgeBorder:"rgba(248,113,113,0.3)", icon:"⚠️", countdown:null };
+    }
+    if (diffDays<=0) return { label:`${dayNum} ${monthName}${yearStr}`, time:timeStr, badge:"Aujourd'hui !", badgeColor:"var(--red)", badgeBg:"rgba(248,113,113,0.12)", badgeBorder:"rgba(248,113,113,0.3)", icon:"🔔", countdown:0 };
+    if (diffDays<=3) return { label:`${dayNum} ${monthName}${yearStr}`, time:timeStr, badge:`dans ${diffDays} j`, badgeColor:"var(--orange)", badgeBg:"rgba(251,146,60,0.12)", badgeBorder:"rgba(251,146,60,0.3)", icon:"⏱️", countdown:diffDays };
+    if (diffDays<=7) return { label:`${dayNum} ${monthName}${yearStr}`, time:timeStr, badge:`dans ${diffDays} j`, badgeColor:"var(--yellow)", badgeBg:"rgba(251,191,36,0.1)", badgeBorder:"rgba(251,191,36,0.28)", icon:"📅", countdown:diffDays };
+    return { label:`${dayNum} ${monthName}${yearStr}`, time:timeStr, badge:`dans ${diffDays} j`, badgeColor:"var(--text3)", badgeBg:"rgba(255,255,255,0.04)", badgeBorder:"var(--border)", icon:"📅", countdown:diffDays };
   };
+  const dueInfo = getDueInfo();
 
   const statusColor  = isPaid?"var(--green)":isOverdue?"var(--red)":"var(--yellow)";
   const statusBg     = isPaid?"rgba(74,222,128,0.08)":isOverdue?"rgba(248,113,113,0.08)":"rgba(251,191,36,0.06)";
@@ -2030,7 +2218,8 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
       style={{ marginBottom:14,background:"var(--glass)",border:`1px solid ${statusBorder}`,borderRadius:18,overflow:"hidden",opacity:isPaid?0.72:1,transition:"all .28s cubic-bezier(.4,0,.2,1)",boxShadow:isOverdue?"0 0 20px rgba(248,113,113,0.1)":undefined,position:"relative" }}>
       <div style={{ height:3,background:`linear-gradient(90deg,${statusColor},transparent)` }}/>
       <div style={{ padding:"16px 18px" }}>
-        <div style={{ display:"flex",alignItems:"center",gap:14,marginBottom:12 }}>
+        {/* Header */}
+        <div style={{ display:"flex",alignItems:"center",gap:14,marginBottom:14 }}>
           <div style={{ width:52,height:52,borderRadius:14,flexShrink:0,background:statusBg,border:`1px solid ${statusBorder}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26 }}>
             {bill.icon||"📋"}
           </div>
@@ -2046,23 +2235,42 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
           )}
         </div>
 
-        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"10px 14px",marginBottom:14,border:"1px solid var(--border)" }}>
+        {/* Info grid — compte + échéance améliorée */}
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"12px 14px",marginBottom:14,border:"1px solid var(--border)" }}>
+          {/* Compte */}
           <div>
-            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,marginBottom:4 }}>Compte</div>
+            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontWeight:700 }}>Compte</div>
             <div style={{ display:"flex",alignItems:"center",gap:7 }}>
               <div style={{ width:28,height:28,borderRadius:8,background:prof?`${prof.color}20`:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15 }}>{prof?.avatar||"🏦"}</div>
               <div style={{ fontWeight:700,fontSize:13,color:prof?.color||"var(--text)" }}>{prof?.name||"—"}</div>
             </div>
           </div>
+
+          {/* Échéance — redesignée */}
           <div>
-            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,marginBottom:4 }}>Échéance</div>
-            <div style={{ fontWeight:700,fontSize:12,color:isOverdue?"var(--red)":isPaid?"var(--text3)":"var(--text)",lineHeight:1.4 }}>
-              {fmtFull(bill.dueDate)}
-              {isOverdue && <div style={{ fontSize:10,color:"var(--red)",fontWeight:800,marginTop:3 }}>⚠️ Dépassée</div>}
-            </div>
+            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontWeight:700 }}>Échéance</div>
+            {dueInfo ? (
+              <div>
+                <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:5 }}>
+                  <span style={{ fontSize:14 }}>{dueInfo.icon}</span>
+                  <div>
+                    <div style={{ fontWeight:800,fontSize:13,color:isPaid?"var(--text3)":dueInfo.badgeColor,lineHeight:1.2 }}>{dueInfo.label}</div>
+                    <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>{dueInfo.time}</div>
+                  </div>
+                </div>
+                {!isPaid && (
+                  <span style={{ display:"inline-flex",alignItems:"center",gap:3,background:dueInfo.badgeBg,border:`1px solid ${dueInfo.badgeBorder}`,color:dueInfo.badgeColor,borderRadius:20,padding:"3px 9px",fontSize:10,fontWeight:800 }}>
+                    {dueInfo.badge}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontWeight:600,fontSize:12,color:"var(--text3)" }}>— Pas d'échéance</div>
+            )}
           </div>
         </div>
 
+        {/* Actions */}
         <div style={{ display:"flex",gap:8,alignItems:"center" }}>
           <button onClick={() => onToggle(bill.id)} style={{
             flex:1,padding:"11px",borderRadius:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:14,
@@ -2135,10 +2343,12 @@ function Stats({ data, selMonth, mdata, allMonths }) {
 
   const prevExp = useMemo(() => prevMonths.flatMap(k=>(data.monthsData[k]?.transactions||[])).reduce((s,t)=>s+t.amount,0), [prevMonths,data.monthsData]);
   const trendPct = prevExp>0 ? ((totalExp-prevExp)/prevExp)*100 : null;
+  const savingsRate = totalInc>0 ? Math.round(((totalInc-totalExp)/totalInc)*100) : null;
+  const avgPerDay = (() => { const today = new Date(); const days = period==="month"?today.getDate():months.length*30; return days>0?totalExp/days:0; })();
 
   const CT = ({ active,payload,label }) => {
     if (!active||!payload?.length) return null;
-    return <div className="rc-tooltip"><div style={{ fontWeight:700,marginBottom:4 }}>{label}</div>{payload.map((p,i)=><div key={i} style={{ color:p.color,fontSize:11 }}>{p.name}: {fmt(p.value)}</div>)}</div>;
+    return <div className="rc-tooltip"><div style={{ fontWeight:700,marginBottom:4,fontSize:12 }}>{label}</div>{payload.map((p,i)=><div key={i} style={{ color:p.color,fontSize:11 }}>{p.name}: {fmt(p.value)}</div>)}</div>;
   };
   const PT = ({ active,payload }) => {
     if (!active||!payload?.length) return null;
@@ -2146,91 +2356,112 @@ function Stats({ data, selMonth, mdata, allMonths }) {
     return <div className="rc-tooltip"><div style={{ fontWeight:700 }}>{d.name}</div><div style={{ color:d.payload.color }}>{fmt(d.value)}</div><div style={{ fontSize:10,color:"var(--text3)" }}>{totalExp>0?Math.round((d.value/totalExp)*100):0}%</div></div>;
   };
 
+  const KpiCard = ({ icon, label, value, color, gradient, sub }) => (
+    <div className="stat-kpi-card" style={{ background:`linear-gradient(135deg,${gradient[0]},${gradient[1]})`,border:`1px solid ${color}30`,boxShadow:`0 8px 24px ${color}18` }}>
+      <div style={{ fontSize:26,marginBottom:8 }}>{icon}</div>
+      <div style={{ fontSize:10,color:"rgba(255,255,255,0.55)",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700 }}>{label}</div>
+      <div className="stat-num" style={{ fontSize:22,color:"white",letterSpacing:-.5 }}>{value}</div>
+      {sub && <div style={{ fontSize:11,color:"rgba(255,255,255,0.45)",marginTop:4 }}>{sub}</div>}
+    </div>
+  );
+
   return (
     <div className="fade-up">
-      <div style={{ display:"flex",gap:10,marginBottom:20,alignItems:"center",flexWrap:"wrap" }}>
+      {/* Period + Tab controls */}
+      <div style={{ display:"flex",gap:10,marginBottom:22,alignItems:"center",flexWrap:"wrap" }}>
         <div className="filter-bar" style={{ flex:1 }}>
           {[{ id:"month",label:"Ce mois" },{ id:"quarter",label:"Trimestre" },{ id:"year",label:"Année" }].map(p => (
             <div key={p.id} className={`filter-chip ${period===p.id?"active":""}`} onClick={() => setPeriod(p.id)}>{p.label}</div>
           ))}
         </div>
         <div className="filter-bar">
-          {[{ id:"overview",label:"Vue d'ensemble" },{ id:"categories",label:"Catégories" },{ id:"timeline",label:"Historique" },{ id:"profiles",label:"Profils" }].map(t => (
+          {[{ id:"overview",icon:"🌐",label:"Vue d'ensemble" },{ id:"categories",icon:"🥧",label:"Catégories" },{ id:"timeline",icon:"📈",label:"Historique" },{ id:"profiles",icon:"👥",label:"Profils" }].map(t => (
             <div key={t.id} className={`filter-chip ${statTab===t.id?"active":""}`} onClick={() => setStatTab(t.id)}
               style={{ borderColor:statTab===t.id?"rgba(96,165,250,0.5)":"var(--border)",background:statTab===t.id?"rgba(96,165,250,0.12)":"var(--glass)",color:statTab===t.id?"var(--blue)":"var(--text2)" }}>
-              {t.label}
+              <span style={{ fontSize:14 }}>{t.icon}</span>{t.label}
             </div>
           ))}
         </div>
       </div>
 
       {statTab==="overview" && (
-        <div className="content-grid">
-          <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
-            <div className="grid-4">
-              {[
-                { label:"Revenus",      val:`+${fmtCompact(totalInc)}`,color:"var(--green)",  icon:"💵" },
-                { label:"Dépenses",     val:`-${fmtCompact(totalExp)}`,color:"var(--red)",    icon:"💸" },
-                { label:"Solde net",    val:fmtCompact(totalInc-totalExp),color:totalInc>=totalExp?"var(--green)":"var(--red)",icon:"⚖️" },
-                { label:"Transactions", val:allTx.length,               color:"var(--purple)",icon:"🧾" },
-              ].map(s => (
-                <div key={s.label} className="card" style={{ textAlign:"center",padding:16 }}>
-                  <div style={{ fontSize:22,marginBottom:6 }}>{s.icon}</div>
-                  <div style={{ fontSize:10,color:"var(--text3)",marginBottom:5,textTransform:"uppercase",letterSpacing:.8 }}>{s.label}</div>
-                  <div className="stat-num" style={{ fontSize:15,color:s.color }}>{s.val}</div>
-                </div>
-              ))}
-            </div>
-            {trendPct!==null && (
-              <div className={`alert-banner ${trendPct>0?"alert-warning":"alert-success"}`}>
-                {trendPct>0?"📈":"📉"}
-                <span>Dépenses {trendPct>0?"en hausse":"en baisse"} de <strong>{Math.abs(Math.round(trendPct))}%</strong> vs mois précédent</span>
-              </div>
-            )}
-            <div className="card">
-              <div style={{ fontWeight:700,fontSize:13,marginBottom:14 }}>Revenus vs Dépenses — 12 mois</div>
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={timelineData}>
-                  <defs>
-                    <linearGradient id="gR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4ade80" stopOpacity={0.25}/><stop offset="95%" stopColor="#4ade80" stopOpacity={0}/></linearGradient>
-                    <linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.25}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/></linearGradient>
-                  </defs>
-                  <XAxis dataKey="month" tick={{ fill:"rgba(237,233,248,0.35)",fontSize:10 }} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{ fill:"rgba(237,233,248,0.35)",fontSize:10 }} axisLine={false} tickLine={false} width={72} tickFormatter={v=>v>0?fmtCompact(v):"."}/>
-                  <Tooltip content={<CT/>}/>
-                  <Area type="monotone" dataKey="revenus"  stroke="#4ade80" strokeWidth={2} fill="url(#gR)" name="Revenus"/>
-                  <Area type="monotone" dataKey="dépenses" stroke="#f87171" strokeWidth={2} fill="url(#gE)" name="Dépenses"/>
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+        <div>
+          {/* KPI Cards row */}
+          <div className="grid-4" style={{ marginBottom:20 }}>
+            <KpiCard icon="💵" label="Revenus" value={`+${fmtCompact(totalInc)}`} color="#4ade80" gradient={["#052e16","#065f46"]} sub={period==="month"?monthLabel(selMonth):undefined}/>
+            <KpiCard icon="💸" label="Dépenses" value={`-${fmtCompact(totalExp)}`} color="#f87171" gradient={["#2d0000","#450a0a"]} sub={allTx.length+" transactions"}/>
+            <KpiCard icon="⚖️" label="Solde net" value={fmtCompact(totalInc-totalExp)} color={totalInc>=totalExp?"#4ade80":"#f87171"} gradient={totalInc>=totalExp?["#052e16","#065f46"]:["#2d0000","#450a0a"]} sub={savingsRate!==null?`Épargne: ${savingsRate}%`:undefined}/>
+            <KpiCard icon="📅" label="Moy. / jour" value={fmtCompact(avgPerDay)} color="#a78bfa" gradient={["#1e0a3c","#2d1b69"]} sub={trendPct!==null?`${trendPct>0?"↑":"↓"} ${Math.abs(Math.round(trendPct))}% vs mois préc.`:undefined}/>
           </div>
-          <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
-            {pieData.length>0 && (
+          {trendPct!==null && (
+            <div className={`alert-banner ${trendPct>0?"alert-warning":"alert-success"}`} style={{ marginBottom:18 }}>
+              {trendPct>0?"📈":"📉"}<span>Dépenses {trendPct>0?"en hausse de":"en baisse de"} <strong>{Math.abs(Math.round(trendPct))}%</strong> par rapport au mois précédent ({fmt(prevExp)})</span>
+            </div>
+          )}
+          <div className="content-grid">
+            <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
               <div className="card">
-                <div style={{ fontWeight:700,fontSize:13,marginBottom:10 }}>Répartition</div>
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
-                      {pieData.map((e,i) => <Cell key={i} fill={e.color} stroke="transparent"/>)}
-                    </Pie>
-                    <Tooltip content={<PT/>}/>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ display:"flex",flexWrap:"wrap",gap:6,marginTop:4 }}>
-                  {pieData.slice(0,6).map((d,i) => <div key={i} style={{ display:"flex",alignItems:"center",gap:4,fontSize:11 }}><div style={{ width:8,height:8,borderRadius:2,background:d.color }}/><span style={{ color:"var(--text3)" }}>{d.name}</span></div>)}
+                <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
+                  <div style={{ fontWeight:800,fontSize:14 }}>📊 Revenus vs Dépenses — 12 mois</div>
                 </div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={timelineData} margin={{ top:4,right:4,left:0,bottom:0 }}>
+                    <defs>
+                      <linearGradient id="gR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/><stop offset="95%" stopColor="#4ade80" stopOpacity={0}/></linearGradient>
+                      <linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.3}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/></linearGradient>
+                    </defs>
+                    <XAxis dataKey="month" tick={{ fill:"rgba(237,233,248,0.35)",fontSize:10 }} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{ fill:"rgba(237,233,248,0.35)",fontSize:10 }} axisLine={false} tickLine={false} width={72} tickFormatter={v=>v>0?fmtCompact(v):"."}/>
+                    <Tooltip content={<CT/>}/>
+                    <Area type="monotone" dataKey="revenus"  stroke="#4ade80" strokeWidth={2.5} fill="url(#gR)" name="Revenus" dot={false}/>
+                    <Area type="monotone" dataKey="dépenses" stroke="#f87171" strokeWidth={2.5} fill="url(#gE)" name="Dépenses" dot={false}/>
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-            )}
-            <div className="card">
-              <div style={{ fontWeight:700,fontSize:13,marginBottom:12 }}>Solde mensuel</div>
-              <ResponsiveContainer width="100%" height={150}>
-                <BarChart data={timelineData}>
-                  <XAxis dataKey="month" tick={{ fill:"rgba(237,233,248,0.35)",fontSize:9 }} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{ fill:"rgba(237,233,248,0.35)",fontSize:9 }} axisLine={false} tickLine={false} width={62} tickFormatter={v=>fmtCompact(v)}/>
-                  <Tooltip content={<CT/>}/>
-                  <Bar dataKey="solde" name="Solde" radius={[5,5,0,0]}>{timelineData.map((e,i) => <Cell key={i} fill={e.solde>=0?"#4ade80":"#f87171"}/>)}</Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {/* Top 5 catégories */}
+              {pieData.length>0 && (
+                <div className="card">
+                  <div style={{ fontWeight:800,fontSize:14,marginBottom:14 }}>🏆 Top catégories</div>
+                  {pieData.slice(0,5).map((d,i) => (
+                    <div key={i} style={{ display:"flex",alignItems:"center",gap:10,marginBottom:12 }}>
+                      <div style={{ width:9,height:9,borderRadius:3,background:d.color,flexShrink:0 }}/>
+                      <span style={{ flex:1,fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{d.name}</span>
+                      <span style={{ fontSize:11,color:"var(--text3)",background:"rgba(255,255,255,0.05)",borderRadius:20,padding:"2px 8px",fontWeight:700,flexShrink:0 }}>{totalExp>0?Math.round((d.value/totalExp)*100):0}%</span>
+                      <span style={{ fontWeight:800,fontSize:13,color:d.color,flexShrink:0 }}>{fmt(d.value)}</span>
+                      <div className="progress-track" style={{ width:60,height:5,flexShrink:0 }}><div className="progress-fill" style={{ width:`${totalExp>0?(d.value/totalExp)*100:0}%`,background:d.color }}/></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
+              {pieData.length>0 && (
+                <div className="card">
+                  <div style={{ fontWeight:800,fontSize:14,marginBottom:10 }}>🥧 Répartition</div>
+                  <ResponsiveContainer width="100%" height={190}>
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
+                        {pieData.map((e,i) => <Cell key={i} fill={e.color} stroke="transparent"/>)}
+                      </Pie>
+                      <Tooltip content={<PT/>}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div style={{ display:"flex",flexWrap:"wrap",gap:5,marginTop:4 }}>
+                    {pieData.slice(0,6).map((d,i) => <div key={i} style={{ display:"flex",alignItems:"center",gap:4,fontSize:11 }}><div style={{ width:8,height:8,borderRadius:2,background:d.color }}/><span style={{ color:"var(--text3)" }}>{d.name}</span></div>)}
+                  </div>
+                </div>
+              )}
+              <div className="card">
+                <div style={{ fontWeight:800,fontSize:14,marginBottom:12 }}>📊 Solde mensuel</div>
+                <ResponsiveContainer width="100%" height={150}>
+                  <BarChart data={timelineData} margin={{ top:4,right:4,left:0,bottom:0 }}>
+                    <XAxis dataKey="month" tick={{ fill:"rgba(237,233,248,0.35)",fontSize:9 }} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{ fill:"rgba(237,233,248,0.35)",fontSize:9 }} axisLine={false} tickLine={false} width={62} tickFormatter={v=>fmtCompact(v)}/>
+                    <Tooltip content={<CT/>}/>
+                    <Bar dataKey="solde" name="Solde" radius={[5,5,0,0]}>{timelineData.map((e,i) => <Cell key={i} fill={e.solde>=0?"#4ade80":"#f87171"}/>)}</Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </div>
@@ -2239,28 +2470,33 @@ function Stats({ data, selMonth, mdata, allMonths }) {
       {statTab==="categories" && (
         <div className="content-grid">
           <div className="card">
-            <div style={{ fontWeight:700,fontSize:13,marginBottom:14 }}>Détail par catégorie</div>
-            {pieData.length===0 ? <div className="empty-state"><div className="empty-icon">📊</div>Aucune donnée</div>
+            <div style={{ fontWeight:800,fontSize:14,marginBottom:20 }}>🔍 Analyse par catégorie</div>
+            {pieData.length===0 ? <div className="empty-state"><div className="empty-icon">📊</div>Aucune dépense</div>
               : pieData.map((d,i) => (
-                <div key={i} style={{ marginBottom:14 }}>
-                  <div style={{ display:"flex",justifyContent:"space-between",marginBottom:5,fontSize:13 }}>
-                    <span style={{ fontWeight:600 }}>{d.name}</span>
-                    <div style={{ display:"flex",gap:12 }}>
-                      <span style={{ color:"var(--text3)",fontSize:11 }}>{totalExp>0?Math.round((d.value/totalExp)*100):0}%</span>
-                      <span style={{ fontWeight:800,color:d.color }}>{fmt(d.value)}</span>
+                <div key={i} style={{ marginBottom:18 }}>
+                  <div style={{ display:"flex",justifyContent:"space-between",marginBottom:7,fontSize:13 }}>
+                    <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                      <div style={{ width:32,height:32,borderRadius:9,background:`${d.color}18`,border:`1px solid ${d.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>{d.name.split(" ")[0]}</div>
+                      <span style={{ fontWeight:700 }}>{d.name.split(" ").slice(1).join(" ")}</span>
+                    </div>
+                    <div style={{ display:"flex",gap:10,alignItems:"center" }}>
+                      <span style={{ color:"var(--text3)",fontSize:11,background:"rgba(255,255,255,0.06)",borderRadius:20,padding:"2px 8px",fontWeight:700 }}>{totalExp>0?Math.round((d.value/totalExp)*100):0}%</span>
+                      <span style={{ fontWeight:800,color:d.color,fontSize:15 }}>{fmt(d.value)}</span>
                     </div>
                   </div>
-                  <div className="progress-track" style={{ height:7 }}><div className="progress-fill" style={{ width:`${totalExp>0?(d.value/totalExp)*100:0}%`,background:d.color }}/></div>
+                  <div className="progress-track" style={{ height:8,borderRadius:20 }}>
+                    <div className="progress-fill" style={{ width:`${totalExp>0?(d.value/totalExp)*100:0}%`,background:`linear-gradient(90deg,${d.color},${d.color}88)`,borderRadius:20 }}/>
+                  </div>
                 </div>
               ))
             }
           </div>
           {pieData.length>0 && (
             <div className="card">
-              <div style={{ fontWeight:700,fontSize:13,marginBottom:10 }}>Distribution</div>
-              <ResponsiveContainer width="100%" height={280}>
+              <div style={{ fontWeight:800,fontSize:14,marginBottom:10 }}>🥧 Distribution</div>
+              <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" outerRadius={110} paddingAngle={2} dataKey="value">
+                  <Pie data={pieData} cx="50%" cy="50%" outerRadius={120} paddingAngle={3} dataKey="value">
                     {pieData.map((e,i) => <Cell key={i} fill={e.color} stroke="transparent"/>)}
                   </Pie>
                   <Tooltip content={<PT/>}/>
@@ -2275,29 +2511,29 @@ function Stats({ data, selMonth, mdata, allMonths }) {
       {statTab==="timeline" && (
         <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
           <div className="card">
-            <div style={{ fontWeight:700,fontSize:13,marginBottom:14 }}>Évolution sur 12 mois</div>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={timelineData}>
+            <div style={{ fontWeight:800,fontSize:14,marginBottom:16 }}>📈 Évolution sur 12 mois</div>
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={timelineData} margin={{ top:4,right:4,left:0,bottom:0 }}>
                 <defs>
-                  <linearGradient id="gR2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/><stop offset="95%" stopColor="#4ade80" stopOpacity={0}/></linearGradient>
-                  <linearGradient id="gE2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.3}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/></linearGradient>
+                  <linearGradient id="gR2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4ade80" stopOpacity={0.35}/><stop offset="95%" stopColor="#4ade80" stopOpacity={0}/></linearGradient>
+                  <linearGradient id="gE2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.35}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/></linearGradient>
                 </defs>
                 <XAxis dataKey="month" tick={{ fill:"rgba(237,233,248,0.35)",fontSize:11 }} axisLine={false} tickLine={false}/>
                 <YAxis tick={{ fill:"rgba(237,233,248,0.35)",fontSize:11 }} axisLine={false} tickLine={false} width={75} tickFormatter={v=>fmtCompact(v)}/>
                 <Tooltip content={<CT/>}/><Legend formatter={v => <span style={{ fontSize:12,color:"var(--text2)" }}>{v}</span>}/>
-                <Area type="monotone" dataKey="revenus"  stroke="#4ade80" strokeWidth={2.5} fill="url(#gR2)" name="Revenus"/>
-                <Area type="monotone" dataKey="dépenses" stroke="#f87171" strokeWidth={2.5} fill="url(#gE2)" name="Dépenses"/>
+                <Area type="monotone" dataKey="revenus"  stroke="#4ade80" strokeWidth={2.5} fill="url(#gR2)" name="Revenus" dot={false}/>
+                <Area type="monotone" dataKey="dépenses" stroke="#f87171" strokeWidth={2.5} fill="url(#gE2)" name="Dépenses" dot={false}/>
               </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="card">
-            <div style={{ fontWeight:700,fontSize:13,marginBottom:14 }}>Solde mensuel</div>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={timelineData}>
+            <div style={{ fontWeight:800,fontSize:14,marginBottom:14 }}>💹 Solde net mensuel</div>
+            <ResponsiveContainer width="100%" height={190}>
+              <BarChart data={timelineData} margin={{ top:4,right:4,left:0,bottom:0 }}>
                 <XAxis dataKey="month" tick={{ fill:"rgba(237,233,248,0.35)",fontSize:11 }} axisLine={false} tickLine={false}/>
                 <YAxis tick={{ fill:"rgba(237,233,248,0.35)",fontSize:11 }} axisLine={false} tickLine={false} width={75} tickFormatter={v=>fmtCompact(v)}/>
                 <Tooltip content={<CT/>}/>
-                <Bar dataKey="solde" name="Solde" radius={[6,6,0,0]}>{timelineData.map((e,i) => <Cell key={i} fill={e.solde>=0?"#4ade80":"#f87171"}/>)}</Bar>
+                <Bar dataKey="solde" name="Solde net" radius={[6,6,0,0]}>{timelineData.map((e,i) => <Cell key={i} fill={e.solde>=0?"#4ade80":"#f87171"}/>)}</Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -2308,8 +2544,18 @@ function Stats({ data, selMonth, mdata, allMonths }) {
             const worst = withData.reduce((a,b)=>a.solde<b.solde?a:b);
             return (
               <div className="grid-2">
-                <div className="card" style={{ borderColor:"rgba(74,222,128,0.2)",textAlign:"center" }}><div style={{ fontSize:28,marginBottom:6 }}>🏆</div><div style={{ fontSize:11,color:"var(--text3)",marginBottom:4 }}>Meilleur mois</div><div style={{ fontWeight:700,fontSize:14 }}>{best.month}</div><div style={{ fontWeight:800,color:"var(--green)",fontSize:16 }}>{fmt(best.solde)}</div></div>
-                <div className="card" style={{ borderColor:"rgba(248,113,113,0.2)",textAlign:"center" }}><div style={{ fontSize:28,marginBottom:6 }}>📉</div><div style={{ fontSize:11,color:"var(--text3)",marginBottom:4 }}>Mois difficile</div><div style={{ fontWeight:700,fontSize:14 }}>{worst.month}</div><div style={{ fontWeight:800,color:"var(--red)",fontSize:16 }}>{fmt(worst.solde)}</div></div>
+                <div className="card" style={{ borderColor:"rgba(74,222,128,0.25)",background:"rgba(74,222,128,0.04)",textAlign:"center" }}>
+                  <div style={{ fontSize:32,marginBottom:8 }}>🏆</div>
+                  <div style={{ fontSize:11,color:"var(--text3)",marginBottom:4 }}>Meilleur mois</div>
+                  <div style={{ fontWeight:800,fontSize:15 }}>{best.month}</div>
+                  <div style={{ fontWeight:900,color:"var(--green)",fontSize:18,marginTop:4 }}>{fmt(best.solde)}</div>
+                </div>
+                <div className="card" style={{ borderColor:"rgba(248,113,113,0.25)",background:"rgba(248,113,113,0.04)",textAlign:"center" }}>
+                  <div style={{ fontSize:32,marginBottom:8 }}>📉</div>
+                  <div style={{ fontSize:11,color:"var(--text3)",marginBottom:4 }}>Mois difficile</div>
+                  <div style={{ fontWeight:800,fontSize:15 }}>{worst.month}</div>
+                  <div style={{ fontWeight:900,color:"var(--red)",fontSize:18,marginTop:4 }}>{fmt(worst.solde)}</div>
+                </div>
               </div>
             );
           })()}
@@ -2319,17 +2565,29 @@ function Stats({ data, selMonth, mdata, allMonths }) {
       {statTab==="profiles" && (
         <div className="content-grid">
           {profBreakdown.map(p => (
-            <div key={p.id} className="card">
-              <div style={{ display:"flex",alignItems:"center",gap:14,marginBottom:16 }}>
-                <div style={{ fontSize:46 }}>{p.avatar}</div>
-                <div><div style={{ fontWeight:800,fontSize:18 }}>{p.name}</div><div style={{ fontSize:12,color:p.color }}>Solde : <strong>{fmt(p.balance)}</strong></div></div>
+            <div key={p.id} className="card" style={{ borderColor:`${p.color}25`,background:`${p.color}04` }}>
+              <div style={{ display:"flex",alignItems:"center",gap:14,marginBottom:18 }}>
+                <div style={{ width:56,height:56,borderRadius:16,background:`${p.color}18`,border:`2px solid ${p.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28 }}>{p.avatar}</div>
+                <div>
+                  <div style={{ fontWeight:900,fontSize:18,color:p.color }}>{p.name}</div>
+                  <div style={{ fontSize:12,color:"var(--text3)" }}>Solde : <strong style={{ color:p.balance>=0?"var(--green)":"var(--red)" }}>{fmt(p.balance)}</strong></div>
+                </div>
               </div>
-              <div className="grid-2" style={{ marginBottom:14 }}>
-                <div style={{ background:"rgba(74,222,128,0.08)",borderRadius:12,padding:"10px",textAlign:"center" }}><div style={{ fontSize:10,color:"var(--text3)",marginBottom:3 }}>Revenus</div><div style={{ fontWeight:800,color:"var(--green)",fontSize:16 }}>+{fmt(p.inc)}</div></div>
-                <div style={{ background:"rgba(248,113,113,0.08)",borderRadius:12,padding:"10px",textAlign:"center" }}><div style={{ fontSize:10,color:"var(--text3)",marginBottom:3 }}>Dépenses</div><div style={{ fontWeight:800,color:"var(--red)",fontSize:16 }}>-{fmt(p.spent)}</div></div>
+              <div className="grid-2" style={{ marginBottom:16 }}>
+                <div style={{ background:"rgba(74,222,128,0.08)",borderRadius:12,padding:"12px",textAlign:"center",border:"1px solid rgba(74,222,128,0.15)" }}>
+                  <div style={{ fontSize:10,color:"var(--text3)",marginBottom:4,textTransform:"uppercase",letterSpacing:.5 }}>Revenus</div>
+                  <div style={{ fontWeight:900,color:"var(--green)",fontSize:18 }}>+{fmt(p.inc)}</div>
+                </div>
+                <div style={{ background:"rgba(248,113,113,0.08)",borderRadius:12,padding:"12px",textAlign:"center",border:"1px solid rgba(248,113,113,0.15)" }}>
+                  <div style={{ fontSize:10,color:"var(--text3)",marginBottom:4,textTransform:"uppercase",letterSpacing:.5 }}>Dépenses</div>
+                  <div style={{ fontWeight:900,color:"var(--red)",fontSize:18 }}>-{fmt(p.spent)}</div>
+                </div>
               </div>
               {p.inc>0 && (<>
-                <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--text3)",marginBottom:5 }}><span>Budget utilisé</span><span style={{ fontWeight:700,color:p.spent>p.inc?"var(--red)":"var(--green)" }}>{Math.round((p.spent/p.inc)*100)}%</span></div>
+                <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--text3)",marginBottom:6 }}>
+                  <span>Budget utilisé</span>
+                  <span style={{ fontWeight:800,color:p.spent>p.inc?"var(--red)":"var(--green)" }}>{Math.round((p.spent/p.inc)*100)}%</span>
+                </div>
                 <div className="progress-track" style={{ height:8 }}><div className="progress-fill" style={{ width:`${Math.min(100,(p.spent/p.inc)*100)}%`,background:p.color,boxShadow:`0 0 8px ${p.color}50` }}/></div>
               </>)}
             </div>
@@ -2756,6 +3014,183 @@ function AddRecurringIncomeModal({ close, data, update }) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  SETTINGS PAGE
+// ═══════════════════════════════════════════════════════════
+function SettingsPage({ data, update, setModal, user, activeUID }) {
+  const [tab, setTab] = useState("profiles");
+  const [inviteCode, setInviteCode] = useState(data.inviteCode || "");
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [pwdOld, setPwdOld] = useState(""); const [pwdNew, setPwdNew] = useState(""); const [pwdErr, setPwdErr] = useState(""); const [pwdOk, setPwdOk] = useState(false); const [pwdLoading, setPwdLoading] = useState(false);
+
+  const genCode = async () => {
+    setCodeLoading(true);
+    const code = generateInviteCode();
+    const ok = await saveInviteCode(activeUID || user.uid, code);
+    if (ok) {
+      update(d => { d.inviteCode = code; });
+      setInviteCode(code);
+    }
+    setCodeLoading(false);
+  };
+
+  const copyCode = () => {
+    if (!inviteCode) return;
+    navigator.clipboard?.writeText(inviteCode).then(() => { setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000); });
+  };
+
+  const changePassword = async () => {
+    if (!pwdOld || !pwdNew) { setPwdErr("Remplissez les deux champs."); return; }
+    if (pwdNew.length < 6) { setPwdErr("Nouveau mot de passe trop court (6 caractères min)."); return; }
+    setPwdLoading(true); setPwdErr(""); setPwdOk(false);
+    try {
+      const cred = EmailAuthProvider.credential(user.email, pwdOld);
+      await reauthenticateWithCredential(user, cred);
+      await updatePassword(user, pwdNew);
+      setPwdOk(true); setPwdOld(""); setPwdNew("");
+    } catch (e) {
+      setPwdErr(e.code==="auth/wrong-password"?"Mot de passe actuel incorrect.":"Erreur : "+e.message);
+    }
+    setPwdLoading(false);
+  };
+
+  const pwdStr = getPasswordStrength(pwdNew);
+
+  return (
+    <div className="fade-up">
+      <div className="tab-bar" style={{ marginBottom:20 }}>
+        {[["profiles","👥","Profils"],["categories","🏷️","Catégories"],["account","🔐","Compte"]].map(([id,icon,label]) => (
+          <button key={id} className={`tab-item ${tab===id?"active":""}`} onClick={() => setTab(id)}>
+            <span style={{ fontSize:16 }}>{icon}</span>{label}
+          </button>
+        ))}
+      </div>
+
+      {tab==="profiles" && (
+        <div className="content-grid">
+          <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
+            {data.profiles.map(p => (
+              <div key={p.id} className="card" style={{ display:"flex",alignItems:"center",gap:16,borderColor:`${p.color}25` }}>
+                <div style={{ width:52,height:52,borderRadius:15,background:`${p.color}18`,border:`2px solid ${p.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26 }}>{p.avatar}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:800,fontSize:16,color:p.color }}>{p.name}</div>
+                  <div style={{ fontSize:12,color:"var(--text3)",marginTop:2 }}>{p.id==="common"?"Compte commun":"Compte personnel"} · {p.color}</div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => setModal({ type:"editProfile",profileId:p.id })}>✏️ Modifier</button>
+              </div>
+            ))}
+          </div>
+          <div className="card">
+            <div style={{ fontWeight:700,fontSize:13,marginBottom:12 }}>ℹ️ À propos des profils</div>
+            <div style={{ fontSize:12,color:"var(--text2)",lineHeight:1.7 }}>
+              Les profils représentent les membres du foyer. Chaque dépense est attribuée à un profil. Le compte commun est partagé entre les deux partenaires.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab==="categories" && (
+        <div className="grid-2">
+          {data.categories.map(c => (
+            <div key={c.id} className="card card-sm" style={{ display:"flex",alignItems:"center",gap:12,borderColor:`${c.color}22` }}>
+              <div style={{ width:40,height:40,borderRadius:11,background:`${c.color}18`,border:`1px solid ${c.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>{c.icon}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700,color:c.color }}>{c.name}</div>
+                <div style={{ fontSize:10,color:"var(--text3)",marginTop:2 }}>ID: {c.id}</div>
+              </div>
+              <div style={{ width:14,height:14,borderRadius:"50%",background:c.color,flexShrink:0 }}/>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab==="account" && (
+        <div className="content-grid">
+          {/* Partner invite code */}
+          <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
+            <div className="card" style={{ borderColor:"rgba(167,139,250,0.2)" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:14 }}>
+                <div style={{ width:38,height:38,borderRadius:11,background:"rgba(167,139,250,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>💑</div>
+                <div>
+                  <div style={{ fontWeight:800,fontSize:14 }}>Code d'invitation partenaire</div>
+                  <div style={{ fontSize:11,color:"var(--text3)" }}>Partagez ce code avec votre partenaire pour accéder au même espace</div>
+                </div>
+              </div>
+              {inviteCode ? (
+                <div>
+                  <div style={{ display:"flex",gap:8,marginBottom:10 }}>
+                    <div style={{ flex:1,background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:12,padding:"14px",textAlign:"center",fontFamily:"'Fraunces',serif",fontSize:28,fontWeight:900,letterSpacing:8,color:"var(--purple)" }}>{inviteCode}</div>
+                  </div>
+                  <div style={{ display:"flex",gap:8 }}>
+                    <button className="btn btn-primary" style={{ flex:1 }} onClick={copyCode}>{codeCopied?"✅ Copié !":"📋 Copier le code"}</button>
+                    <button className="btn btn-ghost btn-sm" onClick={genCode} disabled={codeLoading}>🔄</button>
+                  </div>
+                  <div style={{ fontSize:11,color:"var(--text3)",marginTop:10,lineHeight:1.6 }}>
+                    ℹ️ Votre partenaire doit créer un compte via "Rejoindre" et entrer ce code.
+                  </div>
+                </div>
+              ) : (
+                <button className="btn btn-primary" style={{ width:"100%" }} onClick={genCode} disabled={codeLoading}>
+                  {codeLoading ? "Génération…" : "✨ Générer un code d'invitation"}
+                </button>
+              )}
+            </div>
+
+            {/* Change password */}
+            <div className="card">
+              <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:16 }}>
+                <div style={{ width:38,height:38,borderRadius:11,background:"rgba(96,165,250,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>🔐</div>
+                <div>
+                  <div style={{ fontWeight:800,fontSize:14 }}>Changer le mot de passe</div>
+                  <div style={{ fontSize:11,color:"var(--text3)" }}>Compte : {user?.email}</div>
+                </div>
+              </div>
+              <div style={{ marginBottom:12 }}>
+                <label>Mot de passe actuel</label>
+                <input type="password" value={pwdOld} onChange={e=>setPwdOld(e.target.value)} placeholder="••••••••" autoComplete="current-password"/>
+              </div>
+              <div style={{ marginBottom:8 }}>
+                <label>Nouveau mot de passe</label>
+                <input type="password" value={pwdNew} onChange={e=>setPwdNew(e.target.value)} placeholder="Minimum 6 caractères" autoComplete="new-password"/>
+              </div>
+              {pwdNew.length>0 && (
+                <div style={{ marginBottom:12 }}>
+                  <div className="pwd-strength">{[1,2,3,4,5].map(i => <div key={i} className="pwd-strength-bar" style={{ background:i<=pwdStr.score?pwdStr.color:"rgba(255,255,255,0.07)" }}/>)}</div>
+                  {pwdStr.label && <div style={{ fontSize:11,color:pwdStr.color,marginTop:4,textAlign:"right",fontWeight:600 }}>{pwdStr.label}</div>}
+                </div>
+              )}
+              {pwdErr && <div className="alert-banner alert-danger" style={{ marginBottom:12 }}>⚠️ {pwdErr}</div>}
+              {pwdOk  && <div className="alert-banner alert-success" style={{ marginBottom:12 }}>✅ Mot de passe modifié avec succès !</div>}
+              <button className="btn btn-primary" style={{ width:"100%" }} onClick={changePassword} disabled={pwdLoading||!pwdOld||!pwdNew}>
+                {pwdLoading ? "Modification…" : "🔑 Mettre à jour le mot de passe"}
+              </button>
+            </div>
+          </div>
+
+          {/* Account info */}
+          <div className="card">
+            <div style={{ fontWeight:700,fontSize:13,marginBottom:14 }}>👤 Mon compte</div>
+            <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
+              {[
+                { label:"Email",    val:user?.email,       icon:"✉️" },
+                { label:"UID",      val:user?.uid?.slice(0,12)+"…", icon:"🔑" },
+                { label:"Données",  val:activeUID===user?.uid?"Votre espace":"Espace partagé", icon:"💾" },
+              ].map(({ label,val,icon }) => (
+                <div key={label} style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:11,border:"1px solid var(--border)" }}>
+                  <span style={{ fontSize:16 }}>{icon}</span>
+                  <span style={{ fontSize:12,color:"var(--text3)",fontWeight:600,flex:1 }}>{label}</span>
+                  <span style={{ fontSize:12,fontWeight:700,color:"var(--text2)" }}>{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
 //  ESSENCE — Prix carburant via API Claude + web search
 // ═══════════════════════════════════════════════════════════
 function EssencePage() {
@@ -2954,7 +3389,7 @@ function EssencePage() {
                 <div style={{ marginTop:2 }}>Maj {pad(lastUpdate.getHours())}:{pad(lastUpdate.getMinutes())}</div>
               </div>
             )}
-            <button onClick={fetchAll} disabled={loading}
+            <button onClick={doFetchAll} disabled={loading}
               style={{ display:"flex", alignItems:"center", gap:7, padding:"10px 18px", borderRadius:12, border:"1px solid rgba(251,191,36,0.4)", background:"rgba(251,191,36,0.1)", color:"var(--yellow)", cursor:loading?"not-allowed":"pointer", fontSize:13, fontWeight:700, fontFamily:"'Outfit',sans-serif", transition:"all .2s", opacity:loading?.6:1 }}>
               <span className={loading?"spin":""} style={{ fontSize:16 }}>🔄</span>
               {loading ? "Chargement…" : "Actualiser"}
@@ -2967,8 +3402,12 @@ function EssencePage() {
       {Object.entries(errors).map(([sid, msg]) => {
         const s = STATIONS.find(x => x.id === sid);
         return (
-          <div key={sid} className="alert-banner alert-warning" style={{ marginBottom:10 }}>
-            ⚠️ {s?.icon} {s?.label} : {msg}
+          <div key={sid} className="alert-banner alert-warning" style={{ marginBottom:10,flexDirection:"column",alignItems:"flex-start" }}>
+            <div style={{ fontWeight:700 }}>⚠️ {s?.icon} {s?.label} : Impossible de charger les prix</div>
+            <div style={{ fontSize:11,opacity:.8,marginTop:4 }}>{msg}</div>
+            <div style={{ fontSize:11,color:"var(--yellow)",opacity:.7,marginTop:4 }}>
+              💡 Cette fonction utilise l'IA Claude pour lire les prix en temps réel. Assurez-vous que l'application est lancée depuis claude.ai.
+            </div>
           </div>
         );
       })}
@@ -3244,7 +3683,7 @@ function EssencePage() {
               <div className="empty-icon">📊</div>
               <div style={{ fontSize:15, fontWeight:700, marginBottom:6 }}>Pas encore d'historique</div>
               <div style={{ fontSize:13, marginBottom:18 }}>L'évolution des prix sera visible à partir de la deuxième actualisation.</div>
-              <button className="btn btn-primary" onClick={fetchAll} disabled={loading}>🔄 Actualiser maintenant</button>
+              <button className="btn btn-primary" onClick={doFetchAll} disabled={loading}>🔄 Actualiser maintenant</button>
             </div>
           )}
         </div>
