@@ -1536,22 +1536,36 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
               )}
 
               {/* Nb transactions badge */}
-              <div style={{ marginBottom:12,display:"flex",alignItems:"center",gap:7 }}>
-                <span style={{ fontSize:10,color:"var(--text3)",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"2px 9px",fontWeight:600 }}>
+              <div style={{ marginBottom:14,display:"flex",alignItems:"center",gap:7,flexWrap:"wrap" }}>
+                <span style={{ fontSize:11,color:"var(--text3)",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"3px 10px",fontWeight:600 }}>
                   🧾 {profileTx.length} transaction{profileTx.length>1?"s":""}
                 </span>
-                {spent>0&&inc>0&&<span style={{ fontSize:10,color:"var(--text3)",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"2px 9px",fontWeight:600 }}>
-                  💰 Reste: {fmt(inc-spent)}
+                {spent>0&&inc>0&&<span style={{ fontSize:11,color:p.color,background:`${p.color}12`,border:`1px solid ${p.color}28`,borderRadius:20,padding:"3px 10px",fontWeight:700 }}>
+                  💰 Reste : {fmt(inc-spent)}
                 </span>}
               </div>
 
-              {/* BOUTON MODIFIER — pleine largeur, proéminent */}
+              {/* BOUTON MODIFIER — grand, gradient couleur profil */}
               <button
-                className="btn btn-primary tip"
+                className="tip"
                 data-tip={`Modifier le revenu de ${p.name} pour ${monthLabel(selMonth)}`}
-                style={{ width:"100%",justifyContent:"center",padding:"10px",fontSize:13 }}
+                style={{
+                  width:"100%",display:"flex",alignItems:"center",gap:10,
+                  padding:"14px 16px",borderRadius:14,border:"none",cursor:"pointer",
+                  fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:14,
+                  background:`linear-gradient(135deg, ${p.color} 0%, ${p.color}99 100%)`,
+                  color:"white",
+                  boxShadow:`0 6px 22px ${p.color}45, inset 0 1px 0 rgba(255,255,255,0.18)`,
+                  transition:"all .22s cubic-bezier(.4,0,.2,1)",
+                }}
+                onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=`0 10px 30px ${p.color}65, inset 0 1px 0 rgba(255,255,255,0.18)`; }}
+                onMouseLeave={e=>{ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=`0 6px 22px ${p.color}45, inset 0 1px 0 rgba(255,255,255,0.18)`; }}
                 onClick={e=>{ e.stopPropagation(); setModal({ type:"editIncome",profileId:p.id,selMonth }); }}>
-                ✏️ Modifier le revenu
+                <div style={{ width:30,height:30,borderRadius:9,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0 }}>✏️</div>
+                <span style={{ flex:1,textAlign:"left" }}>Modifier le revenu de <strong>{p.name}</strong></span>
+                <div style={{ background:"rgba(0,0,0,0.18)",borderRadius:9,padding:"4px 10px",fontSize:12,fontWeight:900,flexShrink:0 }}>
+                  {inc>0?`+${fmt(inc)}`:"Non défini"}
+                </div>
               </button>
             </div>
           );
@@ -3858,59 +3872,90 @@ function EssencePage() {
             })}
           </div>
 
-          {/* Tableau stations */}
-          <div className="card" style={{ padding:0,overflow:"hidden",marginBottom:14 }}>
-            <div style={{ padding:"15px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10 }}>
-              <div style={{ fontWeight:800,fontSize:14 }}>📋 Stations à {stations[0]?.ville || citySearch}</div>
-              <div style={{ fontSize:11,color:"var(--text3)",marginLeft:"auto" }}>{stations.length} résultat{stations.length>1?"s":""}</div>
+          {/* Tableau stations — coloré, sans colonne Plein 50L */}
+          <div style={{ borderRadius:18,overflow:"hidden",border:"1px solid var(--border)",marginBottom:14 }}>
+            {/* Header */}
+            <div style={{ padding:"14px 20px",background:"rgba(255,255,255,0.03)",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10 }}>
+              <div style={{ width:32,height:32,borderRadius:10,background:"rgba(251,191,36,0.14)",border:"1px solid rgba(251,191,36,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17 }}>📍</div>
+              <div>
+                <div style={{ fontWeight:900,fontSize:15 }}>Stations à <span style={{ color:"var(--yellow)" }}>{stations[0]?.ville || citySearch}</span></div>
+                <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>Prix en €/L · Données gouvernementales temps réel</div>
+              </div>
+              <div style={{ marginLeft:"auto",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:20,padding:"4px 12px",fontSize:11,color:"var(--yellow)",fontWeight:800,flexShrink:0 }}>
+                {stations.length} station{stations.length>1?"s":""}
+              </div>
             </div>
+
             <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%",borderCollapse:"collapse",fontSize:12 }}>
+              <table style={{ width:"100%",borderCollapse:"collapse" }}>
                 <thead>
-                  <tr style={{ background:"rgba(255,255,255,0.025)" }}>
-                    <th style={{ padding:"11px 16px",textAlign:"left",color:"var(--text3)",fontSize:11,textTransform:"uppercase",letterSpacing:.8,fontWeight:800 }}>Station / Adresse</th>
+                  <tr style={{ background:"rgba(0,0,0,0.25)" }}>
+                    <th style={{ padding:"12px 18px",textAlign:"left",color:"var(--text3)",fontSize:10,textTransform:"uppercase",letterSpacing:1.4,fontWeight:900,whiteSpace:"nowrap" }}>
+                      Station / Adresse
+                    </th>
                     {Object.entries(FUEL_META).map(([k,m])=>(
-                      <th key={k} style={{ padding:"11px 10px",textAlign:"center",color:m.color,fontSize:11,fontWeight:800 }}>{m.icon}<br/>{m.label}</th>
+                      <th key={k} style={{ padding:"10px 8px",textAlign:"center",minWidth:80 }}>
+                        <div style={{ display:"flex",flexDirection:"column",alignItems:"center",gap:3 }}>
+                          <div style={{ width:30,height:30,borderRadius:9,background:`${m.color}1a`,border:`1.5px solid ${m.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>{m.icon}</div>
+                          <span style={{ fontSize:10,color:m.color,fontWeight:900,letterSpacing:.4 }}>{m.label}</span>
+                        </div>
+                      </th>
                     ))}
-                    <th style={{ padding:"11px 10px",textAlign:"center",color:"var(--text3)",fontSize:11,fontWeight:700 }}>Plein<br/>50L SP95</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {stations.map((s,i)=>(
-                    <tr key={s.id||i} style={{ borderTop:"1px solid var(--border)" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.025)"}
-                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <td style={{ padding:"13px 16px",minWidth:180 }}>
-                        <div style={{ fontWeight:800,fontSize:13,marginBottom:2 }}>{s.nom}</div>
-                        <div style={{ fontSize:10,color:"var(--text3)",lineHeight:1.4 }}>{s.adresse}</div>
-                        {s.cp && <div style={{ fontSize:9,color:"var(--text3)",marginTop:2,background:"rgba(255,255,255,0.04)",display:"inline-block",borderRadius:6,padding:"1px 6px" }}>📮 {s.cp}</div>}
-                      </td>
-                      {Object.keys(FUEL_META).map(k=>{
-                        const isBest = s[k]!=null && s[k]===bestStation[k]?.[k] && stations.filter(x=>x[k]!=null).length>1;
-                        return (
-                          <td key={k} style={{ padding:"13px 10px",textAlign:"center" }}>
-                            {s[k]!=null ? (
-                              <div style={{ display:"flex",flexDirection:"column",alignItems:"center",gap:3 }}>
-                                <span style={{ fontFamily:"'Fraunces',serif",fontWeight:800,fontSize:15,color:isBest?"var(--green)":"var(--text)" }}>{s[k].toFixed(3)}</span>
-                                {isBest && <span style={{ fontSize:9,color:"var(--green)",fontWeight:800,background:"rgba(74,222,128,0.1)",borderRadius:5,padding:"1px 5px" }}>✓ Moins cher</span>}
-                              </div>
-                            ) : <span style={{ color:"var(--text3)",fontSize:16 }}>—</span>}
-                          </td>
-                        );
-                      })}
-                      <td style={{ padding:"13px 10px",textAlign:"center" }}>
-                        {s.sp95!=null
-                          ? <div><div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,color:"var(--purple)" }}>{(s.sp95*50).toFixed(2)}€</div><div style={{ fontSize:9,color:"var(--text3)" }}>{s.sp95.toFixed(3)}/L</div></div>
-                          : <span style={{ color:"var(--text3)" }}>—</span>}
-                      </td>
-                    </tr>
-                  ))}
+                  {stations.map((s,i)=>{
+                    const isEven = i%2===0;
+                    const rowBg = isEven ? "rgba(255,255,255,0.015)" : "transparent";
+                    return (
+                      <tr key={s.id||i}
+                        style={{ borderTop:"1px solid rgba(255,255,255,0.04)",background:rowBg,transition:"all .15s",cursor:"default" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="rgba(167,139,250,0.07)"}
+                        onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                        <td style={{ padding:"14px 18px",minWidth:200 }}>
+                          <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                            <div style={{ width:38,height:38,borderRadius:11,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.18)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0 }}>⛽</div>
+                            <div>
+                              <div style={{ fontWeight:800,fontSize:13,marginBottom:2 }}>{s.nom}</div>
+                              <div style={{ fontSize:11,color:"var(--text3)" }}>{s.adresse}</div>
+                              {s.cp&&<span style={{ display:"inline-block",marginTop:3,fontSize:9,color:"var(--text3)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"1px 6px",fontWeight:700 }}>📮 {s.cp}</span>}
+                            </div>
+                          </div>
+                        </td>
+                        {Object.entries(FUEL_META).map(([k,m])=>{
+                          const isBest = s[k]!=null && s[k]===bestStation[k]?.[k] && stations.filter(x=>x[k]!=null).length>1;
+                          return (
+                            <td key={k} style={{ padding:"14px 8px",textAlign:"center",verticalAlign:"middle" }}>
+                              {s[k]!=null ? (
+                                <div style={{ display:"flex",flexDirection:"column",alignItems:"center",gap:3 }}>
+                                  <div style={{
+                                    fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,
+                                    color: isBest ? m.color : "var(--text)",
+                                    textShadow: isBest ? `0 0 18px ${m.color}70` : "none",
+                                  }}>
+                                    {s[k].toFixed(3)}
+                                  </div>
+                                  {isBest && (
+                                    <span style={{ fontSize:9,fontWeight:900,color:m.color,background:`${m.color}18`,border:`1px solid ${m.color}35`,borderRadius:6,padding:"1px 6px",whiteSpace:"nowrap" }}>
+                                      ✓ Moins cher
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ color:"rgba(255,255,255,0.1)",fontSize:20,fontWeight:100 }}>—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
 
-          <FuelSimulator avgPrices={avgPrices} FUEL_META={FUEL_META}/>
+          <FuelSimulator stations={stations} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch}/>
         </div>
       )}
 
@@ -3984,41 +4029,146 @@ function EssencePage() {
     </div>
   );
 }
-function FuelSimulator({ avgPrices, FUEL_META }) {
+function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
+  const availableFuels = Object.keys(FUEL_META).filter(k => avgPrices[k] != null || stations.some(s => s[k] != null));
+  const [fuel, setFuel]     = useState(availableFuels[0] || "gazole");
   const [liters, setLiters] = useState(50);
-  const [fuel, setFuel]     = useState("sp95");
-  const price = avgPrices[fuel];
-  const total = price ? (price * liters).toFixed(2) : null;
-  const per100 = price ? (price * 6).toFixed(2) : null; // ~6L/100km
+  const [stationId, setStationId] = useState("__avg__");
+
+  // Stations that have the selected fuel
+  const eligibleStations = stations.filter(s => s[fuel] != null);
+  const selectedStation  = stationId === "__avg__" ? null : eligibleStations.find(s => s.id === stationId);
+  const price = selectedStation ? selectedStation[fuel] : avgPrices[fuel];
+
+  // Best station for selected fuel
+  const bestS = eligibleStations.length > 0
+    ? eligibleStations.reduce((a,b) => a[fuel] < b[fuel] ? a : b)
+    : null;
+
+  const total   = price != null ? (price * liters)       : null;
+  const per100  = price != null ? (price * 6.5)          : null; // 6.5L/100 moyen
+  const saving  = (bestS && selectedStation && bestS.id !== selectedStation.id)
+    ? ((selectedStation[fuel] - bestS[fuel]) * liters) : null;
+
+  const m = FUEL_META[fuel] || {};
 
   return (
-    <div className="card" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
-      <div style={{ fontSize: 22 }}>🧮</div>
-      <div style={{ fontWeight: 800, fontSize: 14 }}>Simulateur de plein</div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+    <div style={{ borderRadius:18,overflow:"hidden",border:`1px solid ${m.color||"var(--border)"}28`,marginBottom:14,background:"rgba(255,255,255,0.02)" }}>
+      {/* Header */}
+      <div style={{ padding:"14px 20px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}12,transparent)`,borderBottom:`1px solid ${m.color||"var(--border)"}20`,display:"flex",alignItems:"center",gap:10 }}>
+        <div style={{ width:36,height:36,borderRadius:11,background:`${m.color||"#a78bfa"}1a`,border:`1.5px solid ${m.color||"#a78bfa"}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>🧮</div>
         <div>
-          <div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 700, marginBottom: 5 }}>Carburant</div>
-          <select value={fuel} onChange={e => setFuel(e.target.value)}
-            style={{ background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", color: "var(--text)", fontFamily: "'Outfit',sans-serif", fontSize: 13, cursor: "pointer" }}>
-            {Object.entries(FUEL_META).map(([k, m]) => avgPrices[k] != null && <option key={k} value={k}>{m.icon} {m.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 700, marginBottom: 5 }}>Litres</div>
-          <input type="number" value={liters} onChange={e => setLiters(Math.max(1, +e.target.value))} min={1} max={200}
-            style={{ width: 80, background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px" }} />
+          <div style={{ fontWeight:900,fontSize:15 }}>Simulateur de plein</div>
+          <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>Estimez le coût de votre plein à {citySearch}</div>
         </div>
       </div>
-      {total && (
-        <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontSize: 11, color: "var(--text3)" }}>Coût estimé</div>
-          <div style={{ fontFamily: "'Fraunces',serif", fontSize: 30, fontWeight: 900, color: "var(--purple)" }}>{total} €</div>
-          <div style={{ fontSize: 11, color: "var(--text3)" }}>
-            pour {liters}L · {FUEL_META[fuel]?.label} à {price?.toFixed(3)} €/L
+
+      <div style={{ padding:"18px 20px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+        {/* LEFT — Controls */}
+        <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
+          {/* Fuel selector */}
+          <div>
+            <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:8 }}>Carburant</div>
+            <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+              {availableFuels.map(k => {
+                const fm = FUEL_META[k];
+                const sel = fuel === k;
+                return (
+                  <button key={k} onClick={()=>{ setFuel(k); setStationId("__avg__"); }}
+                    style={{ padding:"6px 12px",borderRadius:10,border:sel?`1.5px solid ${fm.color}`:"1px solid var(--border)",
+                      background:sel?`${fm.color}1a`:"var(--glass)",color:sel?fm.color:"var(--text3)",
+                      cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:sel?800:600,fontSize:12,
+                      transition:"all .15s",boxShadow:sel?`0 0 14px ${fm.color}30`:"none" }}>
+                    {fm.icon} {fm.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          {per100 && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>≈ {per100} € / 100 km (conso 6L)</div>}
+
+          {/* Station selector */}
+          {eligibleStations.length > 0 && (
+            <div>
+              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:8 }}>Station</div>
+              <select value={stationId} onChange={e=>setStationId(e.target.value)}
+                style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:`1px solid ${m.color||"var(--border)"}40`,borderRadius:11,padding:"9px 12px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:13,cursor:"pointer" }}>
+                <option value="__avg__">📊 Prix moyen ({eligibleStations.length} stations)</option>
+                {eligibleStations.map(s=>(
+                  <option key={s.id} value={s.id}>
+                    {s.nom} — {s[fuel]?.toFixed(3)}€/L{bestS?.id===s.id?" ⭐":""}
+                  </option>
+                ))}
+              </select>
+              {bestS && (
+                <div style={{ marginTop:6,fontSize:11,color:"var(--green)",fontWeight:700,display:"flex",alignItems:"center",gap:5 }}>
+                  <span>⭐</span> Moins cher : {bestS.nom} à <strong>{bestS[fuel]?.toFixed(3)} €/L</strong>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Liters slider */}
+          <div>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
+              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800 }}>Volume</div>
+              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:18,color:m.color||"var(--purple)" }}>{liters} L</div>
+            </div>
+            <input type="range" min={5} max={120} step={5} value={liters} onChange={e=>setLiters(+e.target.value)}
+              style={{ width:"100%",accentColor:m.color||"var(--purple)",height:5,cursor:"pointer" }}/>
+            <div style={{ display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--text3)",marginTop:4 }}>
+              <span>5 L</span>
+              <div style={{ display:"flex",gap:8 }}>
+                {[20,35,50,70].map(v=>(
+                  <button key={v} onClick={()=>setLiters(v)}
+                    style={{ background:liters===v?`${m.color||"#a78bfa"}22`:"rgba(255,255,255,0.04)",border:`1px solid ${liters===v?(m.color||"#a78bfa")+"44":"rgba(255,255,255,0.08)"}`,
+                      borderRadius:7,padding:"2px 8px",fontSize:10,color:liters===v?(m.color||"var(--purple)"):"var(--text3)",
+                      cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700 }}>
+                    {v}L
+                  </button>
+                ))}
+              </div>
+              <span>120 L</span>
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* RIGHT — Result */}
+        <div style={{ display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",gap:10,padding:"16px",borderRadius:16,background:`linear-gradient(135deg,${m.color||"#a78bfa"}0e,${m.color||"#a78bfa"}05)`,border:`1px solid ${m.color||"#a78bfa"}20` }}>
+          {price != null ? (
+            <>
+              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.2,fontWeight:800 }}>Coût estimé</div>
+              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:52,color:m.color||"var(--purple)",lineHeight:1,textShadow:`0 0 40px ${m.color||"#a78bfa"}50` }}>
+                {total?.toFixed(2)}<span style={{ fontSize:28 }}>€</span>
+              </div>
+              <div style={{ fontSize:12,color:"var(--text3)",textAlign:"center",lineHeight:1.6 }}>
+                {liters}L de {m.label} · <strong style={{ color:"var(--text)" }}>{price.toFixed(3)} €/L</strong>
+              </div>
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,width:"100%",marginTop:4 }}>
+                <div style={{ textAlign:"center",padding:"9px",background:"rgba(255,255,255,0.04)",borderRadius:11,border:"1px solid rgba(255,255,255,0.07)" }}>
+                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:3 }}>≈ / 100km</div>
+                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,color:"var(--text)" }}>{per100?.toFixed(2)}€</div>
+                  <div style={{ fontSize:9,color:"var(--text3)" }}>conso 6.5L</div>
+                </div>
+                <div style={{ textAlign:"center",padding:"9px",background:"rgba(255,255,255,0.04)",borderRadius:11,border:"1px solid rgba(255,255,255,0.07)" }}>
+                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:3 }}>Prix/L</div>
+                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,color:m.color||"var(--purple)" }}>{price.toFixed(3)}€</div>
+                  <div style={{ fontSize:9,color:"var(--text3)" }}>à la pompe</div>
+                </div>
+              </div>
+              {saving != null && saving > 0.01 && (
+                <div style={{ width:"100%",padding:"7px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:10,fontSize:11,color:"var(--green)",fontWeight:700,textAlign:"center" }}>
+                  💸 {fmt(saving)} économisés en allant à {bestS?.nom}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ textAlign:"center",padding:20 }}>
+              <div style={{ fontSize:36,marginBottom:8 }}>{m.icon||"⛽"}</div>
+              <div style={{ fontSize:13,color:"var(--text3)",fontWeight:600 }}>Prix {m.label} non disponible<br/>dans cette localisation</div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
