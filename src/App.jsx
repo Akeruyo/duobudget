@@ -2590,3 +2590,513 @@ function AddRecurringIncomeModal({ close, data, update }) {
     </ModalWrap>
   );
 }
+
+// ═══════════════════════════════════════════════════════════
+//  ESSENCE — Prix carburant via API Claude + web search
+// ═══════════════════════════════════════════════════════════
+function EssencePage() {
+  // ── deux stations ──
+  const STATIONS = [
+    { id:"leclerc", label:"Leclerc",  icon:"🛒", color:"#60a5fa", url:"https://mon-essence.fr/station/saint-dizier/sas-petro-est-leclerc-st-dizier" },
+    { id:"cora",    label:"Cora",     icon:"🏪", color:"#f472b6", url:"https://mon-essence.fr/station/saint-dizier/cora" },
+  ];
+
+  const FUEL_META = {
+    SP95:  { label:"SP95",   icon:"⛽", color:"#60a5fa", desc:"Sans plomb 95" },
+    E10:   { label:"E10",    icon:"🌿", color:"#4ade80", desc:"E10 (10% éthanol)" },
+    SP98:  { label:"SP98",   icon:"🔵", color:"#a78bfa", desc:"Sans plomb 98" },
+    Gazole:{ label:"Gazole", icon:"🚛", color:"#fbbf24", desc:"Diesel" },
+    E85:   { label:"E85",    icon:"🌽", color:"#34d399", desc:"Superéthanol E85" },
+    GPL:   { label:"GPL",    icon:"💨", color:"#f87171", desc:"GPL" },
+  };
+
+  const LS_KEY = "duobudget_fuel_history";
+
+  // { leclerc: { SP95: 1.789, ... }, cora: { SP95: 1.799, ... } }
+  const [current, setCurrent]     = useState(null);   // prix actuels
+  const [previous, setPrevious]   = useState(null);   // prix de la session précédente
+  const [loading, setLoading]     = useState(false);
+  const [errors, setErrors]       = useState({});     // { leclerc: "msg", cora: "msg" }
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [activeView, setActiveView] = useState("compare"); // "compare" | "evolution"
+
+
+
+  // ── Charger l'historique depuis localStorage ──
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved) setPrevious(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  // ── Fetch une station via l'API Claude + web_search ──
+  const fetchStation = async (station) => {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        system: `Tu es un extracteur de prix carburant. Visite la page indiquée, lis les prix affichés pour chaque carburant disponible et retourne UNIQUEMENT un objet JSON brut, sans markdown, sans backticks, sans texte autour. Format exact: {"SP95":1.789,"E10":1.759,"SP98":null,"Gazole":1.699,"E85":null,"GPL":null,"nom":"Nom de la station"} — utilise null si le carburant n'est pas disponible, un nombre flottant sinon.`,
+        messages: [{ role: "user", content: `Visite cette page et extrait tous les prix carburant affichés : ${station.url}\n\nRetourne UNIQUEMENT le JSON, rien d'autre.` }]
+      })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    // Récupérer tout le texte de la réponse (ignorer les blocs tool_use)
+    const text = (data.content || [])
+      .filter(b => b.type === "text")
+      .map(b => b.text)
+      .join("")
+      .trim();
+    // Chercher le JSON le plus long (greedy) pour éviter de couper à la première accolade fermante
+    const m = text.match(/\{[\s\S]+\}/);
+    if (!m) throw new Error("Aucun JSON trouvé dans la réponse");
+    try {
+      return JSON.parse(m[0]);
+    } catch {
+      // Tentative de réparation : retirer les trailing commas
+      const fixed = m[0].replace(/,\s*([\]}])/g, "$1");
+      return JSON.parse(fixed);
+    }
+  };
+
+  // ── Fetch les deux stations en parallèle — stable ref ──
+  const currentRef = useRef(null);
+  useEffect(() => { currentRef.current = current; }, [current]);
+
+  const doFetchAll = useCallback(async () => {
+    setLoading(true);
+    setErrors({});
+
+    // Sauvegarder l'état actuel comme "précédent" avant de rafraîchir
+    const snapshot = currentRef.current;
+    if (snapshot) {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot)); } catch {}
+      setPrevious(snapshot);
+    }
+
+    const results = await Promise.allSettled(STATIONS.map(s => fetchStation(s)));
+    const newCurrent = {};
+    const newErrors  = {};
+
+    results.forEach((res, i) => {
+      const sid = STATIONS[i].id;
+      if (res.status === "fulfilled") newCurrent[sid] = res.value;
+      else newErrors[sid] = res.reason?.message || "Erreur inconnue";
+    });
+
+    if (Object.keys(newCurrent).length > 0) {
+      setCurrent(newCurrent);
+      setLastUpdate(new Date());
+    }
+    setErrors(newErrors);
+    setLoading(false);
+  }, []);
+
+  // Premier chargement + intervalle 30 min
+  useEffect(() => {
+    doFetchAll();
+    const t = setInterval(doFetchAll, 30 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [doFetchAll]);
+
+  // ── Helpers tendance ──
+  const getTrend = (stationId, fuelKey) => {
+    const cur  = current?.[stationId]?.[fuelKey];
+    const prev = previous?.[stationId]?.[fuelKey];
+    if (cur == null || prev == null) return null;
+    const diff = cur - prev;
+    if (Math.abs(diff) < 0.0005) return { type:"stable", diff:0 };
+    return { type: diff > 0 ? "up" : "down", diff };
+  };
+
+  // Badge tendance JSX
+  const TrendBadge = ({ stationId, fuelKey, compact }) => {
+    const t = getTrend(stationId, fuelKey);
+    if (!t) return <span style={{ fontSize:11, color:"var(--text3)" }}>—</span>;
+    const isUp = t.type === "up";
+    const isStable = t.type === "stable";
+    const color = isStable ? "var(--text3)" : isUp ? "var(--red)" : "var(--green)";
+    const bg    = isStable ? "rgba(255,255,255,0.04)" : isUp ? "rgba(248,113,113,0.12)" : "rgba(74,222,128,0.12)";
+    const border= isStable ? "var(--border)" : isUp ? "rgba(248,113,113,0.3)" : "rgba(74,222,128,0.3)";
+    const arrow = isStable ? "→" : isUp ? "▲" : "▼";
+    const label = isStable ? "Stable" : `${isUp?"+":""}${(t.diff*100).toFixed(1)} c€/L`;
+    if (compact) return (
+      <span style={{ fontWeight:800, fontSize:12, color }}>{arrow} {label}</span>
+    );
+    return (
+      <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 9px", borderRadius:20, border:`1px solid ${border}`, background:bg, color, fontWeight:800, fontSize:11 }}>
+        {arrow} {label}
+        {!isStable && previous?.[stationId]?.[fuelKey] != null && (
+          <span style={{ fontSize:10, opacity:.7, fontWeight:600 }}>
+            (était {previous[stationId][fuelKey].toFixed(3)})
+          </span>
+        )}
+      </span>
+    );
+  };
+
+  // ── Carburants disponibles dans au moins une station ──
+  const availFuels = Object.keys(FUEL_META).filter(k =>
+    STATIONS.some(s => current?.[s.id]?.[k] != null)
+  );
+
+  // ── Meilleur prix par carburant ──
+  const bestStation = (fuelKey) => {
+    const prices = STATIONS.map(s => ({ sid:s.id, price:current?.[s.id]?.[fuelKey] })).filter(x => x.price != null);
+    if (prices.length === 0) return null;
+    return prices.reduce((a,b) => b.price < a.price ? b : a).sid;
+  };
+
+  const hasAnyData = current && Object.keys(current).length > 0;
+
+  return (
+    <div className="fade-up">
+
+      {/* ── HEADER ── */}
+      <div style={{ background:"linear-gradient(135deg,rgba(251,191,36,0.1),rgba(251,146,60,0.06))", border:"1px solid rgba(251,191,36,0.25)", borderRadius:20, padding:"22px 26px", marginBottom:20, position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", top:-30, right:-30, fontSize:120, opacity:.05, transform:"rotate(-15deg)", userSelect:"none" }}>⛽</div>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:14 }}>
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:13, marginBottom:10 }}>
+              <div style={{ width:46, height:46, borderRadius:14, background:"rgba(251,191,36,0.15)", border:"1px solid rgba(251,191,36,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>⛽</div>
+              <div>
+                <div style={{ fontFamily:"'Fraunces',serif", fontSize:22, fontWeight:700, color:"var(--yellow)" }}>Prix Carburants</div>
+                <div style={{ fontSize:12, color:"var(--text3)" }}>Saint-Dizier (52100) · 2 stations comparées</div>
+              </div>
+            </div>
+            {/* Chips stations */}
+            <div style={{ display:"flex", gap:8 }}>
+              {STATIONS.map(s => (
+                <a key={s.id} href={s.url} target="_blank" rel="noreferrer"
+                  style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px", borderRadius:20, background:`${s.color}12`, border:`1px solid ${s.color}30`, color:s.color, fontSize:12, fontWeight:700, textDecoration:"none", transition:"all .2s" }}
+                  onMouseEnter={e=>{e.currentTarget.style.background=`${s.color}22`;}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=`${s.color}12`;}}>
+                  {s.icon} {s.label} ↗
+                </a>
+              ))}
+            </div>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            {lastUpdate && (
+              <div style={{ textAlign:"right", fontSize:12, color:"var(--text3)" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <div style={{ width:7, height:7, borderRadius:"50%", background:"var(--green)", animation:"pulse 2s infinite" }}/>
+                  <span style={{ color:"var(--green)", fontWeight:700, fontSize:11 }}>LIVE</span>
+                </div>
+                <div style={{ marginTop:2 }}>Maj {pad(lastUpdate.getHours())}:{pad(lastUpdate.getMinutes())}</div>
+              </div>
+            )}
+            <button onClick={fetchAll} disabled={loading}
+              style={{ display:"flex", alignItems:"center", gap:7, padding:"10px 18px", borderRadius:12, border:"1px solid rgba(251,191,36,0.4)", background:"rgba(251,191,36,0.1)", color:"var(--yellow)", cursor:loading?"not-allowed":"pointer", fontSize:13, fontWeight:700, fontFamily:"'Outfit',sans-serif", transition:"all .2s", opacity:loading?.6:1 }}>
+              <span className={loading?"spin":""} style={{ fontSize:16 }}>🔄</span>
+              {loading ? "Chargement…" : "Actualiser"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── ERREURS ── */}
+      {Object.entries(errors).map(([sid, msg]) => {
+        const s = STATIONS.find(x => x.id === sid);
+        return (
+          <div key={sid} className="alert-banner alert-warning" style={{ marginBottom:10 }}>
+            ⚠️ {s?.icon} {s?.label} : {msg}
+          </div>
+        );
+      })}
+
+      {/* ── VUE TABS ── */}
+      {hasAnyData && (
+        <div style={{ display:"flex", gap:3, background:"rgba(255,255,255,0.04)", borderRadius:13, padding:3, marginBottom:18 }}>
+          {[{id:"compare",label:"⚖️ Comparatif stations"},{id:"evolution",label:"📈 Évolution des prix"}].map(t => (
+            <button key={t.id} onClick={() => setActiveView(t.id)} style={{
+              flex:1, padding:"9px 10px", borderRadius:10, border:"none", cursor:"pointer",
+              background: activeView===t.id ? "var(--glass3)" : "transparent",
+              color: activeView===t.id ? "var(--text)" : "var(--text3)",
+              fontFamily:"'Outfit',sans-serif", fontWeight:700, fontSize:13, transition:"all .2s",
+              boxShadow: activeView===t.id ? "0 2px 8px rgba(0,0,0,0.3)" : "none",
+            }}>{t.label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ── LOADING SKELETON ── */}
+      {loading && !hasAnyData && (
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+          {STATIONS.map(s => (
+            <div key={s.id} style={{ background:"var(--glass)", border:`1px solid ${s.color}22`, borderRadius:20, padding:24 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
+                <div style={{ width:44, height:44, borderRadius:13, background:`${s.color}18`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, animation:"pulse 1.5s infinite" }}>{s.icon}</div>
+                <div style={{ fontSize:16, fontWeight:800, color:s.color }}>{s.label}</div>
+              </div>
+              {[1,2,3,4].map(i => <div key={i} style={{ height:38, background:"rgba(255,255,255,0.04)", borderRadius:10, marginBottom:8, animation:"pulse 1.5s infinite", animationDelay:`${i*0.15}s` }}/>)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          VUE COMPARATIF
+      ══════════════════════════════════════════ */}
+      {hasAnyData && activeView === "compare" && (
+        <>
+          {/* ── Bandeau meilleur prix global ── */}
+          {availFuels.length > 0 && (() => {
+            const bests = availFuels.map(k => {
+              const best = bestStation(k);
+              return { k, best, price: best ? current[best][k] : null };
+            }).filter(x => x.price != null);
+            const overall = bests.reduce((a,b) => b.price < a.price ? b : a, bests[0]);
+            const s = overall ? STATIONS.find(x => x.id === overall.best) : null;
+            return s ? (
+              <div style={{ background:"linear-gradient(135deg,rgba(74,222,128,0.1),rgba(34,211,238,0.06))", border:"1px solid rgba(74,222,128,0.3)", borderRadius:16, padding:"14px 20px", marginBottom:18, display:"flex", alignItems:"center", gap:14 }}>
+                <span style={{ fontSize:28 }}>🏆</span>
+                <div>
+                  <div style={{ fontSize:11, color:"var(--green)", fontWeight:800, textTransform:"uppercase", letterSpacing:.8 }}>Meilleur prix toutes stations</div>
+                  <div style={{ fontFamily:"'Fraunces',serif", fontSize:18, fontWeight:900, marginTop:3 }}>
+                    <span style={{ color:s.color }}>{s.icon} {s.label}</span>
+                    <span style={{ color:"var(--text3)", fontSize:13, fontWeight:600, margin:"0 8px" }}>·</span>
+                    <span style={{ color:FUEL_META[overall.k].color }}>{FUEL_META[overall.k].icon} {overall.k}</span>
+                    <span style={{ color:"var(--text3)", fontSize:13, fontWeight:600, margin:"0 8px" }}>à</span>
+                    <span style={{ color:"var(--green)" }}>{overall.price.toFixed(3)} €/L</span>
+                  </div>
+                </div>
+              </div>
+            ) : null;
+          })()}
+
+          {/* ── Grande table comparative ── */}
+          <div className="card" style={{ padding:0, overflow:"hidden" }}>
+            <div style={{ padding:"18px 22px 14px", borderBottom:"1px solid var(--border)" }}>
+              <div style={{ fontWeight:800, fontSize:15, display:"flex", alignItems:"center", gap:10 }}>
+                <span>⚖️</span> Comparatif des prix par carburant
+              </div>
+            </div>
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ background:"rgba(255,255,255,0.02)" }}>
+                    <th style={{ padding:"12px 18px", textAlign:"left", fontSize:11, color:"var(--text3)", fontWeight:800, textTransform:"uppercase", letterSpacing:.8 }}>Carburant</th>
+                    {STATIONS.map(s => (
+                      <th key={s.id} colSpan={2} style={{ padding:"12px 18px", textAlign:"center", fontSize:12, color:s.color, fontWeight:800 }}>
+                        {s.icon} {s.label}
+                      </th>
+                    ))}
+                    <th style={{ padding:"12px 18px", textAlign:"center", fontSize:11, color:"var(--text3)", fontWeight:800, textTransform:"uppercase", letterSpacing:.8 }}>Écart</th>
+                  </tr>
+                  <tr style={{ background:"rgba(255,255,255,0.015)", borderBottom:"1px solid var(--border)" }}>
+                    <th style={{ padding:"6px 18px 10px" }}/>
+                    {STATIONS.map(s => (
+                      <>
+                        <th key={`${s.id}-price`} style={{ padding:"6px 12px 10px", textAlign:"center", fontSize:10, color:"var(--text3)", fontWeight:700 }}>Prix</th>
+                        <th key={`${s.id}-trend`} style={{ padding:"6px 12px 10px", textAlign:"center", fontSize:10, color:"var(--text3)", fontWeight:700 }}>Tendance</th>
+                      </>
+                    ))}
+                    <th style={{ padding:"6px 12px 10px" }}/>
+                  </tr>
+                </thead>
+                <tbody>
+                  {availFuels.map((fuelKey, ri) => {
+                    const meta = FUEL_META[fuelKey];
+                    const best = bestStation(fuelKey);
+                    const prices = STATIONS.map(s => current?.[s.id]?.[fuelKey]);
+                    const diff = prices[0] != null && prices[1] != null ? Math.abs(prices[0] - prices[1]) : null;
+                    return (
+                      <tr key={fuelKey} style={{ borderTop: ri > 0 ? "1px solid rgba(255,255,255,0.04)" : "none", transition:"background .18s" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.025)"}
+                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        {/* Carburant */}
+                        <td style={{ padding:"14px 18px" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                            <div style={{ width:36, height:36, borderRadius:10, background:`${meta.color}14`, border:`1px solid ${meta.color}25`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>{meta.icon}</div>
+                            <div>
+                              <div style={{ fontWeight:800, fontSize:14, color:meta.color }}>{meta.label}</div>
+                              <div style={{ fontSize:10, color:"var(--text3)" }}>{meta.desc}</div>
+                            </div>
+                          </div>
+                        </td>
+                        {/* Prix + tendance par station */}
+                        {STATIONS.map(s => {
+                          const price = current?.[s.id]?.[fuelKey];
+                          const isBest = best === s.id && price != null;
+                          return (
+                            <>
+                              <td key={`${s.id}-price`} style={{ padding:"14px 12px", textAlign:"center" }}>
+                                {price != null ? (
+                                  <div style={{ display:"inline-flex", flexDirection:"column", alignItems:"center", gap:3 }}>
+                                    <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                                      <span style={{ fontFamily:"'Fraunces',serif", fontSize:20, fontWeight:900, color:isBest?"var(--green)":s.color }}>
+                                        {price.toFixed(3)}
+                                      </span>
+                                      <span style={{ fontSize:11, color:"var(--text3)", fontWeight:600 }}>€/L</span>
+                                    </div>
+                                    {isBest && <span style={{ fontSize:9, background:"rgba(74,222,128,0.15)", color:"var(--green)", border:"1px solid rgba(74,222,128,0.3)", borderRadius:20, padding:"1px 7px", fontWeight:800 }}>✓ MOINS CHER</span>}
+                                  </div>
+                                ) : (
+                                  <span style={{ fontSize:12, color:"var(--text3)" }}>N/D</span>
+                                )}
+                              </td>
+                              <td key={`${s.id}-trend`} style={{ padding:"14px 12px", textAlign:"center" }}>
+                                <TrendBadge stationId={s.id} fuelKey={fuelKey} />
+                              </td>
+                            </>
+                          );
+                        })}
+                        {/* Écart entre stations */}
+                        <td style={{ padding:"14px 12px", textAlign:"center" }}>
+                          {diff != null ? (
+                            <span style={{ fontWeight:800, fontSize:12, color: diff > 0.01 ? "var(--orange)" : "var(--text3)" }}>
+                              {diff < 0.001 ? "=" : `${(diff*100).toFixed(1)} c€/L`}
+                            </span>
+                          ) : <span style={{ color:"var(--text3)", fontSize:12 }}>—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Cartes station individuelle (plein 50L, 100km) ── */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginTop:14 }}>
+            {STATIONS.map(s => {
+              const sd = current?.[s.id];
+              if (!sd) return null;
+              const stFuels = Object.entries(FUEL_META).filter(([k]) => sd[k] != null);
+              return (
+                <div key={s.id} style={{ background:`${s.color}08`, border:`1.5px solid ${s.color}25`, borderRadius:18, padding:20 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:16, paddingBottom:12, borderBottom:`1px solid ${s.color}18` }}>
+                    <div style={{ width:40, height:40, borderRadius:12, background:`${s.color}18`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>{s.icon}</div>
+                    <div>
+                      <div style={{ fontWeight:900, fontSize:16, color:s.color }}>{s.label}</div>
+                      <div style={{ fontSize:10, color:"var(--text3)" }}>{sd.nom || "Saint-Dizier"}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {stFuels.map(([k, meta]) => {
+                      const price = sd[k];
+                      return (
+                        <div key={k} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px", background:"rgba(255,255,255,0.025)", borderRadius:10 }}>
+                          <span style={{ fontSize:16 }}>{meta.icon}</span>
+                          <span style={{ fontWeight:700, fontSize:13, color:meta.color, flex:1 }}>{meta.label}</span>
+                          <span style={{ fontFamily:"'Fraunces',serif", fontWeight:800, fontSize:15 }}>{price.toFixed(3)} €/L</span>
+                          <span style={{ fontSize:11, color:"var(--text3)", minWidth:70, textAlign:"right" }}>Plein: {(price*50).toFixed(2)} €</span>
+                          <TrendBadge stationId={s.id} fuelKey={k} compact />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════
+          VUE ÉVOLUTION
+      ══════════════════════════════════════════ */}
+      {hasAnyData && activeView === "evolution" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          {previous ? (
+            <>
+              <div className="alert-banner alert-success" style={{ marginBottom:4 }}>
+                📊 Comparaison avec les prix observés lors de la session précédente
+              </div>
+              {availFuels.map(fuelKey => {
+                const meta = FUEL_META[fuelKey];
+                const hasDiff = STATIONS.some(s => getTrend(s.id, fuelKey) !== null);
+                return (
+                  <div key={fuelKey} className="card" style={{ padding:0, overflow:"hidden" }}>
+                    <div style={{ padding:"14px 20px", background:`${meta.color}08`, borderBottom:`1px solid ${meta.color}18`, display:"flex", alignItems:"center", gap:12 }}>
+                      <div style={{ width:36, height:36, borderRadius:10, background:`${meta.color}14`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>{meta.icon}</div>
+                      <span style={{ fontWeight:900, fontSize:16, color:meta.color }}>{meta.label}</span>
+                      <span style={{ fontSize:12, color:"var(--text3)" }}>— {meta.desc}</span>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:0 }}>
+                      {STATIONS.map((s, si) => {
+                        const cur  = current?.[s.id]?.[fuelKey];
+                        const prev = previous?.[s.id]?.[fuelKey];
+                        const trend = getTrend(s.id, fuelKey);
+                        if (cur == null && prev == null) return null;
+                        return (
+                          <div key={s.id} style={{ padding:"18px 22px", borderRight: si === 0 ? "1px solid var(--border)" : "none" }}>
+                            <div style={{ fontWeight:800, fontSize:13, color:s.color, marginBottom:12 }}>{s.icon} {s.label}</div>
+                            <div style={{ display:"flex", alignItems:"flex-end", gap:14, marginBottom:12 }}>
+                              {/* Prix actuel */}
+                              <div>
+                                <div style={{ fontSize:9, color:"var(--text3)", textTransform:"uppercase", letterSpacing:.8, marginBottom:4 }}>Actuel</div>
+                                <div style={{ fontFamily:"'Fraunces',serif", fontSize:28, fontWeight:900, color:cur!=null?"var(--text)":"var(--text3)" }}>
+                                  {cur != null ? cur.toFixed(3) : "—"}
+                                </div>
+                                {cur != null && <div style={{ fontSize:10, color:"var(--text3)", marginTop:2 }}>€/L</div>}
+                              </div>
+                              {/* Flèche */}
+                              {trend && (
+                                <div style={{ fontSize:24, marginBottom:8, color: trend.type==="up"?"var(--red)":trend.type==="down"?"var(--green)":"var(--text3)" }}>
+                                  {trend.type==="up" ? "↑" : trend.type==="down" ? "↓" : "→"}
+                                </div>
+                              )}
+                              {/* Prix précédent */}
+                              {prev != null && (
+                                <div style={{ opacity:.65 }}>
+                                  <div style={{ fontSize:9, color:"var(--text3)", textTransform:"uppercase", letterSpacing:.8, marginBottom:4 }}>Précédent</div>
+                                  <div style={{ fontFamily:"'Fraunces',serif", fontSize:22, fontWeight:700, color:"var(--text3)" }}>{prev.toFixed(3)}</div>
+                                  <div style={{ fontSize:10, color:"var(--text3)", marginTop:2 }}>€/L</div>
+                                </div>
+                              )}
+                            </div>
+                            {/* Badge tendance détaillé */}
+                            {trend ? (
+                              <div style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:20, fontWeight:800, fontSize:12,
+                                background: trend.type==="stable"?"rgba(255,255,255,0.04)":trend.type==="up"?"rgba(248,113,113,0.12)":"rgba(74,222,128,0.12)",
+                                border: `1px solid ${trend.type==="stable"?"var(--border)":trend.type==="up"?"rgba(248,113,113,0.3)":"rgba(74,222,128,0.3)"}`,
+                                color: trend.type==="stable"?"var(--text3)":trend.type==="up"?"var(--red)":"var(--green)",
+                              }}>
+                                {trend.type==="up" ? "📈 Hausse" : trend.type==="down" ? "📉 Baisse" : "➡️ Stable"}
+                                {trend.type !== "stable" && <span style={{ opacity:.8 }}>{trend.type==="up"?"+":""}{(trend.diff*100).toFixed(1)} c€/L</span>}
+                                {trend.type !== "stable" && cur != null && prev != null && (
+                                  <span style={{ opacity:.6 }}>· plein 50L: {trend.type==="up"?"+":""}{((cur-prev)*50).toFixed(2)} €</span>
+                                )}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize:11, color:"var(--text3)" }}>Pas d'historique disponible</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            <div className="card empty-state">
+              <div className="empty-icon">📊</div>
+              <div style={{ fontSize:15, fontWeight:700, marginBottom:6 }}>Pas encore d'historique</div>
+              <div style={{ fontSize:13, marginBottom:18 }}>L'évolution des prix sera visible à partir de la deuxième actualisation.</div>
+              <button className="btn btn-primary" onClick={fetchAll} disabled={loading}>🔄 Actualiser maintenant</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Footer ── */}
+      {hasAnyData && (
+        <div style={{ marginTop:16, padding:"11px 16px", background:"rgba(255,255,255,0.02)", border:"1px solid var(--border)", borderRadius:12, display:"flex", alignItems:"center", gap:10 }}>
+          <span>ℹ️</span>
+          <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>
+            Sources : <strong style={{ color:"var(--text2)" }}>mon-essence.fr</strong> ·
+            {STATIONS.map((s,i) => <><a key={s.id} href={s.url} target="_blank" rel="noreferrer" style={{ color:s.color, fontWeight:700, textDecoration:"none", marginLeft:4 }}>{s.icon} {s.label}</a>{i<STATIONS.length-1?" ·":""}</>)} ·
+            Actualisation auto toutes les 30 min
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
