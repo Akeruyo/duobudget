@@ -3650,14 +3650,16 @@ function EssencePage() {
       const BASE = "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
       const isCP = /^\d{5}$/.test(city.trim());
 
-      // ODS v2: use `where=cp='XXXXX'` for postal codes (single-quoted, known to work)
-      // For city names: use `q=` (global text search, no encoding issues) + `where` filter on ville
+      // ODS v2 ODSQL: string literals MUST use double-quotes, not single-quotes
+      // CP search: where=cp="52100"  →  encodeURIComponent gives cp%3D%2252100%22
+      // City name: q= parameter (full-text, no ODSQL parsing, no quoting needed)
       let url;
       if (isCP) {
-        url = `${BASE}?where=cp%3D'${encodeURIComponent(city.trim())}'&limit=30&timezone=Europe%2FParis&order_by=nom`;
+        const w = encodeURIComponent(`cp="${city.trim()}"`);
+        url = `${BASE}?where=${w}&limit=30&timezone=Europe%2FParis`;
       } else {
-        // q= does full-text search across all fields — no % wildcards, no encoding issues
-        url = `${BASE}?q=${encodeURIComponent(city.trim())}&limit=30&timezone=Europe%2FParis&order_by=nom`;
+        // q= does full-text search — safe, no wildcards, no quote issues
+        url = `${BASE}?q=${encodeURIComponent(city.trim())}&limit=30&timezone=Europe%2FParis`;
       }
 
       const res = await fetch(url);
