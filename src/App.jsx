@@ -280,15 +280,28 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;width:0;
   transition:margin-left .3s cubic-bezier(.4,0,.2,1);}
 .topbar{
-  height:calc(62px + env(safe-area-inset-top));
+  height:calc(64px + env(safe-area-inset-top));
   padding-top:calc(10px + env(safe-area-inset-top));
-  padding-left:calc(26px + env(safe-area-inset-left));
-  padding-right:calc(20px + env(safe-area-inset-right));
+  padding-left:calc(22px + env(safe-area-inset-left));
+  padding-right:calc(16px + env(safe-area-inset-right));
   padding-bottom:10px;
-  background:rgba(7,6,15,0.92);backdrop-filter:blur(28px);
+  background:rgba(7,6,15,0.94);backdrop-filter:blur(32px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
 .page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;}
+
+/* ── TOPBAR RIGHT WIDGET ── */
+.topbar-clock{display:flex;align-items:center;gap:0;background:linear-gradient(135deg,rgba(167,139,250,0.12),rgba(244,114,182,0.08));border:1px solid rgba(167,139,250,0.2);border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.07);}
+.topbar-clock-date{padding:7px 12px;text-align:right;line-height:1.25;border-right:1px solid rgba(255,255,255,0.07);}
+.topbar-clock-time{padding:7px 14px;display:flex;align-items:baseline;gap:1px;font-family:'Fraunces',serif;}
+.topbar-action-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:11px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;border:none;white-space:nowrap;}
+
+/* ── PROFILE PHOTO ── */
+.profile-photo{border-radius:50%;object-fit:cover;background:rgba(255,255,255,0.05);}
+.photo-upload-btn{position:relative;cursor:pointer;display:inline-block;}
+.photo-upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
+.photo-upload-overlay{position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;font-size:16px;}
+.photo-upload-btn:hover .photo-upload-overlay{opacity:1;}
 
 /* ── CONTENT GRIDS ── */
 .content-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;}
@@ -307,19 +320,24 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .bill-section-hdr{display:flex;align-items:center;gap:10px;margin:18px 0 10px;font-size:10px;font-weight:900;letter-spacing:2px;text-transform:uppercase;}
 .bill-section-hdr::after{content:'';flex:1;height:1px;background:currentColor;opacity:.18;}
 
-/* ── TOOLTIP SYSTEM ── */
+/* ── TOOLTIP SYSTEM — fixed position, never clipped ── */
+/* Disable old CSS tooltips — replaced by GlobalTooltip JS component */
 .tip{position:relative;}
-.tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) scale(.92);background:linear-gradient(135deg,#1e1b3a,#2a2450);color:var(--text);font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:600;white-space:nowrap;padding:7px 13px;border-radius:10px;border:1px solid rgba(167,139,250,0.3);box-shadow:0 8px 32px rgba(0,0,0,0.6);pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;z-index:99999;}
-.tip::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#2a2450;pointer-events:none;opacity:0;transition:opacity .18s;z-index:99999;}
-.tip:hover::after,.tip:hover::before{opacity:1;transform:translateX(-50%) scale(1);}
-.tip-right::after{left:auto;right:0;transform:translateX(0) scale(.92);}.tip-right:hover::after{transform:translateX(0) scale(1);}.tip-right::before{left:auto;right:14px;transform:none;}
-.tip-left::after{left:0;transform:translateX(0) scale(.92);}.tip-left:hover::after{transform:translateX(0) scale(1);}
-/* Tooltip below the element — for items near the top of the page */
-.tip-below::after{bottom:auto;top:calc(100% + 10px);}
-.tip-below::before{bottom:auto;top:calc(100% + 3px);border-top-color:transparent;border-bottom-color:#2a2450;}
-.tip-below:hover::after,.tip-below:hover::before{opacity:1;transform:translateX(-50%) scale(1);}
-/* Profile grid ensures tooltips overflow */
-.profile-cards-grid{overflow:visible !important;}
+/* old ::after / ::before kept hidden */
+.tip::after,.tip::before{display:none !important;}
+/* Global tooltip overlay — rendered via JS fixed position */
+.gtip{position:fixed;pointer-events:none;z-index:999999;
+  background:linear-gradient(135deg,#1e1b3a,#2a2450);
+  color:var(--text);font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:600;
+  white-space:nowrap;padding:7px 13px;border-radius:10px;
+  border:1px solid rgba(167,139,250,0.3);
+  box-shadow:0 8px 32px rgba(0,0,0,0.7);
+  transition:opacity .15s;
+  max-width:260px;white-space:normal;text-align:center;}
+.gtip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#2a2450;}
+.gtip.tip-above::after{top:100%;border-top-color:#2a2450;border-bottom:none;}
+.gtip.tip-below{transform:translateX(-50%);}.gtip.tip-below::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:#2a2450;}
 
 /* ── NAV ── */
 .nav-section-label{font-size:9px;font-weight:900;letter-spacing:2.2px;text-transform:uppercase;color:var(--text3);padding:0 18px;margin:20px 0 7px;display:flex;align-items:center;gap:8px;}
@@ -553,6 +571,66 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 }
 `;
 
+// ═══════════════════════════════════════════════════════════
+//  GLOBAL TOOLTIP — fixed-position, never clipped
+// ═══════════════════════════════════════════════════════════
+function GlobalTooltip() {
+  const [tip, setTip] = useState(null);
+  useEffect(() => {
+    let timer;
+    const show = (e) => {
+      const el = e.target.closest('[data-tip]');
+      if (!el) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const rect = el.getBoundingClientRect();
+        const below = rect.top < 80; // near top → show below
+        setTip({
+          text: el.dataset.tip,
+          x: rect.left + rect.width / 2,
+          y: below ? rect.bottom + 10 : rect.top - 10,
+          below,
+        });
+      }, 60);
+    };
+    const hide = () => { clearTimeout(timer); setTip(null); };
+    document.addEventListener('mouseover', show, true);
+    document.addEventListener('mouseout', hide, true);
+    document.addEventListener('click', hide, true);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mouseover', show, true);
+      document.removeEventListener('mouseout', hide, true);
+      document.removeEventListener('click', hide, true);
+    };
+  }, []);
+  if (!tip) return null;
+  return (
+    <div className={`gtip ${tip.below ? "tip-below" : "tip-above"}`}
+      style={{
+        left: tip.x,
+        top: tip.below ? tip.y : undefined,
+        bottom: tip.below ? undefined : `calc(100vh - ${tip.y}px)`,
+        transform: 'translateX(-50%)',
+      }}>
+      {tip.text}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FAVICON — SVG emoji injected dynamically
+// ═══════════════════════════════════════════════════════════
+function useFavicon() {
+  useEffect(() => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%23a78bfa"/><stop offset="100%" stop-color="%23f472b6"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(%23g)"/><text y=".9em" font-size="72" x="12">💑</text></svg>`;
+    const link = document.querySelector("link[rel~='icon']") || Object.assign(document.createElement('link'), { rel: 'icon' });
+    link.href = `data:image/svg+xml,${svg}`;
+    link.type = 'image/svg+xml';
+    document.head.appendChild(link);
+    document.title = "DuoBudget 💑";
+  }, []);
+}
 
 function getPasswordStrength(pwd) {
   if (!pwd) return { score: 0, label: "", color: "transparent" };
@@ -787,6 +865,8 @@ function AuthScreen({ onLinked }) {
 }
 
 export default function App() {
+  useFavicon();
+
   const [user, setUser] = useState(undefined);
   const [data, setData] = useState(INIT);
   const [ready, setReady] = useState(false);
@@ -898,6 +978,7 @@ export default function App() {
   return (
     <>
       <style>{CSS}</style>
+      <GlobalTooltip/>
       <div className="app-shell">
         <div className={`sidebar-overlay ${sidebarOpen?"open":""}`} onClick={() => setSidebarOpen(false)}/>
 
@@ -919,7 +1000,9 @@ export default function App() {
                     style={{ flex:1,display:"flex",alignItems:"center",gap:8,padding:"9px 11px",borderRadius:12,background:`${p.color}0c`,border:`1px solid ${p.color}25`,cursor:"default",transition:"all .2s" }}
                     onMouseEnter={e=>e.currentTarget.style.background=p.color+"1e"}
                     onMouseLeave={e=>e.currentTarget.style.background=p.color+"0c"}>
-                    <div style={{ width:30,height:30,borderRadius:9,background:p.color+"22",border:`1px solid ${p.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17 }}>{p.avatar}</div>
+                    <div style={{ width:32,height:32,borderRadius:10,background:p.color+"22",border:`1px solid ${p.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,overflow:"hidden",flexShrink:0 }}>
+                      {p.photo ? <img src={p.photo} alt={p.name} style={{ width:"100%",height:"100%",objectFit:"cover" }}/> : p.avatar}
+                    </div>
                     <div style={{ minWidth:0 }}>
                       <div style={{ fontSize:11.5,fontWeight:800,color:p.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{p.name}</div>
                       <div style={{ fontSize:10,color:"var(--text3)",fontWeight:600,marginTop:1 }}>{inc>0?fmt(inc):"—"}</div>
@@ -978,17 +1061,39 @@ export default function App() {
         <div className="main-area">
           <div className="topbar">
             <button className="menu-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">☰</button>
-            <div style={{ fontFamily:"'Fraunces',serif",fontSize:20,fontWeight:700,color:"var(--text)",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{pageTitles[page]}</div>
+            <div style={{ fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:700,color:"var(--text)",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{pageTitles[page]}</div>
             <div style={{ display:"flex",alignItems:"center",gap:8,flexShrink:0 }}>
               {page==="expenses" && (
                 <>
-                  <button className="btn btn-ghost btn-sm tip" data-tip="Exporter les dépenses en CSV" onClick={() => exportCSV(mdata(selMonth).transactions,data.categories,data.profiles,selMonth)}>📥 CSV</button>
-                  <button className="btn btn-primary btn-sm tip" data-tip="Ajouter une dépense" onClick={() => setModal({ type:"addTransaction",selMonth })}>+ Dépense</button>
+                  <button className="topbar-action-btn tip" data-tip="Exporter en CSV"
+                    style={{ background:"rgba(255,255,255,0.07)",border:"1px solid var(--border)",color:"var(--text2)" }}
+                    onClick={() => exportCSV(mdata(selMonth).transactions,data.categories,data.profiles,selMonth)}>
+                    📥 <span style={{ fontSize:12 }}>CSV</span>
+                  </button>
+                  <button className="topbar-action-btn tip" data-tip="Ajouter une dépense"
+                    style={{ background:"var(--grad-main)",color:"white",boxShadow:"0 4px 14px rgba(167,139,250,0.35)" }}
+                    onClick={() => setModal({ type:"addTransaction",selMonth })}>
+                    + Dépense
+                  </button>
                 </>
               )}
-              {page==="bills" && <button className="btn btn-primary btn-sm tip" data-tip="Créer une facture" onClick={() => setModal({ type:"addBill" })}>+ Facture</button>}
-              {page==="incomes" && <button className="btn btn-primary btn-sm tip" data-tip="Revenu mensuel automatique" onClick={() => setModal({ type:"addRecurringIncome" })}>+ Récurrent</button>}
+              {page==="bills" && (
+                <button className="topbar-action-btn tip" data-tip="Créer une facture récurrente"
+                  style={{ background:"var(--grad-main)",color:"white",boxShadow:"0 4px 14px rgba(167,139,250,0.35)" }}
+                  onClick={() => setModal({ type:"addBill" })}>
+                  + Facture
+                </button>
+              )}
+              {page==="incomes" && (
+                <button className="topbar-action-btn tip" data-tip="Ajouter un revenu récurrent"
+                  style={{ background:"var(--grad-main)",color:"white",boxShadow:"0 4px 14px rgba(167,139,250,0.35)" }}
+                  onClick={() => setModal({ type:"addRecurringIncome" })}>
+                  + Récurrent
+                </button>
+              )}
+              {/* Sync dot */}
               <div className={`sync-dot tip ${syncStatus}`} data-tip={syncLabel[syncStatus]}/>
+              {/* Clock */}
               <LiveClock/>
             </div>
           </div>
@@ -1659,18 +1764,17 @@ function LiveClock() {
   const [now, setNow] = useState(new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()),1000); return () => clearInterval(t); }, []);
   const weekday = now.toLocaleDateString("fr-FR",{ weekday:"long" });
-  const date    = now.toLocaleDateString("fr-FR",{ day:"numeric",month:"long",year:"numeric" });
+  const dateStr = now.toLocaleDateString("fr-FR",{ day:"numeric",month:"long" });
   const hh=pad(now.getHours()),mm=pad(now.getMinutes()),ss=pad(now.getSeconds());
   return (
-    <div style={{ display:"flex",alignItems:"center",gap:10,flexShrink:0,background:"var(--glass)",border:"1px solid var(--border)",borderRadius:13,padding:"7px 14px",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.05)" }}>
-      <div style={{ textAlign:"right",lineHeight:1.2 }}>
-        <div style={{ fontSize:9.5,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:700 }}>{weekday}</div>
-        <div style={{ fontSize:12,color:"var(--text2)",fontWeight:600,marginTop:1 }}>{date}</div>
+    <div className="topbar-clock">
+      <div className="topbar-clock-date">
+        <div style={{ fontSize:9,color:"rgba(237,233,248,0.4)",textTransform:"uppercase",letterSpacing:1.2,fontWeight:800 }}>{weekday}</div>
+        <div style={{ fontSize:11.5,color:"rgba(237,233,248,0.7)",fontWeight:700,marginTop:1 }}>{dateStr}</div>
       </div>
-      <div style={{ width:1,height:28,background:"var(--border)" }}/>
-      <div style={{ display:"flex",alignItems:"baseline",gap:1,fontFamily:"'Fraunces',serif" }}>
-        <span style={{ fontSize:22,fontWeight:700,color:"var(--text)",letterSpacing:-1 }}>{hh}:{mm}</span>
-        <span style={{ fontSize:13,fontWeight:700,color:"var(--purple)",minWidth:22,textAlign:"left",animation:"pulse 1s steps(1) infinite" }}>:{ss}</span>
+      <div className="topbar-clock-time">
+        <span style={{ fontSize:20,fontWeight:700,color:"var(--text)",letterSpacing:-1 }}>{hh}:{mm}</span>
+        <span style={{ fontSize:12,fontWeight:700,color:"var(--purple)",minWidth:20,animation:"pulse 1s steps(1) infinite" }}>:{ss}</span>
       </div>
     </div>
   );
@@ -2485,11 +2589,13 @@ function Stats({ data, selMonth, mdata, allMonths }) {
   };
 
   const KpiCard = ({ icon, label, value, color, gradient, sub }) => (
-    <div className="stat-kpi-card" style={{ background:`linear-gradient(135deg,${gradient[0]},${gradient[1]})`,border:`1px solid ${color}30`,boxShadow:`0 8px 24px ${color}18` }}>
-      <div style={{ fontSize:26,marginBottom:8 }}>{icon}</div>
-      <div style={{ fontSize:10,color:"rgba(255,255,255,0.55)",textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontWeight:700 }}>{label}</div>
-      <div className="stat-num" style={{ fontSize:22,color:"white",letterSpacing:-.5 }}>{value}</div>
-      {sub && <div style={{ fontSize:11,color:"rgba(255,255,255,0.45)",marginTop:4 }}>{sub}</div>}
+    <div className="stat-kpi-card" style={{ background:`linear-gradient(145deg,${gradient[0]},${gradient[1]})`,border:`1px solid ${color}28`,boxShadow:`0 8px 28px ${color}20,0 2px 8px rgba(0,0,0,0.4)` }}>
+      <div style={{ display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14 }}>
+        <div style={{ width:44,height:44,borderRadius:13,background:`${color}20`,border:`1px solid ${color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22 }}>{icon}</div>
+        {sub && <div style={{ fontSize:11,color:`${color}99`,fontWeight:700,background:`${color}12`,borderRadius:20,padding:"3px 9px",maxWidth:"55%",textAlign:"right",lineHeight:1.3 }}>{sub}</div>}
+      </div>
+      <div style={{ fontSize:10,color:"rgba(255,255,255,0.45)",textTransform:"uppercase",letterSpacing:1.5,marginBottom:6,fontWeight:800 }}>{label}</div>
+      <div className="stat-num" style={{ fontSize:28,color:"white",letterSpacing:-.5,lineHeight:1 }}>{value}</div>
     </div>
   );
 
@@ -3234,19 +3340,47 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
           <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
             {data.profiles.map(p => (
               <div key={p.id} className="card" style={{ display:"flex",alignItems:"center",gap:16,borderColor:`${p.color}25` }}>
-                <div style={{ width:52,height:52,borderRadius:15,background:`${p.color}18`,border:`2px solid ${p.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26 }}>{p.avatar}</div>
+                {/* Avatar / photo */}
+                <div style={{ position:"relative",flexShrink:0 }}>
+                  {p.photo ? (
+                    <img src={p.photo} alt={p.name} style={{ width:56,height:56,borderRadius:16,objectFit:"cover",border:`2px solid ${p.color}50` }}/>
+                  ) : (
+                    <div style={{ width:56,height:56,borderRadius:16,background:`${p.color}18`,border:`2px solid ${p.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28 }}>{p.avatar}</div>
+                  )}
+                  {/* Photo upload overlay */}
+                  <label style={{ position:"absolute",inset:0,borderRadius:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0)",transition:"background .2s",margin:0 }}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(0,0,0,0.55)"}
+                    onMouseLeave={e=>e.currentTarget.style.background="rgba(0,0,0,0)"}>
+                    <span style={{ fontSize:18,opacity:0,transition:"opacity .2s" }} ref={r=>{if(r)r.closest('label').addEventListener('mouseenter',()=>r.style.opacity=1);if(r)r.closest('label')?.addEventListener('mouseleave',()=>r.style.opacity=0);}}>📷</span>
+                    <input type="file" accept="image/*" style={{ display:"none" }} onChange={e=>{
+                      const f=e.target.files?.[0]; if(!f) return;
+                      const reader=new FileReader();
+                      reader.onload=ev=>update(d=>{ const prof=d.profiles.find(x=>x.id===p.id); if(prof) prof.photo=ev.target.result; });
+                      reader.readAsDataURL(f);
+                    }}/>
+                  </label>
+                </div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontWeight:800,fontSize:16,color:p.color }}>{p.name}</div>
-                  <div style={{ fontSize:12,color:"var(--text3)",marginTop:2 }}>{p.id==="common"?"Compte commun":"Compte personnel"} · {p.color}</div>
+                  <div style={{ fontSize:12,color:"var(--text3)",marginTop:2 }}>{p.id==="common"?"Compte commun":"Compte personnel"}</div>
+                  {p.photo && (
+                    <button onClick={() => update(d=>{ const prof=d.profiles.find(x=>x.id===p.id); if(prof) prof.photo=null; })}
+                      style={{ marginTop:5,background:"none",border:"none",cursor:"pointer",fontSize:10,color:"var(--text3)",fontFamily:"'Outfit',sans-serif",padding:0,fontWeight:600 }}>
+                      🗑️ Supprimer la photo
+                    </button>
+                  )}
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => setModal({ type:"editProfile",profileId:p.id })}>✏️ Modifier</button>
               </div>
             ))}
           </div>
           <div className="card">
-            <div style={{ fontWeight:700,fontSize:13,marginBottom:12 }}>ℹ️ À propos des profils</div>
+            <div style={{ fontWeight:700,fontSize:13,marginBottom:12 }}>📸 Photo de profil</div>
             <div style={{ fontSize:12,color:"var(--text2)",lineHeight:1.7 }}>
-              Les profils représentent les membres du foyer. Chaque dépense est attribuée à un profil. Le compte commun est partagé entre les deux partenaires.
+              Cliquez sur l'avatar pour ajouter une photo personnalisée. Les photos sont stockées localement dans votre espace.
+            </div>
+            <div style={{ marginTop:12,padding:"10px 14px",background:"rgba(167,139,250,0.06)",border:"1px solid rgba(167,139,250,0.15)",borderRadius:11,fontSize:11,color:"var(--text3)",lineHeight:1.6 }}>
+              💡 Formats acceptés : JPG, PNG, GIF, WEBP
             </div>
           </div>
         </div>
@@ -3430,38 +3564,61 @@ function EssencePage() {
     gplc:   { label:"GPL",    icon:"💨", color:"#f87171" },
   };
 
-  const LS_PRICES  = "duobudget_fuel_prices_v4";
-  const LS_HISTORY = "duobudget_fuel_history_v4";
+  const LS_KEY = "duobudget_fuel_v5";
 
-  const [stations, setStations]         = useState([]);
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState("");
-  const [lastUpdate, setLastUpdate]     = useState(null);
-  const [history, setHistory]           = useState([]);
-  const [activeTab, setActiveTab]       = useState("prices");
-  const [chartFuel, setChartFuel]       = useState("sp95");
+  const [stations, setStations]       = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState("");
+  const [lastUpdate, setLastUpdate]   = useState(null);
+  const [history, setHistory]         = useState([]);
+  const [activeTab, setActiveTab]     = useState("prices");
+  const [chartFuel, setChartFuel]     = useState("sp95");
+  const [citySearch, setCitySearch]   = useState("Saint-Dizier");
+  const [cityInput, setCityInput]     = useState("Saint-Dizier");
+  const [countdown, setCountdown]     = useState(600); // 10min in seconds
+  const intervalRef = useRef(null);
 
-  // ── Charger cache localStorage ──
+  // Charger cache
   useEffect(() => {
     try {
-      const p = localStorage.getItem(LS_PRICES);
-      if (p) { setStations(JSON.parse(p)); setLastUpdate(new Date()); }
-      const h = localStorage.getItem(LS_HISTORY);
-      if (h) setHistory(JSON.parse(h));
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved) {
+        const { stations:s, history:h, city, ts } = JSON.parse(saved);
+        if (s) { setStations(s); setLastUpdate(new Date(ts)); }
+        if (h) setHistory(h);
+        if (city) { setCitySearch(city); setCityInput(city); }
+      }
     } catch {}
   }, []);
 
-  // ── Fetch API gouvernement ──
-  const doFetch = useCallback(async () => {
-    setLoading(true); setError("");
+  // Compte à rebours 10 min
+  useEffect(() => {
+    const t = setInterval(() => setCountdown(c => c <= 1 ? 600 : c - 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const doFetch = useCallback(async (city = citySearch) => {
+    setLoading(true); setError(""); setCountdown(600);
     try {
-      const url = "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=cp%3D'52100'&limit=20&timezone=Europe%2FParis";
+      // Chercher par nom de commune (insensible à la casse)
+      const encoded = encodeURIComponent(`search(nom_departement, "${city}") OR search(ville, "${city}")`);
+      const url = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=ville%20like%20'${encodeURIComponent(city)}'&limit=30&timezone=Europe%2FParis&order_by=nom`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur réseau " + res.status);
       const json = await res.json();
-      if (!json.results?.length) throw new Error("Aucune station trouvée pour Saint-Dizier (52100)");
 
-      const parsed = json.results.map(r => {
+      // Fallback: chercher par CP si le nom ne donne rien
+      let results = json.results || [];
+      if (results.length === 0 && /^\d{5}$/.test(city.trim())) {
+        const url2 = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=cp%3D'${city.trim()}'&limit=30&timezone=Europe%2FParis`;
+        const res2 = await fetch(url2);
+        const json2 = await res2.json();
+        results = json2.results || [];
+      }
+
+      if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez un autre nom de ville ou un code postal.`);
+
+      const parsed = results.map(r => {
         const fuels = {};
         Object.keys(FUEL_META).forEach(k => {
           const v = parseFloat(r[k + "_prix"]);
@@ -3469,69 +3626,76 @@ function EssencePage() {
         });
         return {
           id: r.id || r.adresse,
-          nom: r.nom || r.adresse || "Station",
-          adresse: r.adresse || "",
+          nom: r.enseignes?.[0] || r.nom || "Station",
+          adresse: [r.adresse, r.ville].filter(Boolean).join(", "),
+          cp: r.cp || "",
+          ville: r.ville || city,
           ...fuels,
         };
       }).filter(s => Object.keys(FUEL_META).some(k => s[k] != null));
 
+      if (!parsed.length) throw new Error(`Aucun prix disponible pour "${city}".`);
+
+      const ts = new Date().toISOString();
+      const tsFmt = new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) + " " +
+                    new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+
       setStations(parsed);
       setLastUpdate(new Date());
-      try { localStorage.setItem(LS_PRICES, JSON.stringify(parsed)); } catch {}
 
-      // Historique : une entrée par station par fetch
-      const ts = new Date().toISOString();
-      const tsFmt = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) +
-                    " " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
       const newEntries = parsed.map(s => ({
-        ts, tsFmt,
-        stationId: s.id,
-        stationNom: (s.nom || "Station").slice(0, 22),
-        ...Object.fromEntries(Object.keys(FUEL_META).map(k => [k, s[k]])),
+        ts, tsFmt, stationId:s.id, stationNom:(s.nom||"Station").slice(0,20),
+        ...Object.fromEntries(Object.keys(FUEL_META).map(k=>[k,s[k]])),
       }));
       setHistory(prev => {
-        const cutoff = new Date(Date.now() - 86400000 * 30).toISOString(); // garder 30j
-        const lastHour = new Date(Date.now() - 3600000).toISOString();
-        const cleaned = prev.filter(e => e.ts >= cutoff && e.ts < lastHour);
-        const next = [...cleaned, ...newEntries].slice(-600);
-        try { localStorage.setItem(LS_HISTORY, JSON.stringify(next)); } catch {}
+        const cutoff = new Date(Date.now() - 86400000*30).toISOString();
+        const last10 = new Date(Date.now() - 600000).toISOString();
+        const cleaned = prev.filter(e => e.ts >= cutoff && e.ts < last10);
+        const next = [...cleaned, ...newEntries].slice(-800);
+        try { localStorage.setItem(LS_KEY, JSON.stringify({stations:parsed,history:next,city,ts:Date.now()})); } catch {}
         return next;
       });
-    } catch (e) {
-      setError(e.message || "Erreur inconnue");
-    }
+    } catch(e) { setError(e.message || "Erreur inconnue"); }
     setLoading(false);
-  }, []);
+  }, [citySearch]);
 
+  // Auto-refresh toutes les 10 min
   useEffect(() => {
-    doFetch();
-    const t = setInterval(doFetch, 30 * 60 * 1000);
-    return () => clearInterval(t);
-  }, [doFetch]);
+    doFetch(citySearch);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => doFetch(citySearch), 10 * 60 * 1000);
+    return () => clearInterval(intervalRef.current);
+  }, [citySearch]);
 
-  // ── Données graphique linéaire ──
+  const handleSearch = () => {
+    const c = cityInput.trim();
+    if (!c) return;
+    setCitySearch(c);
+  };
+
+  // Graphique
   const chartData = useMemo(() => {
-    if (history.length === 0) return [];
+    if (!history.length) return [];
     const byTs = {};
     history.forEach(e => {
-      if (!byTs[e.ts]) byTs[e.ts] = { ts: e.ts, tsFmt: e.tsFmt };
+      if (!byTs[e.ts]) byTs[e.ts] = { ts:e.ts, tsFmt:e.tsFmt };
       if (e[chartFuel] != null) byTs[e.ts][e.stationNom] = e[chartFuel];
     });
-    return Object.values(byTs).sort((a, b) => a.ts.localeCompare(b.ts)).slice(-60);
+    return Object.values(byTs).sort((a,b)=>a.ts.localeCompare(b.ts)).slice(-60);
   }, [history, chartFuel]);
 
   const chartLines = useMemo(() => {
     const names = new Set();
-    chartData.forEach(d => Object.keys(d).filter(k => k !== "ts" && k !== "tsFmt").forEach(k => names.add(k)));
-    const COLORS = ["#60a5fa", "#f472b6", "#4ade80", "#fbbf24", "#a78bfa", "#f87171"];
-    return [...names].map((n, i) => ({ key: n, color: COLORS[i % COLORS.length] }));
+    chartData.forEach(d => Object.keys(d).filter(k=>k!=="ts"&&k!=="tsFmt").forEach(k=>names.add(k)));
+    const COLORS = ["#60a5fa","#f472b6","#4ade80","#fbbf24","#a78bfa","#f87171","#34d399"];
+    return [...names].map((n,i) => ({ key:n, color:COLORS[i%COLORS.length] }));
   }, [chartData]);
 
   const avgPrices = useMemo(() => {
     const res = {};
     Object.keys(FUEL_META).forEach(k => {
-      const vals = stations.map(s => s[k]).filter(v => v != null);
-      res[k] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      const vals = stations.map(s=>s[k]).filter(v=>v!=null);
+      res[k] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
     });
     return res;
   }, [stations]);
@@ -3539,232 +3703,222 @@ function EssencePage() {
   const bestStation = useMemo(() => {
     const res = {};
     Object.keys(FUEL_META).forEach(k => {
-      const withVal = stations.filter(s => s[k] != null).sort((a, b) => a[k] - b[k]);
-      res[k] = withVal[0] || null;
+      const sorted = stations.filter(s=>s[k]!=null).sort((a,b)=>a[k]-b[k]);
+      res[k] = sorted[0] || null;
     });
     return res;
   }, [stations]);
 
-  const fmtUpd = d => d
-    ? "Mis à jour le " + d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) +
-      " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-    : null;
+  const fmtUpd = d => d ? d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) + " à " + d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : null;
+  const mm = String(Math.floor(countdown/60)).padStart(2,"0");
+  const ss2 = String(countdown%60).padStart(2,"0");
 
-  const FuelTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px", fontSize: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 6, color: "var(--text2)" }}>{label}</div>
-        {payload.map(p => (
-          <div key={p.dataKey} style={{ color: p.color, fontWeight: 700, marginBottom: 3 }}>
-            {p.name} : {p.value?.toFixed(3)} €/L
-          </div>
-        ))}
-      </div>
-    );
+  const FuelTooltip = ({ active,payload,label }) => {
+    if (!active||!payload?.length) return null;
+    return <div style={{ background:"var(--card,#1a1635)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px",fontSize:12 }}>
+      <div style={{ fontWeight:800,marginBottom:6,color:"var(--text2)" }}>{label}</div>
+      {payload.map(p=><div key={p.dataKey} style={{ color:p.color,fontWeight:700,marginBottom:3 }}>{p.name}: {p.value?.toFixed(3)} €/L</div>)}
+    </div>;
   };
 
   return (
-    <div className="fade-up" style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div className="fade-up" style={{ maxWidth:1100,margin:"0 auto" }}>
 
-      {/* ── Header ── */}
-      <div className="card" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-        <div style={{ width: 52, height: 52, borderRadius: 16, background: "linear-gradient(135deg,#fbbf24,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, boxShadow: "0 6px 20px rgba(251,191,36,0.4)", flexShrink: 0 }}>⛽</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 2 }}>Prix Carburants — Saint-Dizier (52100)</div>
-          <div style={{ fontSize: 11, color: "var(--text3)" }}>
-            {loading ? "⟳ Actualisation…"
-              : error ? "⚠️ Erreur"
-              : stations.length > 0 ? `✅ ${stations.length} station${stations.length > 1 ? "s" : ""} · ${fmtUpd(lastUpdate)}`
-              : "En attente…"}
+      {/* ── Header card ── */}
+      <div className="card" style={{ marginBottom:16,background:"linear-gradient(135deg,rgba(251,191,36,0.06),rgba(167,139,250,0.04))",borderColor:"rgba(251,191,36,0.15)" }}>
+        <div style={{ display:"flex",alignItems:"center",gap:14,flexWrap:"wrap" }}>
+          <div style={{ width:54,height:54,borderRadius:17,background:"linear-gradient(135deg,#f59e0b,#fbbf24)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,boxShadow:"0 6px 22px rgba(251,191,36,0.4)",flexShrink:0 }}>⛽</div>
+          <div style={{ flex:1,minWidth:0 }}>
+            <div style={{ fontWeight:900,fontSize:18,marginBottom:2 }}>Prix Carburants</div>
+            <div style={{ fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap" }}>
+              {loading ? <><span style={{ color:"var(--yellow)" }}>⟳</span> Actualisation…</>
+                : error ? <span style={{ color:"var(--red)" }}>⚠️ Erreur</span>
+                : stations.length > 0 ? <><span style={{ color:"var(--green)" }}>✅</span> {stations.length} station{stations.length>1?"s":""} · {fmtUpd(lastUpdate)}</>
+                : "En attente…"}
+              {!loading && <span style={{ color:"var(--text3)",fontSize:11 }}>· Actualisation dans {mm}:{ss2}</span>}
+            </div>
+          </div>
+          {/* City search */}
+          <div style={{ display:"flex",gap:8,alignItems:"center",flex:1,minWidth:220,maxWidth:380 }}>
+            <div style={{ flex:1,position:"relative" }}>
+              <span style={{ position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none" }}>🔍</span>
+              <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&handleSearch()}
+                placeholder="Ville ou code postal…"
+                style={{ paddingLeft:34,fontSize:13,borderRadius:11,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)" }}/>
+            </div>
+            <button className="btn btn-primary" onClick={handleSearch} disabled={loading||!cityInput.trim()} style={{ padding:"10px 16px",fontSize:13,whiteSpace:"nowrap",flexShrink:0 }}>
+              Chercher
+            </button>
+          </div>
+          {/* Tabs + refresh */}
+          <div style={{ display:"flex",gap:6,alignItems:"center",flexShrink:0 }}>
+            {[["prices","💰","Prix"],["chart","📈","Courbes"]].map(([id,ic,lb])=>(
+              <button key={id} onClick={()=>setActiveTab(id)}
+                style={{ padding:"8px 13px",borderRadius:10,border:activeTab===id?"1px solid rgba(167,139,250,0.5)":"1px solid var(--border)",background:activeTab===id?"rgba(167,139,250,0.15)":"var(--glass)",color:activeTab===id?"var(--purple)":"var(--text2)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
+                {ic} {lb}
+              </button>
+            ))}
+            <button className="btn btn-ghost btn-sm tip" data-tip="Forcer l'actualisation maintenant"
+              onClick={()=>doFetch(citySearch)} disabled={loading}
+              style={{ padding:"9px 12px" }}>
+              {loading?"⟳":"🔄"}
+            </button>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {[["prices", "💰", "Prix"], ["chart", "📈", "Courbes"]].map(([id, ic, lb]) => (
-            <button key={id} onClick={() => setActiveTab(id)}
-              style={{ padding: "8px 14px", borderRadius: 10, border: activeTab === id ? "1px solid rgba(167,139,250,0.5)" : "1px solid var(--border)", background: activeTab === id ? "rgba(167,139,250,0.15)" : "var(--glass)", color: activeTab === id ? "var(--purple)" : "var(--text2)", cursor: "pointer", fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 13 }}>
-              {ic} {lb}
-            </button>
-          ))}
-        </div>
-        <button className="btn btn-primary" onClick={doFetch} disabled={loading} style={{ padding: "9px 18px", fontSize: 13 }}>
-          {loading ? "⟳ Chargement…" : "🔄 Actualiser"}
-        </button>
       </div>
 
-      {/* ── Erreur ── */}
       {error && (
-        <div style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
-          <div style={{ fontWeight: 800, color: "var(--red)", marginBottom: 6 }}>⚠️ Impossible de charger les prix</div>
-          <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 8 }}>{error}</div>
-          <div style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1.6 }}>
-            💡 Données issues de <strong>data.economie.gouv.fr</strong> (API officielle du gouvernement, gratuite et publique). Vérifiez votre connexion internet.
-          </div>
-          <button className="btn btn-primary" onClick={doFetch} style={{ marginTop: 12, fontSize: 12, padding: "8px 18px" }}>🔄 Réessayer</button>
+        <div style={{ background:"rgba(248,113,113,0.07)",border:"1px solid rgba(248,113,113,0.22)",borderRadius:14,padding:"14px 18px",marginBottom:16 }}>
+          <div style={{ fontWeight:800,color:"var(--red)",marginBottom:5 }}>⚠️ {error}</div>
+          <div style={{ fontSize:11,color:"var(--text3)" }}>Essayez un autre nom de ville, un code postal, ou vérifiez votre connexion.</div>
         </div>
       )}
 
-      {/* ══════════════ TAB PRIX ══════════════ */}
-      {activeTab === "prices" && (
+      {/* ══ TAB PRIX ══ */}
+      {activeTab==="prices" && stations.length>0 && (
         <div>
-          {stations.length > 0 && (
-            <>
-              {/* Grille carburants */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12, marginBottom: 16 }}>
-                {Object.entries(FUEL_META).map(([k, meta]) => {
-                  const avg = avgPrices[k];
-                  if (!avg) return null;
-                  const best = bestStation[k];
-                  return (
-                    <div key={k} style={{ background: `${meta.color}09`, border: `1.5px solid ${meta.color}22`, borderRadius: 16, padding: "16px 14px", position: "relative", overflow: "hidden" }}>
-                      <div style={{ position: "absolute", top: -10, right: -10, fontSize: 50, opacity: .06 }}>{meta.icon}</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
-                        <span style={{ fontSize: 18 }}>{meta.icon}</span>
-                        <span style={{ fontWeight: 800, fontSize: 13, color: meta.color }}>{meta.label}</span>
-                      </div>
-                      <div style={{ fontFamily: "'Fraunces',serif", fontSize: 27, fontWeight: 900, marginBottom: 2 }}>
-                        {avg.toFixed(3)}<span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)" }}> €/L</span>
-                      </div>
-                      <div style={{ fontSize: 10, color: "var(--text3)" }}>Moy. {stations.length} stations</div>
-                      {best && (
-                        <div style={{ fontSize: 10, color: meta.color, fontWeight: 700, marginTop: 5, borderTop: `1px solid ${meta.color}18`, paddingTop: 5 }}>
-                          📍 Moins cher : {best.nom.slice(0, 18)}<br/>{best[k]?.toFixed(3)} €/L
-                        </div>
-                      )}
+          {/* Cartes synthèse par carburant */}
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:12,marginBottom:16 }}>
+            {Object.entries(FUEL_META).map(([k,meta])=>{
+              const avg = avgPrices[k];
+              if (!avg) return null;
+              const best = bestStation[k];
+              return (
+                <div key={k} style={{ background:`linear-gradient(145deg,${meta.color}0a,${meta.color}04)`,border:`1.5px solid ${meta.color}20`,borderRadius:18,padding:"16px 14px",position:"relative",overflow:"hidden" }}>
+                  <div style={{ position:"absolute",top:-12,right:-12,fontSize:54,opacity:.06 }}>{meta.icon}</div>
+                  <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:12 }}>
+                    <div style={{ width:34,height:34,borderRadius:10,background:`${meta.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17 }}>{meta.icon}</div>
+                    <span style={{ fontWeight:900,fontSize:14,color:meta.color }}>{meta.label}</span>
+                  </div>
+                  <div style={{ fontFamily:"'Fraunces',serif",fontSize:28,fontWeight:900,letterSpacing:-.5,marginBottom:3 }}>
+                    {avg.toFixed(3)}<span style={{ fontSize:13,fontWeight:400,color:"var(--text3)" }}>€/L</span>
+                  </div>
+                  <div style={{ fontSize:10,color:"var(--text3)",fontWeight:600 }}>Moy. {stations.length} stations</div>
+                  {best && (
+                    <div style={{ marginTop:8,paddingTop:8,borderTop:`1px solid ${meta.color}15`,fontSize:10,color:meta.color,fontWeight:700,lineHeight:1.4 }}>
+                      📍 {best.nom.slice(0,18)}<br/>
+                      <span style={{ fontFamily:"'Fraunces',serif",fontSize:13 }}>{best[k]?.toFixed(3)} €/L</span>
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* Tableau détail */}
-              <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 14 }}>
-                <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", fontWeight: 800, fontSize: 14 }}>📋 Détail par station</div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ background: "rgba(255,255,255,0.025)" }}>
-                        <th style={{ padding: "10px 16px", textAlign: "left", color: "var(--text3)", fontSize: 11, textTransform: "uppercase", letterSpacing: .8 }}>Station</th>
-                        {Object.entries(FUEL_META).map(([k, m]) => (
-                          <th key={k} style={{ padding: "10px 12px", textAlign: "center", color: m.color, fontSize: 11 }}>{m.icon} {m.label}</th>
-                        ))}
-                        <th style={{ padding: "10px 12px", textAlign: "center", color: "var(--text3)", fontSize: 11 }}>Plein 50L</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stations.map((s, i) => (
-                        <tr key={s.id || i} style={{ borderTop: "1px solid var(--border)" }}
-                          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          <td style={{ padding: "12px 16px" }}>
-                            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>{s.nom}</div>
-                            <div style={{ fontSize: 10, color: "var(--text3)" }}>{s.adresse}</div>
-                          </td>
-                          {Object.keys(FUEL_META).map(k => {
-                            const isBest = s[k] != null && s[k] === bestStation[k]?.[k] && stations.filter(x => x[k] != null).length > 1;
-                            return (
-                              <td key={k} style={{ padding: "12px", textAlign: "center" }}>
-                                {s[k] != null ? (
-                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                    <span style={{ fontFamily: "'Fraunces',serif", fontWeight: 800, fontSize: 14, color: isBest ? "var(--green)" : "var(--text)" }}>{s[k].toFixed(3)}</span>
-                                    {isBest && <span style={{ fontSize: 9, color: "var(--green)", fontWeight: 800, background: "rgba(74,222,128,0.1)", borderRadius: 5, padding: "1px 4px" }}>✓ Moins cher</span>}
-                                  </div>
-                                ) : <span style={{ color: "var(--text3)" }}>—</span>}
-                              </td>
-                            );
-                          })}
-                          <td style={{ padding: "12px", textAlign: "center" }}>
-                            {s.sp95 != null
-                              ? <span style={{ fontFamily: "'Fraunces',serif", fontWeight: 800, fontSize: 13 }}>{(s.sp95 * 50).toFixed(2)} €</span>
-                              : <span style={{ color: "var(--text3)" }}>—</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  )}
                 </div>
-              </div>
+              );
+            })}
+          </div>
 
-              {/* Simulateur */}
-              <FuelSimulator avgPrices={avgPrices} FUEL_META={FUEL_META} />
-            </>
-          )}
-          {!loading && stations.length === 0 && !error && (
-            <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text3)" }}>
-              <div style={{ fontSize: 52, marginBottom: 12 }}>⛽</div>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Chargement des prix en cours…</div>
-              <button className="btn btn-primary" onClick={doFetch}>🔄 Actualiser</button>
+          {/* Tableau stations */}
+          <div className="card" style={{ padding:0,overflow:"hidden",marginBottom:14 }}>
+            <div style={{ padding:"15px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10 }}>
+              <div style={{ fontWeight:800,fontSize:14 }}>📋 Stations à {stations[0]?.ville || citySearch}</div>
+              <div style={{ fontSize:11,color:"var(--text3)",marginLeft:"auto" }}>{stations.length} résultat{stations.length>1?"s":""}</div>
             </div>
-          )}
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ width:"100%",borderCollapse:"collapse",fontSize:12 }}>
+                <thead>
+                  <tr style={{ background:"rgba(255,255,255,0.025)" }}>
+                    <th style={{ padding:"11px 16px",textAlign:"left",color:"var(--text3)",fontSize:11,textTransform:"uppercase",letterSpacing:.8,fontWeight:800 }}>Station / Adresse</th>
+                    {Object.entries(FUEL_META).map(([k,m])=>(
+                      <th key={k} style={{ padding:"11px 10px",textAlign:"center",color:m.color,fontSize:11,fontWeight:800 }}>{m.icon}<br/>{m.label}</th>
+                    ))}
+                    <th style={{ padding:"11px 10px",textAlign:"center",color:"var(--text3)",fontSize:11,fontWeight:700 }}>Plein<br/>50L SP95</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stations.map((s,i)=>(
+                    <tr key={s.id||i} style={{ borderTop:"1px solid var(--border)" }}
+                      onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.025)"}
+                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      <td style={{ padding:"13px 16px",minWidth:180 }}>
+                        <div style={{ fontWeight:800,fontSize:13,marginBottom:2 }}>{s.nom}</div>
+                        <div style={{ fontSize:10,color:"var(--text3)",lineHeight:1.4 }}>{s.adresse}</div>
+                        {s.cp && <div style={{ fontSize:9,color:"var(--text3)",marginTop:2,background:"rgba(255,255,255,0.04)",display:"inline-block",borderRadius:6,padding:"1px 6px" }}>📮 {s.cp}</div>}
+                      </td>
+                      {Object.keys(FUEL_META).map(k=>{
+                        const isBest = s[k]!=null && s[k]===bestStation[k]?.[k] && stations.filter(x=>x[k]!=null).length>1;
+                        return (
+                          <td key={k} style={{ padding:"13px 10px",textAlign:"center" }}>
+                            {s[k]!=null ? (
+                              <div style={{ display:"flex",flexDirection:"column",alignItems:"center",gap:3 }}>
+                                <span style={{ fontFamily:"'Fraunces',serif",fontWeight:800,fontSize:15,color:isBest?"var(--green)":"var(--text)" }}>{s[k].toFixed(3)}</span>
+                                {isBest && <span style={{ fontSize:9,color:"var(--green)",fontWeight:800,background:"rgba(74,222,128,0.1)",borderRadius:5,padding:"1px 5px" }}>✓ Moins cher</span>}
+                              </div>
+                            ) : <span style={{ color:"var(--text3)",fontSize:16 }}>—</span>}
+                          </td>
+                        );
+                      })}
+                      <td style={{ padding:"13px 10px",textAlign:"center" }}>
+                        {s.sp95!=null
+                          ? <div><div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,color:"var(--purple)" }}>{(s.sp95*50).toFixed(2)}€</div><div style={{ fontSize:9,color:"var(--text3)" }}>{s.sp95.toFixed(3)}/L</div></div>
+                          : <span style={{ color:"var(--text3)" }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <FuelSimulator avgPrices={avgPrices} FUEL_META={FUEL_META}/>
         </div>
       )}
 
-      {/* ══════════════ TAB COURBES ══════════════ */}
-      {activeTab === "chart" && (
+      {activeTab==="prices" && !loading && stations.length===0 && !error && (
+        <div style={{ textAlign:"center",padding:"60px 20px",color:"var(--text3)" }}>
+          <div style={{ fontSize:52,marginBottom:12 }}>⛽</div>
+          <div style={{ fontWeight:700,fontSize:15,marginBottom:12 }}>Recherchez une ville pour afficher les prix</div>
+        </div>
+      )}
+
+      {/* ══ TAB COURBES ══ */}
+      {activeTab==="chart" && (
         <div>
-          {/* Sélecteur carburant */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontWeight: 700, fontSize: 12, color: "var(--text3)" }}>Carburant :</span>
-            {Object.entries(FUEL_META).map(([k, m]) => (
-              <button key={k} onClick={() => setChartFuel(k)}
-                style={{ padding: "6px 13px", borderRadius: 9, border: chartFuel === k ? `1px solid ${m.color}` : "1px solid var(--border)", background: chartFuel === k ? `${m.color}18` : "var(--glass)", color: chartFuel === k ? m.color : "var(--text3)", cursor: "pointer", fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 12 }}>
+          <div style={{ display:"flex",gap:8,marginBottom:16,flexWrap:"wrap" }}>
+            <span style={{ fontWeight:700,fontSize:12,color:"var(--text3)",alignSelf:"center" }}>Carburant :</span>
+            {Object.entries(FUEL_META).map(([k,m])=>(
+              <button key={k} onClick={()=>setChartFuel(k)}
+                style={{ padding:"6px 12px",borderRadius:9,border:chartFuel===k?`1px solid ${m.color}`:"1px solid var(--border)",background:chartFuel===k?`${m.color}18`:"var(--glass)",color:chartFuel===k?m.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
                 {m.icon} {m.label}
               </button>
             ))}
           </div>
 
-          {/* Graphique linéaire évolution */}
-          <div className="card" style={{ marginBottom: 14 }}>
-            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>
-              📈 Évolution — {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 16 }}>
-              {chartData.length} points · chaque actualisation ajoute un point toutes les 30 min
-            </div>
-            {chartData.length >= 2 ? (
+          <div className="card" style={{ marginBottom:14 }}>
+            <div style={{ fontWeight:800,fontSize:14,marginBottom:4 }}>📈 Évolution — {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label} · {citySearch}</div>
+            <div style={{ fontSize:11,color:"var(--text3)",marginBottom:16 }}>Actualisation toutes les 10 min · {chartData.length} points enregistrés</div>
+            {chartData.length>=2 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="tsFmt" tick={{ fill: "var(--text3)", fontSize: 10 }} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
-                  <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--text3)", fontSize: 10 }} tickLine={false} axisLine={false}
-                    tickFormatter={v => v?.toFixed(3) + "€"} />
-                  <Tooltip content={<FuelTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                  {chartLines.map(l => (
+                <LineChart data={chartData} margin={{ top:5,right:20,left:0,bottom:5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
+                  <XAxis dataKey="tsFmt" tick={{ fill:"var(--text3)",fontSize:10 }} tickLine={false} axisLine={{ stroke:"var(--border)" }}/>
+                  <YAxis domain={["auto","auto"]} tick={{ fill:"var(--text3)",fontSize:10 }} tickLine={false} axisLine={false} tickFormatter={v=>v?.toFixed(3)+"€"}/>
+                  <Tooltip content={<FuelTooltip/>}/>
+                  <Legend wrapperStyle={{ fontSize:11,paddingTop:10 }}/>
+                  {chartLines.map(l=>(
                     <Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color} strokeWidth={2.5}
-                      dot={{ r: 4, fill: l.color, strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} name={l.key} />
+                      dot={{ r:3,fill:l.color,strokeWidth:0 }} activeDot={{ r:5,strokeWidth:0 }} name={l.key}/>
                   ))}
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text3)" }}>
-                <div style={{ fontSize: 44, marginBottom: 10 }}>📊</div>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Historique en cours de constitution</div>
-                <div style={{ fontSize: 12, marginBottom: 16, lineHeight: 1.6 }}>
-                  Les courbes s'affichent après plusieurs actualisations.<br />
-                  Revenez demain pour voir l'évolution !
-                </div>
-                <button className="btn btn-primary" onClick={doFetch} disabled={loading}>🔄 Actualiser maintenant</button>
+              <div style={{ textAlign:"center",padding:"40px 20px",color:"var(--text3)" }}>
+                <div style={{ fontSize:44,marginBottom:10 }}>📊</div>
+                <div style={{ fontWeight:700,marginBottom:6 }}>Historique en cours de constitution</div>
+                <div style={{ fontSize:12,marginBottom:16,lineHeight:1.6 }}>L'app enregistre les prix toutes les 10 min.<br/>Revenez dans quelques heures pour voir l'évolution !</div>
+                <button className="btn btn-primary" onClick={()=>doFetch(citySearch)} disabled={loading}>🔄 Actualiser</button>
               </div>
             )}
           </div>
 
-          {/* Barres comparatif actuel */}
-          {stations.length > 0 && avgPrices[chartFuel] != null && (
+          {stations.length>0 && avgPrices[chartFuel]!=null && (
             <div className="card">
-              <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 14 }}>
-                📊 Comparatif stations — {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label} aujourd'hui
-              </div>
+              <div style={{ fontWeight:800,fontSize:14,marginBottom:14 }}>📊 Comparatif stations — {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label}</div>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart
-                  data={stations.filter(s => s[chartFuel] != null).map(s => ({ nom: (s.nom || "Station").slice(0, 18), prix: s[chartFuel] }))}
-                  margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="nom" tick={{ fill: "var(--text3)", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
-                  <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--text3)", fontSize: 10 }} tickLine={false} axisLine={false}
-                    tickFormatter={v => v.toFixed(3)} />
-                  <Tooltip formatter={(v) => [v?.toFixed(3) + " €/L", "Prix"]}
-                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12 }} />
-                  <Bar dataKey="prix" radius={[8, 8, 0, 0]} fill={FUEL_META[chartFuel]?.color || "#a78bfa"} maxBarSize={80} />
+                <BarChart data={stations.filter(s=>s[chartFuel]!=null).map(s=>({ nom:(s.nom||"Station").slice(0,16),prix:s[chartFuel] }))} margin={{ top:0,right:16,left:0,bottom:0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false}/>
+                  <XAxis dataKey="nom" tick={{ fill:"var(--text3)",fontSize:10 }} tickLine={false} axisLine={{ stroke:"var(--border)" }}/>
+                  <YAxis domain={["auto","auto"]} tick={{ fill:"var(--text3)",fontSize:10 }} tickLine={false} axisLine={false} tickFormatter={v=>v.toFixed(3)}/>
+                  <Tooltip formatter={v=>[v?.toFixed(3)+" €/L","Prix"]} contentStyle={{ background:"var(--card,#1a1635)",border:"1px solid var(--border)",borderRadius:10,fontSize:12 }}/>
+                  <Bar dataKey="prix" radius={[8,8,0,0]} fill={FUEL_META[chartFuel]?.color||"#a78bfa"} maxBarSize={80}/>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -3772,13 +3926,12 @@ function EssencePage() {
         </div>
       )}
 
-      <div style={{ marginTop: 16, padding: "10px 14px", fontSize: 11, color: "var(--text3)", textAlign: "center" }}>
-        Source : <strong style={{ color: "var(--text2)" }}>data.economie.gouv.fr</strong> — API officielle du gouvernement français · Actualisation automatique toutes les 30 min
+      <div style={{ marginTop:16,padding:"10px 14px",fontSize:11,color:"var(--text3)",textAlign:"center" }}>
+        Source : <strong style={{ color:"var(--text2)" }}>data.economie.gouv.fr</strong> — API officielle du gouvernement · Actualisation automatique toutes les 10 min
       </div>
     </div>
   );
 }
-
 function FuelSimulator({ avgPrices, FUEL_META }) {
   const [liters, setLiters] = useState(50);
   const [fuel, setFuel]     = useState("sp95");
