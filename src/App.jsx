@@ -3738,11 +3738,12 @@ function EssencePage() {
           const v = parseFloat(r[k + "_prix"]);
           fuels[k] = isNaN(v) ? null : v;
         });
-        // Real station name from enseignes array or nom field
-        const rawNom = Array.isArray(r.enseignes) && r.enseignes.length
-          ? r.enseignes.join(" / ")
-          : (r.nom && r.nom !== "Station" ? r.nom : null);
-        const stationNom = rawNom || `Station ${r.cp || ""}`.trim();
+        // Robust station name: handle array, stringified JSON, or plain string
+        let ens = r.enseignes;
+        if (typeof ens === "string") { try { ens = JSON.parse(ens); } catch { ens = ens ? [ens] : []; } }
+        const ensNom = Array.isArray(ens) ? ens.filter(Boolean).join(" / ") : "";
+        const rawNom = ensNom || (r.nom && !/^station$/i.test(r.nom) ? r.nom : "");
+        const stationNom = rawNom || (r.adresse ? r.adresse.split(",")[0].trim() : `Station ${r.cp||""}`.trim());
         return {
           id: r.id || r.adresse,
           nom: stationNom,
@@ -3907,44 +3908,29 @@ function EssencePage() {
       {/* ══ TAB PRIX ══ */}
       {activeTab==="prices" && stations.length>0 && (
         <div>
-          {/* Cartes par carburant — station la moins chère */}
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10,marginBottom:16 }}>
+          {/* Cartes synthèse — prix le plus bas par carburant */}
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:10,marginBottom:16 }}>
             {Object.entries(FUEL_META).map(([k,meta])=>{
-              const stationsWithFuel = stations.filter(s=>s[k]!=null);
-              if (!stationsWithFuel.length) return null;
-              const cheapest = stationsWithFuel.reduce((a,b)=>a[k]<b[k]?a:b);
-              const avg = avgPrices[k];
-              const diff = avg ? ((cheapest[k]-avg)*100).toFixed(1) : null;
+              const list = stations.filter(s=>s[k]!=null);
+              if (!list.length) return null;
+              const best = list.reduce((a,b)=>a[k]<b[k]?a:b);
               return (
-                <div key={k} style={{ background:`linear-gradient(145deg,${meta.color}0d,${meta.color}05)`,border:`1.5px solid ${meta.color}25`,borderRadius:18,padding:"14px",position:"relative",overflow:"hidden" }}>
-                  <div style={{ position:"absolute",top:-14,right:-14,fontSize:58,opacity:.05 }}>{meta.icon}</div>
-                  {/* Header */}
-                  <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:10 }}>
-                    <div style={{ width:32,height:32,borderRadius:9,background:`${meta.color}1a`,border:`1px solid ${meta.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0 }}>{meta.icon}</div>
-                    <span style={{ fontWeight:900,fontSize:13,color:meta.color }}>{meta.label}</span>
+                <div key={k} style={{ background:`linear-gradient(160deg,${meta.color}0b,transparent)`,border:`1.5px solid ${meta.color}20`,borderRadius:18,padding:"15px 13px",position:"relative",overflow:"hidden" }}>
+                  <div style={{ position:"absolute",bottom:-8,right:-8,fontSize:60,opacity:.04,pointerEvents:"none" }}>{meta.icon}</div>
+                  {/* Label */}
+                  <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:11 }}>
+                    <div style={{ width:27,height:27,borderRadius:8,background:`${meta.color}16`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14 }}>{meta.icon}</div>
+                    <span style={{ fontWeight:900,fontSize:12,color:meta.color,letterSpacing:.3 }}>{meta.label}</span>
                   </div>
-                  {/* Best price - big */}
-                  <div style={{ fontFamily:"'Fraunces',serif",fontSize:30,fontWeight:900,color:"var(--text)",letterSpacing:-.5,lineHeight:1,marginBottom:2 }}>
-                    {cheapest[k].toFixed(3)}<span style={{ fontSize:12,fontWeight:400,color:"var(--text3)" }}>€/L</span>
+                  {/* Price */}
+                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,lineHeight:1,marginBottom:11 }}>
+                    <span style={{ fontSize:30,color:"var(--text)",letterSpacing:-1 }}>{best[k].toFixed(3)}</span>
+                    <span style={{ fontSize:11,color:"var(--text3)",fontWeight:400 }}> €/L</span>
                   </div>
-                  {diff!==null && (
-                    <div style={{ fontSize:10,color:parseFloat(diff)<0?"var(--green)":"var(--text3)",fontWeight:700,marginBottom:8 }}>
-                      {parseFloat(diff)<0 ? `▼ ${Math.abs(diff)}cts sous la moy.` : `Moy. ${avg?.toFixed(3)}€/L`}
-                    </div>
-                  )}
-                  {/* Station info */}
-                  <div style={{ paddingTop:8,borderTop:`1px solid ${meta.color}18` }}>
-                    <div style={{ fontWeight:800,fontSize:12,color:"var(--text)",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                      📍 {cheapest.nom}
-                    </div>
-                    <div style={{ fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                      {cheapest.adresse}
-                    </div>
-                    {cheapest.cp && <span style={{ fontSize:9,color:meta.color,fontWeight:700,marginTop:3,display:"inline-block",background:`${meta.color}15`,borderRadius:5,padding:"1px 5px" }}>{cheapest.cp}</span>}
-                  </div>
-                  {/* Badge: cheapest of N stations */}
-                  <div style={{ position:"absolute",top:10,right:10,background:`${meta.color}20`,border:`1px solid ${meta.color}35`,borderRadius:20,padding:"2px 7px",fontSize:9,color:meta.color,fontWeight:900 }}>
-                    🏆 Moins cher
+                  {/* Station */}
+                  <div style={{ borderTop:`1px solid ${meta.color}12`,paddingTop:9 }}>
+                    <div style={{ fontWeight:800,fontSize:11,color:"var(--text)",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{best.nom}</div>
+                    <div style={{ fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{best.adresse}</div>
                   </div>
                 </div>
               );
@@ -4109,185 +4095,204 @@ function EssencePage() {
   );
 }
 function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
+  const VEHICLES = {
+    "Renault": {
+      "Clio 1.0 TCe 90": { conso:5.4, fuel:"sp95" }, "Clio 1.5 dCi 85": { conso:3.9, fuel:"gazole" },
+      "Captur 1.0 TCe 100": { conso:5.9, fuel:"sp95" }, "Captur 1.5 dCi 115": { conso:4.5, fuel:"gazole" },
+      "Mégane 1.3 TCe 140": { conso:6.2, fuel:"sp95" }, "Mégane 1.5 dCi 115": { conso:4.2, fuel:"gazole" },
+      "Kadjar 1.5 dCi 110": { conso:4.7, fuel:"gazole" }, "Arkana 1.3 TCe 140": { conso:6.4, fuel:"sp95" },
+      "Austral 1.2 E-Tech 200": { conso:5.5, fuel:"sp95" },
+    },
+    "Peugeot": {
+      "208 1.2 PureTech 75": { conso:5.3, fuel:"sp95" }, "208 1.5 BlueHDi 100": { conso:3.8, fuel:"gazole" },
+      "308 1.2 PureTech 130": { conso:6.3, fuel:"sp95" }, "308 1.5 BlueHDi 130": { conso:4.4, fuel:"gazole" },
+      "2008 1.2 PureTech 100": { conso:6.0, fuel:"sp95" }, "2008 1.5 BlueHDi 110": { conso:4.3, fuel:"gazole" },
+      "3008 1.5 BlueHDi 130": { conso:4.8, fuel:"gazole" }, "408 1.2 PureTech 130": { conso:6.6, fuel:"sp95" },
+    },
+    "Citroën": {
+      "C3 1.2 PureTech 83": { conso:5.2, fuel:"sp95" }, "C3 1.5 BlueHDi 100": { conso:3.7, fuel:"gazole" },
+      "C4 1.2 PureTech 130": { conso:6.2, fuel:"sp95" }, "C4 1.5 BlueHDi 130": { conso:4.3, fuel:"gazole" },
+      "C5 Aircross 1.5 BlueHDi 130": { conso:4.7, fuel:"gazole" }, "Berlingo 1.5 BlueHDi 130": { conso:5.1, fuel:"gazole" },
+    },
+    "Volkswagen": {
+      "Polo 1.0 TSI 95": { conso:5.3, fuel:"sp95" }, "Golf 1.5 TSI 130": { conso:6.4, fuel:"sp95" },
+      "Golf 2.0 TDI 115": { conso:4.5, fuel:"gazole" }, "Tiguan 2.0 TDI 150": { conso:5.6, fuel:"gazole" },
+      "T-Roc 1.5 TSI 150": { conso:7.0, fuel:"sp95" }, "Passat 2.0 TDI 150": { conso:4.8, fuel:"gazole" },
+    },
+    "Toyota": {
+      "Yaris 1.5 Hybrid": { conso:4.1, fuel:"sp95" }, "Yaris Cross 1.5 Hybrid": { conso:5.0, fuel:"sp95" },
+      "Corolla 1.8 Hybrid": { conso:4.5, fuel:"sp95" }, "C-HR 2.0 Hybrid": { conso:5.1, fuel:"sp95" },
+      "RAV4 2.5 Hybrid": { conso:6.0, fuel:"sp95" },
+    },
+    "Dacia": {
+      "Sandero 1.0 TCe 90": { conso:5.9, fuel:"sp95" }, "Duster 1.5 dCi 115": { conso:5.1, fuel:"gazole" },
+      "Jogger 1.0 TCe 110": { conso:6.5, fuel:"sp95" }, "Duster 1.3 TCe 130": { conso:7.0, fuel:"sp95" },
+    },
+    "Ford": {
+      "Puma 1.0 EcoBoost 125": { conso:6.2, fuel:"sp95" }, "Focus 1.5 EcoBoost 182": { conso:6.7, fuel:"sp95" },
+      "Focus 1.5 EcoBlue 120": { conso:4.7, fuel:"gazole" }, "Kuga 1.5 EcoBlue 120": { conso:5.4, fuel:"gazole" },
+    },
+    "BMW": {
+      "Série 1 116d": { conso:4.8, fuel:"gazole" }, "Série 1 118i": { conso:6.9, fuel:"sp95" },
+      "Série 3 320d": { conso:5.2, fuel:"gazole" }, "Série 3 330i": { conso:7.8, fuel:"sp95" },
+      "X1 xDrive20d": { conso:5.5, fuel:"gazole" }, "X3 xDrive20d": { conso:6.1, fuel:"gazole" },
+    },
+    "Mercedes": {
+      "Classe A 180d": { conso:4.4, fuel:"gazole" }, "Classe A 200": { conso:7.2, fuel:"sp95" },
+      "Classe C 220d": { conso:5.0, fuel:"gazole" }, "GLA 200d": { conso:5.3, fuel:"gazole" },
+      "GLC 220d": { conso:6.2, fuel:"gazole" },
+    },
+    "Autre": {
+      "Citadine essence (≈5.5L)": { conso:5.5, fuel:"sp95" }, "Berline essence (≈7L)": { conso:7.0, fuel:"sp95" },
+      "SUV essence (≈8L)": { conso:8.0, fuel:"sp95" }, "Citadine diesel (≈4L)": { conso:4.0, fuel:"gazole" },
+      "SUV diesel (≈6L)": { conso:6.0, fuel:"gazole" }, "Hybride (≈4.5L)": { conso:4.5, fuel:"sp95" },
+    },
+  };
+
   const availableFuels = Object.keys(FUEL_META).filter(k => avgPrices[k] != null || stations.some(s => s[k] != null));
-  const [fuel, setFuel]         = useState(availableFuels[0] || "gazole");
-  const [liters, setLiters]     = useState(50);
+  const [fuel, setFuel]           = useState(availableFuels[0] || "gazole");
+  const [liters, setLiters]       = useState(50);
   const [stationId, setStationId] = useState("__avg__");
-  const [plate, setPlate]       = useState("");
-  const [conso, setConso]       = useState(null);   // L/100km from SIV API
-  const [consoLoading, setConsoLoading] = useState(false);
-  const [consoError, setConsoError]     = useState("");
-  const [manualConso, setManualConso]   = useState(7); // fallback manual
+  const [selMake, setSelMake]     = useState("");
+  const [selModel, setSelModel]   = useState("");
+  const [manualConso, setManualConso] = useState(7);
+
+  const vehicleData    = selMake && selModel ? VEHICLES[selMake]?.[selModel] : null;
+  const vehicleConso   = vehicleData?.conso ?? null;
+  const effectiveConso = vehicleConso ?? manualConso;
 
   const eligibleStations = stations.filter(s => s[fuel] != null);
   const selectedStation  = stationId === "__avg__" ? null : eligibleStations.find(s => s.id === stationId);
-  const price = selectedStation ? selectedStation[fuel] : avgPrices[fuel];
-  const bestS = eligibleStations.length > 0 ? eligibleStations.reduce((a,b) => a[fuel] < b[fuel] ? a : b) : null;
-
+  const price  = selectedStation ? selectedStation[fuel] : avgPrices[fuel];
+  const bestS  = eligibleStations.length > 0 ? eligibleStations.reduce((a,b) => a[fuel]<b[fuel]?a:b) : null;
   const total  = price != null ? price * liters : null;
-  const effectiveConso = conso ?? manualConso;
-  const per100 = price != null ? (price * effectiveConso) : null;
-  const saving = bestS && selectedStation && bestS.id !== selectedStation.id ? (selectedStation[fuel] - bestS[fuel]) * liters : null;
+  const per100 = price != null ? price * effectiveConso : null;
+  const saving = bestS && selectedStation && bestS.id !== selectedStation.id
+    ? (selectedStation[fuel] - bestS[fuel]) * liters : null;
   const m = FUEL_META[fuel] || {};
 
-  // Lookup vehicle consumption by plate via DVLA-like lookup
-  // We use a public API to fetch vehicle data (SIV France via a CORS proxy)
-  const lookupPlate = async () => {
-    const p = plate.replace(/[\s-]/g,"").toUpperCase();
-    if (!p) return;
-    setConsoLoading(true); setConsoError("");
-    try {
-      // Use api.apiplaqueimmat.fr (public, free)
-      const res = await fetch(`https://api.apiplaqueimmat.fr/vehicule?immat=${p}`);
-      if (!res.ok) throw new Error("Plaque non trouvée");
-      const data = await res.json();
-      // Field varies: consommation_mixte, conso_mixte, mixed_consumption
-      const raw = data?.consommation_mixte || data?.conso_mixte || data?.consumption_mixed;
-      if (raw && parseFloat(raw) > 0) {
-        setConso(parseFloat(raw));
-        setManualConso(parseFloat(raw));
-      } else {
-        throw new Error("Consommation non renseignée pour ce véhicule");
-      }
-    } catch(e) {
-      setConsoError(e.message || "Impossible de récupérer les données");
-    }
-    setConsoLoading(false);
-  };
-
   return (
-    <div style={{ borderRadius:18,overflow:"hidden",border:`1px solid ${m.color||"var(--border)"}28`,marginBottom:14,background:"rgba(255,255,255,0.02)" }}>
-      {/* Header */}
-      <div style={{ padding:"14px 20px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}10,transparent)`,borderBottom:`1px solid ${m.color||"var(--border)"}20`,display:"flex",alignItems:"center",gap:10 }}>
-        <div style={{ width:38,height:38,borderRadius:12,background:`${m.color||"#a78bfa"}1a`,border:`1.5px solid ${m.color||"#a78bfa"}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20 }}>🧮</div>
+    <div style={{ borderRadius:18,overflow:"hidden",border:`1px solid ${m.color||"var(--border)"}25`,marginBottom:14,background:"rgba(255,255,255,0.018)" }}>
+      <div style={{ padding:"13px 18px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}0d,transparent)`,borderBottom:`1px solid ${m.color||"var(--border)"}15`,display:"flex",alignItems:"center",gap:10 }}>
+        <div style={{ width:36,height:36,borderRadius:11,background:`${m.color||"#a78bfa"}16`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>🧮</div>
         <div>
-          <div style={{ fontWeight:900,fontSize:15 }}>Simulateur de plein</div>
-          <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>à {citySearch} · {conso?`Conso réelle ${conso}L/100`:`Conso estimée ${manualConso}L/100`}</div>
+          <div style={{ fontWeight:900,fontSize:14 }}>Simulateur de plein</div>
+          <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>
+            {citySearch} · {vehicleConso ? `${selMake} · ${vehicleConso}L/100` : `${effectiveConso}L/100 (manuel)`}
+          </div>
         </div>
       </div>
 
-      <div className="fuel-sim-grid" style={{ padding:"16px 20px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:18 }}>
-        {/* LEFT */}
-        <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
-          {/* Fuel pills */}
+      <div className="fuel-sim-grid" style={{ padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+        <div style={{ display:"flex",flexDirection:"column",gap:13 }}>
+
           <div>
-            <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:7 }}>Carburant</div>
+            <label style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,display:"block",marginBottom:6 }}>Carburant</label>
             <div style={{ display:"flex",gap:5,flexWrap:"wrap" }}>
-              {availableFuels.map(k => {
-                const fm = FUEL_META[k]; const sel = fuel===k;
+              {availableFuels.map(k=>{ const fm=FUEL_META[k]; const s=fuel===k;
                 return <button key={k} onClick={()=>{setFuel(k);setStationId("__avg__");}}
-                  style={{ padding:"6px 11px",borderRadius:10,border:sel?`1.5px solid ${fm.color}`:"1px solid var(--border)",background:sel?`${fm.color}1a`:"var(--glass)",color:sel?fm.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:sel?800:600,fontSize:11,transition:"all .15s",boxShadow:sel?`0 0 12px ${fm.color}30`:"none" }}>
+                  style={{ padding:"5px 10px",borderRadius:9,border:s?`1.5px solid ${fm.color}`:"1px solid var(--border)",background:s?`${fm.color}16`:"var(--glass)",color:s?fm.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:s?800:600,fontSize:11,transition:"all .15s" }}>
                   {fm.icon} {fm.label}
                 </button>;
               })}
             </div>
           </div>
 
-          {/* Station */}
           {eligibleStations.length > 0 && (
             <div>
-              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:7 }}>Station</div>
+              <label style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,display:"block",marginBottom:6 }}>Station</label>
               <select value={stationId} onChange={e=>setStationId(e.target.value)}
-                style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:`1px solid ${m.color||"var(--border)"}35`,borderRadius:11,padding:"9px 12px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:12,cursor:"pointer" }}>
-                <option value="__avg__">📊 Prix moyen ({eligibleStations.length} stations)</option>
-                {eligibleStations.map(s=>(
-                  <option key={s.id} value={s.id}>{s.nom} — {s[fuel]?.toFixed(3)}€{bestS?.id===s.id?" ⭐":""}</option>
-                ))}
+                style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:`1px solid ${m.color||"var(--border)"}30`,borderRadius:10,padding:"8px 11px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:12,cursor:"pointer" }}>
+                <option value="__avg__">📊 Prix moyen · {eligibleStations.length} stations</option>
+                {eligibleStations.map(s=><option key={s.id} value={s.id}>{s.nom} — {s[fuel]?.toFixed(3)}€{bestS?.id===s.id?" ⭐":""}</option>)}
               </select>
-              {bestS && <div style={{ marginTop:5,fontSize:11,color:"var(--green)",fontWeight:700 }}>⭐ {bestS.nom} · {bestS[fuel]?.toFixed(3)}€/L</div>}
+              {bestS && <div style={{ marginTop:4,fontSize:10,color:"var(--green)",fontWeight:700 }}>⭐ {bestS.nom} · {bestS[fuel]?.toFixed(3)} €/L</div>}
             </div>
           )}
 
-          {/* Liters slider */}
           <div>
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7 }}>
-              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800 }}>Volume</div>
-              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:20,color:m.color||"var(--purple)" }}>{liters}L</div>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6 }}>
+              <label style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800 }}>Volume</label>
+              <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:18,color:m.color||"var(--purple)" }}>{liters} L</span>
             </div>
             <input type="range" min={5} max={120} step={5} value={liters} onChange={e=>setLiters(+e.target.value)}
-              style={{ width:"100%",accentColor:m.color||"var(--purple)",height:5,cursor:"pointer" }}/>
-            <div style={{ display:"flex",gap:5,marginTop:7,flexWrap:"wrap" }}>
+              style={{ width:"100%",accentColor:m.color||"var(--purple)",cursor:"pointer",marginBottom:6 }}/>
+            <div style={{ display:"flex",gap:5 }}>
               {[20,35,50,70,100].map(v=>(
                 <button key={v} onClick={()=>setLiters(v)}
-                  style={{ flex:1,minWidth:30,background:liters===v?`${m.color||"#a78bfa"}22`:"rgba(255,255,255,0.04)",border:`1px solid ${liters===v?(m.color||"#a78bfa")+"44":"rgba(255,255,255,0.08)"}`,borderRadius:8,padding:"4px 2px",fontSize:11,color:liters===v?(m.color||"var(--purple)"):"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700 }}>
+                  style={{ flex:1,padding:"4px 2px",borderRadius:8,border:`1px solid ${liters===v?(m.color||"#a78bfa")+"40":"rgba(255,255,255,0.08)"}`,background:liters===v?`${m.color||"#a78bfa"}18`:"rgba(255,255,255,0.04)",color:liters===v?(m.color||"var(--purple)"):"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:10 }}>
                   {v}L
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Plate lookup */}
           <div>
-            <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,marginBottom:7 }}>Consommation véhicule</div>
-            <div style={{ display:"flex",gap:6 }}>
-              <div style={{ flex:1,position:"relative" }}>
-                <span style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:12,pointerEvents:"none" }}>🚗</span>
-                <input value={plate} onChange={e=>setPlate(e.target.value.toUpperCase())}
-                  onKeyDown={e=>e.key==="Enter"&&lookupPlate()}
-                  placeholder="Ex: AB-123-CD"
-                  style={{ paddingLeft:30,fontSize:12,letterSpacing:1,fontWeight:700,textTransform:"uppercase",borderRadius:10,border:`1px solid rgba(255,255,255,0.1)`,background:"rgba(255,255,255,0.05)",height:38 }}/>
-              </div>
-              <button onClick={lookupPlate} disabled={consoLoading||!plate.trim()}
-                style={{ padding:"8px 12px",borderRadius:10,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.12)",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12,flexShrink:0 }}>
-                {consoLoading?"⟳":"Chercher"}
-              </button>
+            <label style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,display:"block",marginBottom:6 }}>Mon véhicule</label>
+            <div style={{ display:"flex",gap:6,marginBottom:6 }}>
+              <select value={selMake} onChange={e=>{ setSelMake(e.target.value); setSelModel(""); }}
+                style={{ flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:10,padding:"7px 9px",color:selMake?"var(--text)":"var(--text3)",fontFamily:"'Outfit',sans-serif",fontSize:11,cursor:"pointer" }}>
+                <option value="">Marque…</option>
+                {Object.keys(VEHICLES).map(mk=><option key={mk} value={mk}>{mk}</option>)}
+              </select>
+              {selMake && (
+                <select value={selModel} onChange={e=>setSelModel(e.target.value)}
+                  style={{ flex:2,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:10,padding:"7px 9px",color:selModel?"var(--text)":"var(--text3)",fontFamily:"'Outfit',sans-serif",fontSize:11,cursor:"pointer" }}>
+                  <option value="">Modèle…</option>
+                  {Object.keys(VEHICLES[selMake]).map(mo=><option key={mo} value={mo}>{mo}</option>)}
+                </select>
+              )}
             </div>
-            {conso && <div style={{ marginTop:5,fontSize:11,color:"var(--green)",fontWeight:700 }}>✅ Conso réelle : {conso}L/100km</div>}
-            {consoError && (
-              <div style={{ marginTop:5,fontSize:10,color:"var(--orange)" }}>
-                ⚠️ {consoError}
-                <div style={{ display:"flex",alignItems:"center",gap:6,marginTop:5 }}>
-                  <span style={{ color:"var(--text3)" }}>Saisir manuellement :</span>
-                  <input type="number" value={manualConso} onChange={e=>setManualConso(+e.target.value)} min={1} max={30} step={0.1}
-                    style={{ width:60,fontSize:12,padding:"3px 8px",borderRadius:8,textAlign:"center",height:30 }}/>
-                  <span style={{ color:"var(--text3)",fontSize:11 }}>L/100</span>
+            {vehicleConso ? (
+              <div style={{ display:"flex",alignItems:"center",gap:7,padding:"6px 10px",background:"rgba(74,222,128,0.07)",border:"1px solid rgba(74,222,128,0.18)",borderRadius:9 }}>
+                <span>🚗</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11,fontWeight:800,color:"var(--green)" }}>{vehicleConso} L/100 km (WLTP)</div>
+                  <div style={{ fontSize:9,color:"var(--text3)" }}>{selMake} {selModel}</div>
                 </div>
+                <button onClick={()=>{ setSelMake(""); setSelModel(""); }} style={{ background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:16,lineHeight:1 }}>×</button>
               </div>
-            )}
-            {!conso && !consoError && (
-              <div style={{ marginTop:5,display:"flex",alignItems:"center",gap:6 }}>
-                <span style={{ fontSize:10,color:"var(--text3)" }}>Conso manuelle :</span>
+            ) : (
+              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                <span style={{ fontSize:10,color:"var(--text3)",whiteSpace:"nowrap" }}>Ou manuellement :</span>
                 <input type="number" value={manualConso} onChange={e=>setManualConso(Math.max(1,+e.target.value))} min={1} max={30} step={0.1}
-                  style={{ width:65,fontSize:12,padding:"3px 8px",borderRadius:8,textAlign:"center",height:30,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)",color:"var(--text)" }}/>
-                <span style={{ fontSize:10,color:"var(--text3)" }}>L/100km</span>
+                  style={{ width:68,fontSize:13,fontWeight:700,padding:"5px 9px",borderRadius:9,textAlign:"center",background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)",color:"var(--text)" }}/>
+                <span style={{ fontSize:10,color:"var(--text3)" }}>L / 100 km</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* RIGHT — Result */}
-        <div style={{ display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",gap:10,padding:"20px 16px",borderRadius:16,background:`linear-gradient(145deg,${m.color||"#a78bfa"}0e,${m.color||"#a78bfa"}05)`,border:`1px solid ${m.color||"#a78bfa"}22` }}>
-          {price != null ? (
-            <>
-              <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.5,fontWeight:800 }}>Coût du plein</div>
-              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:54,color:m.color||"var(--purple)",lineHeight:1,textShadow:`0 0 40px ${m.color||"#a78bfa"}50` }}>
-                {total?.toFixed(2)}<span style={{ fontSize:26 }}>€</span>
-              </div>
-              <div style={{ fontSize:11,color:"var(--text3)",textAlign:"center",lineHeight:1.7 }}>
-                {liters}L · {m.label} · <strong style={{ color:"var(--text)" }}>{price.toFixed(3)}€/L</strong>
-              </div>
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,width:"100%",marginTop:4 }}>
-                {[
-                  { label:"/ 100 km",value:`${per100?.toFixed(2)}€`,sub:`${effectiveConso}L/100` },
-                  { label:"Prix/L",value:`${price.toFixed(3)}€`,sub:"à la pompe" },
-                ].map(s=>(
-                  <div key={s.label} style={{ textAlign:"center",padding:"10px",background:"rgba(255,255,255,0.04)",borderRadius:11,border:"1px solid rgba(255,255,255,0.07)" }}>
-                    <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:3 }}>{s.label}</div>
-                    <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,color:"var(--text)" }}>{s.value}</div>
-                    <div style={{ fontSize:9,color:"var(--text3)" }}>{s.sub}</div>
-                  </div>
-                ))}
-              </div>
-              {saving!=null && saving>0.01 && (
-                <div style={{ width:"100%",padding:"8px 12px",background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.2)",borderRadius:10,fontSize:11,color:"var(--green)",fontWeight:700,textAlign:"center" }}>
-                  💸 Économisez {saving.toFixed(2)}€ en allant à {bestS?.nom}
+        <div style={{ display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",gap:11,padding:"20px 14px",borderRadius:15,background:`linear-gradient(145deg,${m.color||"#a78bfa"}0b,rgba(0,0,0,0.1))`,border:`1px solid ${m.color||"#a78bfa"}1a` }}>
+          {price != null ? (<>
+            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.5,fontWeight:800 }}>Coût du plein</div>
+            <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,lineHeight:1,color:m.color||"var(--purple)",textShadow:`0 0 36px ${m.color||"#a78bfa"}45`,textAlign:"center" }}>
+              <span style={{ fontSize:52 }}>{total?.toFixed(2)}</span><span style={{ fontSize:24 }}>€</span>
+            </div>
+            <div style={{ fontSize:10,color:"var(--text3)",textAlign:"center",lineHeight:1.7 }}>
+              {liters} L · {m.label} · <strong style={{ color:"var(--text)" }}>{price.toFixed(3)} €/L</strong>
+            </div>
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,width:"100%" }}>
+              {[
+                { label:"/ 100 km", val:`${per100?.toFixed(2)}€`, sub:`${effectiveConso}L/100` },
+                { label:"Prix / L",  val:`${price.toFixed(3)}€`,  sub:"à la pompe" },
+              ].map(s=>(
+                <div key={s.label} style={{ textAlign:"center",padding:"9px 6px",background:"rgba(255,255,255,0.04)",borderRadius:10,border:"1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.7,marginBottom:4 }}>{s.label}</div>
+                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,color:"var(--text)" }}>{s.val}</div>
+                  <div style={{ fontSize:9,color:"var(--text3)",marginTop:1 }}>{s.sub}</div>
                 </div>
-              )}
-            </>
-          ) : (
+              ))}
+            </div>
+            {saving!=null && saving>0.01 && (
+              <div style={{ width:"100%",padding:"7px 11px",background:"rgba(74,222,128,0.07)",border:"1px solid rgba(74,222,128,0.16)",borderRadius:9,fontSize:10,color:"var(--green)",fontWeight:700,textAlign:"center" }}>
+                💸 Économisez {saving.toFixed(2)} € chez {bestS?.nom}
+              </div>
+            )}
+          </>) : (
             <div style={{ textAlign:"center",padding:20 }}>
-              <div style={{ fontSize:40,marginBottom:8 }}>{m.icon||"⛽"}</div>
-              <div style={{ fontSize:13,color:"var(--text3)",fontWeight:600 }}>Prix non disponible<br/>pour cette zone</div>
+              <div style={{ fontSize:38,marginBottom:8 }}>{m.icon||"⛽"}</div>
+              <div style={{ fontSize:12,color:"var(--text3)",fontWeight:600 }}>Prix non disponible<br/>dans cette zone</div>
             </div>
           )}
         </div>
