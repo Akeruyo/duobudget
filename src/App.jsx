@@ -3647,19 +3647,26 @@ function EssencePage() {
   const doFetch = useCallback(async (city = citySearch) => {
     setLoading(true); setError(""); setCountdown(600);
     try {
+      const BASE = "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
       const isCP = /^\d{5}$/.test(city.trim());
-      // ODS v2 syntax: double-quoted strings, LIKE needs % wildcards
-      const whereClause = isCP
-        ? `cp="${city.trim()}"`
-        : `ville like "%${city.trim()}%" or nom like "%${city.trim()}%"`;
-      const url = `https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?where=${encodeURIComponent(whereClause)}&limit=30&timezone=Europe%2FParis&order_by=nom`;
+
+      // ODS v2: use `where=cp='XXXXX'` for postal codes (single-quoted, known to work)
+      // For city names: use `q=` (global text search, no encoding issues) + `where` filter on ville
+      let url;
+      if (isCP) {
+        url = `${BASE}?where=cp%3D'${encodeURIComponent(city.trim())}'&limit=30&timezone=Europe%2FParis&order_by=nom`;
+      } else {
+        // q= does full-text search across all fields — no % wildcards, no encoding issues
+        url = `${BASE}?q=${encodeURIComponent(city.trim())}&limit=30&timezone=Europe%2FParis&order_by=nom`;
+      }
+
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Erreur réseau " + res.status);
+      if (!res.ok) throw new Error(`Erreur API ${res.status} — Essayez avec le code postal (ex: 52100)`);
       const json = await res.json();
 
-      // Parse results
+      // Résultats
       let results = json.results || [];
-      if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez un autre nom ou code postal.`);
+      if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez un code postal (ex: 52100) ou un autre nom de ville.`);
 
       const parsed = results.map(r => {
         const fuels = {};
@@ -3787,7 +3794,7 @@ function EssencePage() {
               <span style={{ position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none" }}>🔍</span>
               <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
                 onKeyDown={e=>e.key==="Enter"&&handleSearch()}
-                placeholder="Ville ou code postal…"
+                placeholder="Code postal (52100) ou ville…"
                 style={{ paddingLeft:34,fontSize:13,borderRadius:11,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)" }}/>
             </div>
             <button className="btn btn-primary" onClick={handleSearch} disabled={loading||!cityInput.trim()} style={{ padding:"10px 16px",fontSize:13,whiteSpace:"nowrap",flexShrink:0 }}>
