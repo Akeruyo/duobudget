@@ -628,7 +628,7 @@ function AuthScreen({ onLinked }) {
     try {
       // fetchSignInMethodsForEmail est obsolète en Firebase v10+ et retourne toujours []
       // On envoie directement — Firebase gère si l'email n'existe pas
-      await sendPasswordResetEmail(auth, trimmed, { url: window.location.origin });
+      await sendPasswordResetEmail(auth, trimmed);
       setResetSent(true);
     } catch (e) {
       if (e.code === "auth/user-not-found") {
