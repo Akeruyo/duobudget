@@ -3732,38 +3732,91 @@ function EssencePage() {
 
       if (!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez le code postal (ex: 52100) ou vérifiez l'orthographe.`);
 
+      // ── Parse stations (noms de base depuis l'API gouvernementale) ──
       const parsed = results.map(r => {
         const fuels = {};
         Object.keys(FUEL_META).forEach(k => {
           const v = parseFloat(r[k + "_prix"]);
           fuels[k] = isNaN(v) ? null : v;
         });
-        // Robust station name: handle array, stringified JSON, or plain string
+        // Nom de base : enseignes > nom > début d'adresse
         let ens = r.enseignes;
         if (typeof ens === "string") { try { ens = JSON.parse(ens); } catch { ens = ens ? [ens] : []; } }
         const ensNom = Array.isArray(ens) ? ens.filter(Boolean).join(" / ") : "";
-        const rawNom = ensNom || (r.nom && !/^station$/i.test(r.nom) ? r.nom : "");
-        const stationNom = rawNom || (r.adresse ? r.adresse.split(",")[0].trim() : `Station ${r.cp||""}`.trim());
+        const rawNom = ensNom || (r.nom && !/^station$/i.test(r.nom.trim()) ? r.nom.trim() : "");
+        const baseNom = rawNom || (r.adresse ? r.adresse.split(",")[0].trim() : `Station ${r.cp||""}`.trim());
+        // Coordonnées pour enrichissement OSM
+        const geo = r.geom?.coordinates || r.coordonnees?.coordinates;
+        const lat = geo ? geo[1] : null;
+        const lng = geo ? geo[0] : null;
         return {
           id: r.id || r.adresse,
-          nom: stationNom,
+          nom: baseNom,
           adresse: r.adresse || "",
           ville: r.ville || city,
           cp: r.cp || "",
+          lat, lng,
           ...fuels,
         };
       }).filter(s => Object.keys(FUEL_META).some(k => s[k] != null));
 
       if (!parsed.length) throw new Error(`Aucun prix disponible pour "${city}".`);
 
+      // ── Enrichissement OSM : vrais noms de marques via Overpass ──
+      // Une seule requête pour toute la zone → on matche par proximité
+      let enriched = parsed;
+      const withGeo = parsed.filter(s => s.lat && s.lng);
+      if (withGeo.length > 0) {
+        try {
+          const lats = withGeo.map(s => s.lat), lngs = withGeo.map(s => s.lng);
+          const bbox = [
+            (Math.min(...lats) - 0.01).toFixed(5),
+            (Math.min(...lngs) - 0.01).toFixed(5),
+            (Math.max(...lats) + 0.01).toFixed(5),
+            (Math.max(...lngs) + 0.01).toFixed(5),
+          ].join(",");
+          const ovQuery = `[out:json][timeout:10];(node[amenity=fuel](${bbox});way[amenity=fuel](${bbox}););out center;`;
+          const ovRes = await fetch("https://overpass-api.de/api/interpreter", {
+            method:"POST",
+            body: "data=" + encodeURIComponent(ovQuery),
+          });
+          if (ovRes.ok) {
+            const ovData = await ovRes.json();
+            const osmNodes = (ovData.elements || []).map(el => ({
+              lat: el.lat ?? el.center?.lat,
+              lng: el.lon ?? el.center?.lon,
+              name: el.tags?.name || el.tags?.brand || el.tags?.operator || "",
+            })).filter(n => n.lat && n.lng && n.name);
+
+            // Match chaque station gouvernementale avec le nœud OSM le plus proche (< 150m)
+            const deg2rad = d => d * Math.PI / 180;
+            const haversine = (la1,lo1,la2,lo2) => {
+              const R=6371000, dLa=deg2rad(la2-la1), dLo=deg2rad(lo2-lo1);
+              const a=Math.sin(dLa/2)**2+Math.cos(deg2rad(la1))*Math.cos(deg2rad(la2))*Math.sin(dLo/2)**2;
+              return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+            };
+
+            enriched = parsed.map(s => {
+              if (!s.lat || !s.lng) return s;
+              let best = null, bestDist = 150; // max 150m
+              osmNodes.forEach(n => {
+                const d = haversine(s.lat, s.lng, n.lat, n.lng);
+                if (d < bestDist) { bestDist = d; best = n; }
+              });
+              return best ? { ...s, nom: best.name } : s;
+            });
+          }
+        } catch { /* OSM optionnel — pas critique */ }
+      }
+
       const ts = new Date().toISOString();
       const tsFmt = new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) + " " +
                     new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
 
-      setStations(parsed);
+      setStations(enriched);
       setLastUpdate(new Date());
 
-      const newEntries = parsed.map(s => ({
+      const newEntries = enriched.map(s => ({
         ts, tsFmt, stationId:s.id, stationNom:(s.nom||"Station").slice(0,20),
         ...Object.fromEntries(Object.keys(FUEL_META).map(k=>[k,s[k]])),
       }));
@@ -3772,7 +3825,7 @@ function EssencePage() {
         const last10 = new Date(Date.now() - 600000).toISOString();
         const cleaned = prev.filter(e => e.ts >= cutoff && e.ts < last10);
         const next = [...cleaned, ...newEntries].slice(-800);
-        try { localStorage.setItem(LS_KEY, JSON.stringify({stations:parsed,history:next,city,ts:Date.now()})); } catch {}
+        try { localStorage.setItem(LS_KEY, JSON.stringify({stations:enriched,history:next,city,ts:Date.now()})); } catch {}
         return next;
       });
     } catch(e) { setError(e.message || "Erreur inconnue"); }
