@@ -248,14 +248,23 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
   background:rgba(7,6,15,0.92);backdrop-filter:blur(28px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
-.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:hidden;min-height:0;scroll-behavior:smooth;}
+.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;}
 
 /* ── CONTENT GRIDS ── */
 .content-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;}
 .content-grid.wide{grid-template-columns:1fr !important;}
 
 /* ── TOOLTIP SYSTEM ── */
-.tip{position:relative;}.tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) scale(.92);background:linear-gradient(135deg,#1e1b3a,#2a2450);color:var(--text);font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:600;white-space:nowrap;padding:7px 12px;border-radius:10px;border:1px solid rgba(167,139,250,0.25);box-shadow:0 8px 24px rgba(0,0,0,0.5);pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;z-index:9999;}.tip::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#2a2450;pointer-events:none;opacity:0;transition:opacity .18s;z-index:9999;}.tip:hover::after,.tip:hover::before{opacity:1;transform:translateX(-50%) scale(1);}.tip-right::after{left:auto;right:0;transform:translateX(0) scale(.92);}.tip-right:hover::after{transform:translateX(0) scale(1);}.tip-right::before{left:auto;right:14px;transform:none;}.tip-left::after{left:0;transform:translateX(0) scale(.92);}.tip-left:hover::after{transform:translateX(0) scale(1);}
+.tip{position:relative;}
+.tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) scale(.92);background:linear-gradient(135deg,#1e1b3a,#2a2450);color:var(--text);font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:600;white-space:nowrap;padding:7px 13px;border-radius:10px;border:1px solid rgba(167,139,250,0.3);box-shadow:0 8px 32px rgba(0,0,0,0.6);pointer-events:none;opacity:0;transition:opacity .18s,transform .18s;z-index:99999;}
+.tip::before{content:'';position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#2a2450;pointer-events:none;opacity:0;transition:opacity .18s;z-index:99999;}
+.tip:hover::after,.tip:hover::before{opacity:1;transform:translateX(-50%) scale(1);}
+.tip-right::after{left:auto;right:0;transform:translateX(0) scale(.92);}.tip-right:hover::after{transform:translateX(0) scale(1);}.tip-right::before{left:auto;right:14px;transform:none;}
+.tip-left::after{left:0;transform:translateX(0) scale(.92);}.tip-left:hover::after{transform:translateX(0) scale(1);}
+
+/* Tooltip classique pour filter chips — position absolue visible */
+.filter-bar{position:relative;overflow:visible !important;}
+.filter-chip{position:relative;}
 
 /* ── NAV ── */
 .nav-section-label{font-size:9px;font-weight:900;letter-spacing:2.2px;text-transform:uppercase;color:var(--text3);padding:0 18px;margin:20px 0 7px;display:flex;align-items:center;gap:8px;}
@@ -354,9 +363,9 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .tab-item:hover:not(.active){color:var(--text2);background:rgba(255,255,255,0.03);}
 
 /* ── FILTER BAR ── */
-.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;flex-wrap:wrap;}
+.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;flex-wrap:wrap;overflow:visible !important;}
 .filter-bar::-webkit-scrollbar{display:none;}
-.filter-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:22px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text2);cursor:pointer;font-size:12.5px;font-weight:600;white-space:nowrap;flex-shrink:0;transition:all .2s;user-select:none;}
+.filter-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:22px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text2);cursor:pointer;font-size:12.5px;font-weight:600;white-space:nowrap;flex-shrink:0;transition:all .2s;user-select:none;position:relative;}
 .filter-chip .chip-emoji{font-size:15px;line-height:1;}
 .filter-chip.active{border-color:rgba(167,139,250,0.55);background:rgba(167,139,250,0.14);color:var(--purple);box-shadow:0 2px 12px rgba(167,139,250,0.15),inset 0 1px 0 rgba(167,139,250,0.12);}
 .filter-chip:hover:not(.active){background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.15);transform:translateY(-1px);}
@@ -374,6 +383,26 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .dash-bill-item{transition:all .28s cubic-bezier(.4,0,.2,1);}
 .dash-bill-item:hover{transform:translateX(5px) !important;box-shadow:0 0 0 1.5px rgba(167,139,250,0.45),0 6px 28px rgba(167,139,250,0.18) !important;}
 .dash-bill-item.overdue:hover{transform:translateX(5px) !important;box-shadow:0 0 0 1.5px rgba(248,113,113,0.55),0 6px 28px rgba(248,113,113,0.22) !important;}
+
+/* ── CARD HOVER GLOW ── */
+.card-glow{transition:all .28s cubic-bezier(.4,0,.2,1);}
+.card-glow:hover{box-shadow:0 0 0 1.5px rgba(167,139,250,0.35),0 8px 36px rgba(167,139,250,0.14),var(--shadow-card) !important;transform:translateY(-2px);}
+
+/* ── INCOME CARD ── */
+.income-card{border-radius:var(--r);position:relative;overflow:hidden;transition:all .28s cubic-bezier(.4,0,.2,1);}
+.income-card:hover{transform:translateY(-3px);box-shadow:0 0 0 1.5px rgba(167,139,250,0.4),0 12px 40px rgba(0,0,0,0.35),0 0 60px rgba(167,139,250,0.08) !important;}
+.income-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;background:radial-gradient(ellipse 80% 60% at 50% -20%,rgba(167,139,250,0.07),transparent);pointer-events:none;}
+.income-card:hover::before{opacity:1;}
+
+/* ── BILL CARD ROW HOVER ACTIONS (like transactions) ── */
+.bill-card-row{transition:all .28s cubic-bezier(.4,0,.2,1);}
+.bill-card-row:hover{transform:translateY(-2px);box-shadow:0 0 0 1.5px rgba(167,139,250,0.3),0 8px 32px rgba(0,0,0,0.3) !important;}
+.bill-hover-actions{opacity:0;transform:translateX(10px);transition:all .22s cubic-bezier(.4,0,.2,1);}
+.bill-card-row:hover .bill-hover-actions{opacity:1;transform:translateX(0);}
+
+/* ── PROFILE CARD HOVER ── */
+.profile-card{border-radius:var(--r);position:relative;cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);}
+.profile-card:hover{transform:translateY(-2px);box-shadow:0 8px 36px rgba(0,0,0,0.3),0 0 0 1.5px rgba(167,139,250,0.25) !important;}
 
 /* ── BOTTOM NAV ── */
 .bottom-nav{display:none;}
@@ -415,7 +444,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .grid-4{grid-template-columns:1fr 1fr !important;}
   .page-content{
     padding:14px;
-    padding-bottom:calc(72px + env(safe-area-inset-bottom));
+    padding-bottom:calc(80px + env(safe-area-inset-bottom));
     padding-left:calc(14px + env(safe-area-inset-left));
     padding-right:calc(14px + env(safe-area-inset-right));
   }
@@ -424,27 +453,44 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     background:rgba(7,6,15,0.97);backdrop-filter:blur(24px);
     border-top:1px solid var(--border);
     justify-content:space-around;
-    padding-top:6px;
-    padding-bottom:calc(10px + env(safe-area-inset-bottom));
+    padding-top:8px;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom));
     padding-left:env(safe-area-inset-left);
     padding-right:env(safe-area-inset-right);
     z-index:250;
   }
-  .bnav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 10px;border-radius:10px;cursor:pointer;transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;min-width:50px;position:relative;}
+  .bnav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 10px;border-radius:12px;cursor:pointer;transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;min-width:52px;position:relative;}
   .bnav-item.active{color:var(--purple);}
-  .bnav-item.active .bnav-icon-wrap{background:rgba(167,139,250,0.15);border-radius:12px;}
-  .bnav-icon{font-size:20px;}
+  .bnav-item.active .bnav-icon-wrap{background:rgba(167,139,250,0.18);border-radius:12px;}
+  .bnav-icon{font-size:22px;}
   .bnav-icon-wrap{padding:4px 14px;border-radius:10px;transition:all .18s;}
   .topbar{
     padding-left:calc(16px + env(safe-area-inset-left));
     padding-right:calc(16px + env(safe-area-inset-right));
   }
+  /* Transaction rows on mobile */
+  .expense-row{padding:16px 14px !important;}
+  .expense-row:hover{padding-left:18px !important;}
+  .row-actions{opacity:1 !important;transform:translateX(0) !important;flex-direction:row !important;}
+  /* Income cards mobile */
+  .income-card .stat-num{font-size:22px !important;}
+  /* Bill actions always visible on mobile */
+  .bill-hover-actions{opacity:1 !important;transform:translateX(0) !important;}
 }
 @media(max-width:520px){
   .grid-2{grid-template-columns:1fr !important;}
   .grid-3{grid-template-columns:1fr 1fr !important;}
   .grid-4{grid-template-columns:1fr 1fr !important;}
-  .modal-box{padding:20px;}
+  .modal-box{padding:20px;border-radius:20px;}
+  /* Full width profile cards */
+  .profile-card{margin-bottom:2px;}
+  /* Smaller transaction icon on mobile */
+  .expense-row .tx-icon{width:48px !important;height:48px !important;font-size:22px !important;}
+}
+/* iPhone notch / safe area */
+@supports(padding-top: env(safe-area-inset-top)){
+  .app-shell{padding-top:0;}
+  .auth-shell{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
 }
 `;
 
@@ -1365,68 +1411,107 @@ function Incomes({ data, update, selMonth, mdata, setModal }) {
           const profileTx = md.transactions.filter(t=>t.profileId===p.id);
           const profileSpent = profileTx.reduce((s,t)=>s+t.amount,0);
           const savingsRate = inc>0 ? Math.round(((inc-profileSpent)/inc)*100) : null;
+          const remaining = inc - profileSpent;
+          const isCommon = p.id==="common";
+          const typeLabel = isCommon ? "🏦 Compte commun" : "💼 Compte personnel";
+          const typeDesc  = isCommon ? "Fonds partagés du couple" : "Revenu individuel mensuel";
           return (
-            <div key={p.id} className={`income-card glass-hover fade-up stagger-${i+1}`}
-              style={{ padding:"22px 24px",background:"var(--glass)",border:`1px solid var(--border)`,borderLeft:`4px solid ${p.color}` }}>
-              <div style={{ display:"flex",alignItems:"center",gap:16,marginBottom:18 }}>
-                <div style={{ position:"relative",flexShrink:0 }}>
-                  <div style={{ width:60,height:60,borderRadius:18,background:`${p.color}20`,border:`2px solid ${p.color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,boxShadow:`0 6px 20px ${p.color}20` }}>
-                    {p.avatar}
+            <div key={p.id} className={`income-card fade-up stagger-${i+1}`}
+              style={{ padding:0,background:"var(--glass)",border:`1px solid var(--border)`,boxShadow:"var(--shadow-card)" }}>
+
+              {/* BANDE COULEUR TOP */}
+              <div style={{ height:4,background:`linear-gradient(90deg,${p.color},${p.color}44)`,borderRadius:"var(--r) var(--r) 0 0" }}/>
+
+              <div style={{ padding:"22px 24px" }}>
+                {/* ── HEADER ── */}
+                <div style={{ display:"flex",alignItems:"flex-start",gap:16,marginBottom:20 }}>
+                  <div className="tip" data-tip={`${p.name} · ${typeDesc}`} style={{ position:"relative",flexShrink:0 }}>
+                    <div style={{ width:64,height:64,borderRadius:18,background:`${p.color}18`,border:`2px solid ${p.color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:`0 8px 24px ${p.color}25` }}>
+                      {p.avatar}
+                    </div>
+                    <div style={{ position:"absolute",bottom:-5,right:-5,width:22,height:22,borderRadius:"50%",background:"var(--grad-main)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,border:"2.5px solid var(--bg2)",fontWeight:900,color:"#fff" }}>
+                      {isCommon?"🏦":p.id==="p1"?"1":"2"}
+                    </div>
                   </div>
-                  <div style={{ position:"absolute",bottom:-4,right:-4,width:20,height:20,borderRadius:"50%",background:"var(--grad-main)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,border:"2px solid var(--bg2)" }}>
-                    {p.id==="common"?"🏦":p.id==="p1"?"1":"2"}
-                  </div>
-                </div>
-                <div style={{ flex:1,minWidth:0 }}>
-                  <div style={{ display:"flex",alignItems:"center",gap:9,marginBottom:5 }}>
-                    <div style={{ fontWeight:900,fontSize:18,color:p.color }}>{p.name}</div>
-                    <span className="tip" data-tip={`Type de compte — ${p.id==="common"?"Fonds communs du couple":"Revenu personnel"}`}
-                      style={{ fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,background:`${p.color}15`,border:`1px solid ${p.color}30`,color:p.color,textTransform:"uppercase",letterSpacing:.5 }}>
-                      {p.id==="common"?"🏦 Commun":"💼 Personnel"}
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontWeight:900,fontSize:20,color:p.color,marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{p.name}</div>
+                    <span className="tip" data-tip={typeDesc}
+                      style={{ display:"inline-flex",alignItems:"center",gap:5,fontSize:11,fontWeight:700,padding:"3px 11px",borderRadius:20,background:`${p.color}15`,border:`1px solid ${p.color}30`,color:p.color,textTransform:"uppercase",letterSpacing:.5 }}>
+                      {typeLabel}
                     </span>
+                    <div style={{ fontSize:12,color:"var(--text3)",marginTop:6 }}>
+                      {isCommon ? "Revenus partagés du couple" : `${profileTx.length} transaction${profileTx.length>1?"s":""} ce mois`}
+                    </div>
                   </div>
-                  <div style={{ fontSize:12,color:"var(--text3)" }}>
-                    {p.id!=="common" ? `${profileTx.length} transaction${profileTx.length>1?"s":""} ce mois` : "Revenus partagés du couple"}
+                  <div style={{ textAlign:"right",flexShrink:0 }}>
+                    <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:4 }}>Revenu mensuel</div>
+                    <div className="stat-num" style={{ fontSize:30,color:inc>0?"var(--green)":"var(--text3)",lineHeight:1,textShadow:inc>0?"0 0 30px rgba(74,222,128,0.25)":"none" }}>
+                      {inc>0?`+${fmt(inc)}`:"—"}
+                    </div>
+                    {totalInc>0&&inc>0&&<div style={{ fontSize:11,color:"var(--text3)",marginTop:3,fontWeight:600 }}>{Math.round(pctOfTotal)}% du total</div>}
                   </div>
                 </div>
-                <div style={{ textAlign:"right" }}>
-                  <div className="stat-num" style={{ fontSize:28,color:inc>0?"var(--green)":"var(--text3)",lineHeight:1 }}>
-                    {inc>0?`+${fmt(inc)}`:"—"}
-                  </div>
-                  {totalInc>0 && inc>0 && <div style={{ fontSize:11,color:"var(--text3)",marginTop:3 }}>{Math.round(pctOfTotal)}% du total</div>}
+
+                {/* ── STATS GRID 3 colonnes ── */}
+                <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16 }}>
+                  {[
+                    { icon:"💵",label:"Revenu",fullLabel:"Revenu mensuel",val:inc>0?`+${fmt(inc)}`:"Non défini",color:"var(--green)",tip:"Revenu mensuel de ce profil",bg:"rgba(74,222,128,0.06)",bd:"rgba(74,222,128,0.15)" },
+                    { icon:"💸",label:"Dépensé",fullLabel:"Total dépensé",val:profileSpent>0?`-${fmt(profileSpent)}`:"0 €",color:"var(--red)",tip:`Somme des ${profileTx.length} transactions de ce profil`,bg:"rgba(248,113,113,0.06)",bd:"rgba(248,113,113,0.14)" },
+                    { icon:"💹",label:"Épargne",fullLabel:"Taux d'épargne",val:savingsRate!==null?`${savingsRate}%`:"—",color:savingsRate!==null&&savingsRate<0?"var(--red)":"var(--teal)",tip:"Taux d'épargne = (Revenu - Dépenses) / Revenu",bg:"rgba(45,212,191,0.06)",bd:"rgba(45,212,191,0.15)" },
+                  ].map(s => (
+                    <div key={s.label} className="tip" data-tip={s.tip}
+                      style={{ textAlign:"center",padding:"12px 8px",background:s.bg,borderRadius:13,border:`1px solid ${s.bd}`,transition:"all .2s",cursor:"default" }}
+                      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.2)";}}
+                      onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+                      <div style={{ fontSize:20,marginBottom:5 }}>{s.icon}</div>
+                      <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5,fontWeight:800,marginBottom:4 }}>{s.fullLabel}</div>
+                      <div className="stat-num" style={{ fontSize:14,fontWeight:900,color:s.color }}>{s.val}</div>
+                    </div>
+                  ))}
                 </div>
+
+                {/* ── BARRE DE PROGRESSION ── */}
+                {inc>0 && (
+                  <div style={{ marginBottom:16 }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"var(--text3)",marginBottom:7 }}>
+                      <span style={{ fontWeight:600 }}>Part du revenu total utilisée</span>
+                      <span style={{ fontWeight:800,color:profileSpent/inc>0.8?"var(--red)":profileSpent/inc>0.6?"var(--orange)":p.color }}>
+                        {Math.round(profileSpent/inc*100)}%
+                      </span>
+                    </div>
+                    <div className="progress-track" style={{ height:7 }}>
+                      <div className="progress-fill" style={{ width:`${Math.min(100,(profileSpent/inc)*100)}%`,background:profileSpent/inc>0.8?"var(--grad-red)":p.color,boxShadow:`0 0 12px ${p.color}40` }}/>
+                    </div>
+                    <div style={{ display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--text3)",marginTop:5 }}>
+                      <span>💸 Dépensé : {fmt(profileSpent)}</span>
+                      <span style={{ color:remaining>=0?"var(--green)":"var(--red)",fontWeight:700 }}>
+                        {remaining>=0?"💰":"⚠️"} Reste : {fmt(Math.abs(remaining))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── PART DU TOTAL ── */}
+                {totalInc>0&&inc>0&&(
+                  <div style={{ marginBottom:16 }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text3)",marginBottom:7 }}>
+                      <span style={{ fontWeight:600 }}>Part du revenu total du foyer</span>
+                      <span style={{ fontWeight:800,color:p.color }}>{Math.round(pctOfTotal)}%</span>
+                    </div>
+                    <div className="progress-track" style={{ height:5 }}>
+                      <div className="progress-fill" style={{ width:`${pctOfTotal}%`,background:p.color,boxShadow:`0 0 10px ${p.color}50` }}/>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── BOUTON MODIFIER PLEINE LARGEUR ── */}
+                <button className="btn btn-primary tip"
+                  data-tip={`Modifier le revenu de ${p.name} pour ${monthLabel(selMonth)}`}
+                  style={{ width:"100%",justifyContent:"center",padding:"13px",fontSize:14,letterSpacing:.3,borderRadius:13,boxShadow:`0 4px 18px rgba(167,139,250,0.35)` }}
+                  onClick={() => setModal({ type:"editIncome",profileId:p.id,selMonth })}>
+                  ✏️ Modifier le revenu de {p.name}
+                </button>
               </div>
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14 }}>
-                {[
-                  { icon:"💵",label:"Revenu",val:inc>0?`+${fmt(inc)}`:"Non défini",color:"var(--green)",tip:"Revenu mensuel de ce profil" },
-                  { icon:"💸",label:"Dépensé",val:profileSpent>0?`-${fmt(profileSpent)}`:"0 €",color:"var(--red)",tip:`Somme des ${profileTx.length} transactions de ce profil` },
-                  { icon:"💹",label:"Épargne",val:savingsRate!==null?`${savingsRate}%`:"—",color:savingsRate!==null&&savingsRate<0?"var(--red)":"var(--teal)",tip:"Taux d'épargne = (Revenu - Dépenses) / Revenu" },
-                ].map(s => (
-                  <div key={s.label} className="tip" data-tip={s.tip}
-                    style={{ textAlign:"center",padding:"10px 6px",background:"rgba(255,255,255,0.03)",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)" }}>
-                    <div style={{ fontSize:18,marginBottom:4 }}>{s.icon}</div>
-                    <div style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5,fontWeight:700,marginBottom:3 }}>{s.label}</div>
-                    <div style={{ fontSize:14,fontWeight:900,color:s.color }}>{s.val}</div>
-                  </div>
-                ))}
-              </div>
-              {inc>0 && (
-                <div style={{ marginBottom:14 }}>
-                  <div style={{ display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text3)",marginBottom:6 }}>
-                    <span>Part du revenu total</span>
-                    <span style={{ fontWeight:700,color:p.color }}>{Math.round(pctOfTotal)}%</span>
-                  </div>
-                  <div className="progress-track" style={{ height:6 }}>
-                    <div className="progress-fill" style={{ width:`${pctOfTotal}%`,background:p.color,boxShadow:`0 0 10px ${p.color}50` }}/>
-                  </div>
-                </div>
-              )}
-              <button className="btn btn-primary tip"
-                data-tip={`Modifier le revenu de ${p.name} pour ${monthLabel(selMonth)}`}
-                style={{ width:"100%",justifyContent:"center",padding:"11px",fontSize:14 }}
-                onClick={() => setModal({ type:"editIncome",profileId:p.id,selMonth })}>
-                ✏️ Modifier le revenu
-              </button>
             </div>
           );
         })}
@@ -1605,15 +1690,15 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
       </div>
 
       {/* FILTER CHIPS */}
-      <div style={{ marginBottom:20,paddingTop:4 }}>
-        <div className="filter-bar">
+      <div style={{ marginBottom:20,paddingTop:8,overflow:"visible" }}>
+        <div className="filter-bar" style={{ paddingTop:6,paddingBottom:8,overflow:"visible" }}>
           {[
             { id:"all",label:"Tout",icon:"",tip:"Afficher toutes les dépenses" },
             ...data.profiles.map(p => ({ id:p.id,label:p.name,icon:p.avatar,tip:`Dépenses de ${p.name}`,color:p.color })),
             ...data.categories.map(c => ({ id:c.id,label:c.name,icon:c.icon,tip:`Catégorie : ${c.name}`,color:c.color })),
           ].map(f => (
             <div key={f.id}
-              className={`filter-chip tip tip-down ${filter===f.id?"active":""}`}
+              className={`filter-chip tip ${filter===f.id?"active":""}`}
               data-tip={f.tip}
               onClick={() => setFilter(filter===f.id&&f.id!=="all"?"all":f.id)}
               style={filter===f.id&&f.color?{ borderColor:f.color+"66",background:f.color+"18",color:f.color,boxShadow:`0 2px 12px ${f.color}22` }:{}}>
@@ -1673,20 +1758,21 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                         onMouseEnter={e => { e.currentTarget.style.background=`linear-gradient(135deg,${cat.color}08,rgba(167,139,250,0.05))`; e.currentTarget.style.borderLeftColor=cat.color; e.currentTarget.style.paddingLeft="28px"; }}
                         onMouseLeave={e => { e.currentTarget.style.background="transparent"; e.currentTarget.style.borderLeftColor="transparent"; e.currentTarget.style.paddingLeft="22px"; }}>
 
-                        <div style={{ display:"flex",alignItems:"center",gap:14,flex:"0 0 auto",minWidth:0 }}>
+                        <div style={{ display:"flex",alignItems:"center",gap:14,flex:1,minWidth:0 }}>
                           <div style={{ position:"relative",flexShrink:0 }}>
-                            <div style={{ width:58,height:58,borderRadius:18,background:`linear-gradient(135deg,${cat.color}1a,${cat.color}08)`,border:`2px solid ${cat.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:27,boxShadow:`0 6px 20px ${cat.color}18,inset 0 1px 0 rgba(255,255,255,0.06)` }}>
+                            <div style={{ width:62,height:62,borderRadius:20,background:`linear-gradient(135deg,${cat.color}22,${cat.color}08)`,border:`2px solid ${cat.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:`0 8px 22px ${cat.color}20,inset 0 1px 0 rgba(255,255,255,0.07)` }}>
                               {cat.icon}
                             </div>
                             <div className="tip tip-right" data-tip={`Profil : ${prof.name}`}
-                              style={{ position:"absolute",bottom:-5,right:-5,width:22,height:22,borderRadius:"50%",background:prof.color||"var(--bg3)",border:"2.5px solid var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:`0 2px 8px rgba(0,0,0,0.4)` }}>
+                              style={{ position:"absolute",bottom:-6,right:-6,width:24,height:24,borderRadius:"50%",background:prof.color||"var(--bg3)",border:"2.5px solid var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,boxShadow:`0 2px 8px rgba(0,0,0,0.5)` }}>
                               {prof.avatar}
                             </div>
                           </div>
 
-                          <div style={{ display:"flex",flexDirection:"column",gap:7,minWidth:0 }}>
+                          <div style={{ display:"flex",flexDirection:"column",gap:8,flex:1,minWidth:0 }}>
+                            {/* Ligne 1 : titre + badge AUTO */}
                             <div style={{ display:"flex",alignItems:"center",gap:8,flexWrap:"wrap" }}>
-                              <span style={{ fontWeight:900,fontSize:16,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:240 }}>{tx.label}</span>
+                              <span style={{ fontWeight:900,fontSize:16,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:260 }}>{tx.label}</span>
                               {tx.auto && (
                                 <span className="tip" data-tip="Transaction automatique depuis une facture récurrente"
                                   style={{ flexShrink:0,fontSize:9.5,background:"rgba(167,139,250,0.15)",border:"1px solid rgba(167,139,250,0.3)",color:"var(--purple)",borderRadius:20,padding:"2px 8px",fontWeight:800,letterSpacing:.3 }}>
@@ -1694,23 +1780,27 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                                 </span>
                               )}
                             </div>
+                            {/* Ligne 2 : badges profil + catégorie + date */}
                             <div style={{ display:"flex",alignItems:"center",gap:6,flexWrap:"wrap" }}>
                               <span className="tip" data-tip={`Profil payeur : ${prof.name}`}
-                                style={{ display:"inline-flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.06)",borderRadius:20,padding:"3px 10px",border:"1px solid rgba(255,255,255,0.1)",fontSize:12,fontWeight:700,color:"var(--text2)" }}>
-                                {prof.avatar} {prof.name}
+                                style={{ display:"inline-flex",alignItems:"center",gap:5,background:`${prof.color||"#888"}12`,borderRadius:20,padding:"4px 11px",border:`1px solid ${prof.color||"#888"}25`,fontSize:12,fontWeight:700,color:prof.color||"var(--text2)" }}>
+                                <span style={{ fontSize:14 }}>{prof.avatar}</span>
+                                <span>{prof.name}</span>
                               </span>
                               <span className="tip tip-down" data-tip={`Catégorie : ${cat.name}`}
-                                style={{ display:"inline-flex",alignItems:"center",gap:4,background:`${cat.color}12`,borderRadius:20,padding:"3px 10px",border:`1px solid ${cat.color}28`,fontSize:12,fontWeight:700,color:cat.color }}>
-                                {cat.icon} {cat.name}
+                                style={{ display:"inline-flex",alignItems:"center",gap:5,background:`${cat.color}12`,borderRadius:20,padding:"4px 11px",border:`1px solid ${cat.color}28`,fontSize:12,fontWeight:700,color:cat.color }}>
+                                <span>{cat.icon}</span>
+                                <span>{cat.name}</span>
                               </span>
                               <span className="tip tip-down" data-tip="Date et heure de la transaction"
-                                style={{ display:"inline-flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.04)",borderRadius:20,padding:"3px 10px",border:"1px solid rgba(255,255,255,0.07)",fontSize:11.5,color:"var(--text3)",fontWeight:600 }}>
+                                style={{ display:"inline-flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.04)",borderRadius:20,padding:"4px 11px",border:"1px solid rgba(255,255,255,0.07)",fontSize:11.5,color:"var(--text3)",fontWeight:600 }}>
                                 🕐 {smartDate(tx.timestamp)}
                               </span>
                             </div>
-                            <div style={{ display:"flex",alignItems:"center",gap:7 }}>
-                              <div style={{ width:80,height:3,background:"rgba(255,255,255,0.07)",borderRadius:3,overflow:"hidden" }}>
-                                <div style={{ width:`${amountBar}%`,height:"100%",background:cat.color,borderRadius:3,transition:"width .6s" }}/>
+                            {/* Ligne 3 : barre de proportion */}
+                            <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                              <div style={{ flex:1,maxWidth:160,height:3,background:"rgba(255,255,255,0.07)",borderRadius:3,overflow:"hidden" }}>
+                                <div style={{ width:`${amountBar}%`,height:"100%",background:`linear-gradient(90deg,${cat.color},${cat.color}80)`,borderRadius:3,transition:"width .6s" }}/>
                               </div>
                               <span style={{ fontSize:10,color:"var(--text3)",fontWeight:700 }}>{pct}% du total</span>
                             </div>
@@ -1984,14 +2074,14 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
           </button>
           <div className="bill-hover-actions" style={{ display:"flex",gap:6 }}>
             <button onClick={() => setModal({ type:"editBill",bill })}
-              className="tip" data-tip="Modifier cette facture"
-              style={{ display:"flex",alignItems:"center",gap:5,padding:"9px 13px",borderRadius:11,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",transition:"all .2s",whiteSpace:"nowrap" }}>
+              className="tip action-btn action-btn-edit" data-tip="Modifier cette facture"
+              style={{ display:"flex",alignItems:"center",gap:5,padding:"9px 14px",borderRadius:11,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",transition:"all .2s",whiteSpace:"nowrap" }}>
               ✏️ Modifier
             </button>
             <button onClick={() => onDelete(bill.id)}
-              className="tip" data-tip="Supprimer cette facture"
-              style={{ width:42,height:42,borderRadius:11,cursor:"pointer",flexShrink:0,background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",color:"var(--red)",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s" }}>
-              🗑
+              className="tip action-btn action-btn-del" data-tip="Supprimer cette facture définitivement"
+              style={{ display:"flex",alignItems:"center",gap:5,padding:"9px 14px",borderRadius:11,border:"1px solid rgba(248,113,113,0.3)",background:"rgba(248,113,113,0.08)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",transition:"all .2s",whiteSpace:"nowrap" }}>
+              🗑 Supprimer
             </button>
           </div>
         </div>
@@ -2266,6 +2356,7 @@ function ModalRouter({ modal, setModal, data, update, selMonth }) {
   if (modal.type === "addTransaction")      return <AddTxModal               close={close} data={data} update={update} selMonth={modal.selMonth||selMonth}/>;
   if (modal.type === "editTransaction")     return <EditTxModal              close={close} data={data} update={update} tx={modal.tx} selMonth={modal.selMonth||selMonth}/>;
   if (modal.type === "addBill")             return <AddBillModal             close={close} data={data} update={update}/>;
+  if (modal.type === "editBill")            return <EditBillModal            close={close} data={data} update={update} bill={modal.bill}/>;
   if (modal.type === "editProfile")         return <EditProfileModal         close={close} data={data} update={update} profileId={modal.profileId}/>;
   if (modal.type === "addRecurringIncome")  return <AddRecurringIncomeModal  close={close} data={data} update={update}/>;
   return null;
@@ -2497,6 +2588,79 @@ function AddBillModal({ close, data, update }) {
       <div style={{ display:"flex",gap:10 }}>
         <button className="btn btn-ghost" onClick={close} style={{ flex:1 }}>Annuler</button>
         <button className="btn btn-primary" onClick={save} style={{ flex:1 }} disabled={!name.trim()}>Créer</button>
+      </div>
+    </ModalWrap>
+  );
+}
+
+function EditBillModal({ close, data, update, bill }) {
+  const [name, setName]         = useState(bill.name || "");
+  const [amount, setAmount]     = useState(bill.amount || "");
+  const [icon, setIcon]         = useState(bill.icon || "⚡");
+  const [profId, setProfId]     = useState(bill.profileId || "common");
+  const [catId, setCatId]       = useState(bill.categoryId || (data.categories[0]?.id || ""));
+  const [dueDate, setDueDate]   = useState(bill.dueDate ? new Date(bill.dueDate).toISOString().slice(0,10) : "");
+  const [recurring, setRecurring] = useState(bill.recurring ?? true);
+  const save = () => {
+    if (!name.trim()) return;
+    update(d => {
+      const idx = d.bills.findIndex(b => b.id===bill.id);
+      if (idx>=0) {
+        d.bills[idx] = { ...d.bills[idx], name:name.trim(), amount:parseFloat(amount)||0, icon, profileId:profId, categoryId:catId,
+          dueDate:dueDate ? new Date(dueDate).toISOString() : null, recurring };
+      }
+    });
+    close();
+  };
+  return (
+    <ModalWrap close={close} title="✏️ Modifier la facture">
+      <div style={{ marginBottom:12 }}>
+        <label>Nom</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Électricité EDF" autoFocus/>
+      </div>
+      <div style={{ marginBottom:12 }}>
+        <label>Icône</label>
+        <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>
+          {BILL_ICONS.map(i => (
+            <button key={i} onClick={() => setIcon(i)} style={{
+              fontSize:18, background:icon===i?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.05)",
+              border:`2px solid ${icon===i?"var(--purple)":"transparent"}`,
+              borderRadius:8, width:36, height:36, cursor:"pointer", transition:"all .15s",
+            }}>{i}</button>
+          ))}
+        </div>
+      </div>
+      <div className="grid-2" style={{ marginBottom:12 }}>
+        <div>
+          <label>Montant (€)</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0 = variable"/>
+        </div>
+        <div>
+          <label>Date d'échéance</label>
+          <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}/>
+        </div>
+      </div>
+      <div className="grid-2" style={{ marginBottom:12 }}>
+        <div>
+          <label>Payé par</label>
+          <select value={profId} onChange={e => setProfId(e.target.value)}>
+            {data.profiles.map(p => <option key={p.id} value={p.id}>{p.avatar} {p.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label>Catégorie</label>
+          <select value={catId} onChange={e => setCatId(e.target.value)}>
+            {data.categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:20,background:"rgba(167,139,250,0.08)",borderRadius:12,padding:13 }}>
+        <input type="checkbox" id="rec-edit" checked={recurring} onChange={e => setRecurring(e.target.checked)} style={{ width:"auto",cursor:"pointer" }}/>
+        <label htmlFor="rec-edit" style={{ margin:0,cursor:"pointer",fontSize:13,color:"var(--text)" }}>🔄 Facture récurrente mensuelle</label>
+      </div>
+      <div style={{ display:"flex",gap:10 }}>
+        <button className="btn btn-ghost" onClick={close} style={{ flex:1 }}>Annuler</button>
+        <button className="btn btn-primary" onClick={save} style={{ flex:1 }} disabled={!name.trim()}>Enregistrer</button>
       </div>
     </ModalWrap>
   );
