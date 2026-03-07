@@ -289,7 +289,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
   background:rgba(7,6,15,0.94);backdrop-filter:blur(32px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
-.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;transform:translateZ(0);}
+.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;-webkit-overflow-scrolling:touch;}
 
 /* ── TOPBAR RIGHT WIDGET ── */
 .topbar-clock{display:flex;align-items:center;gap:0;background:linear-gradient(135deg,rgba(167,139,250,0.14),rgba(244,114,182,0.09));border:1px solid rgba(167,139,250,0.25);border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);flex-shrink:0;}
@@ -491,15 +491,15 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 ::-webkit-scrollbar-thumb:hover{background:rgba(167,139,250,0.45);}
 
 /* ── ANIMATIONS ── */
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0}to{opacity:1}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 @keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
-.fade-up{animation:fadeUp .3s ease both;}
+.fade-up{animation:fadeUp .25s ease both;}
 .fade-in{animation:fadeIn .2s ease both;}
 .scale-in{animation:scaleIn .28s cubic-bezier(.34,1.56,.64,1) both;}
 .slide-in{animation:slideIn .25s ease both;}
@@ -507,12 +507,10 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .float-icon{animation:float 3s ease-in-out infinite;}
 .pulse-dot{animation:pulse 2s infinite;}
 .spin{animation:spin .7s linear infinite;}
-/* iOS Safari : translateY dans les animations décale les touch targets → désactivé sur touch */
 @media(hover:none){
-  .fade-up{animation:fadeIn .25s ease both !important;}
+  .float-icon{animation:none !important;}
   .slide-in{animation:fadeIn .2s ease both !important;}
   .scale-in{animation:fadeIn .2s ease both !important;}
-  .float-icon{animation:none !important;}
 }
 
 /* ── RECHARTS ── */
