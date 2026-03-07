@@ -213,7 +213,15 @@ function processDueBills(data) {
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;}
+/* ── iOS PWA : empêche tout décalage de scroll sur le document racine ── */
+html,body{ touch-action:none; }
+/* Mais on autorise le scroll dans les zones scrollables de l'app */
+.page-content,.sidebar,.modal-box,.more-sheet,.station-table-wrap{
+  touch-action:pan-y;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
 :root{
   --bg:#07060f;--bg2:#0e0c1e;--bg3:#15122a;--bg4:#1a1635;
   --glass:rgba(255,255,255,0.055);--glass2:rgba(255,255,255,0.09);--glass3:rgba(255,255,255,0.12);
@@ -228,7 +236,20 @@ button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:mani
   --shadow-card:0 4px 24px rgba(0,0,0,0.4);
   --sw:244px;--r:16px;--r-sm:11px;--r-lg:22px;
 }
-html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);width:100%;height:100%;margin:0;padding:0;overflow:hidden;}
+html,body{
+  font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);
+  /* ── iOS PWA tap-offset fix ──
+     position:fixed empêche le body de scroller silencieusement lors de la
+     réouverture du signet, ce qui décalait les zones tactiles des éléments fixed */
+  position:fixed;
+  width:100%;height:100%;
+  margin:0;padding:0;overflow:hidden;
+  /* Stoppe l'overscroll / bounce natif iOS qui peut aussi générer un offset */
+  overscroll-behavior:none;
+  -webkit-overflow-scrolling:auto;
+  touch-action:manipulation;
+}
+#root{font-family:'Outfit',sans-serif;width:100%;height:100%;margin:0;padding:0;overflow:hidden;}
 
 /* ── AUTH ── */
 .auth-shell{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -939,7 +960,7 @@ function useFavicon() {
       vp.name = 'viewport';
       document.head.appendChild(vp);
     }
-    vp.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
+    vp.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
     [
       ['apple-mobile-web-app-capable',          'yes'],
       ['mobile-web-app-capable',                'yes'],
@@ -986,6 +1007,45 @@ function useFavicon() {
     };
     applyStandaloneLayout();
     setTimeout(applyStandaloneLayout, 100);
+
+    // ── iOS PWA tap-offset fix ──────────────────────────────────────────────
+    // Quand le signet est rouvert, iOS peut laisser un scrollTop résiduel sur
+    // html/document. Les éléments position:fixed restent ancrés à y=0 mais
+    // les touch events utilisent les coords paginées → décalage apparent.
+    // On force le reset immédiatement et à chaque retour en premier plan.
+    const resetScroll = () => {
+      // Reset synchrone
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch { window.scrollTo(0, 0); }
+    };
+
+    resetScroll();
+    // À chaque retour en premier plan (app backgroundée puis réouverte)
+    const onVisibility = () => { if (document.visibilityState === 'visible') resetScroll(); };
+    // pageshow couvre aussi le cache de navigation iOS (bfcache)
+    const onPageShow  = (e) => { if (e.persisted) resetScroll(); };
+    // focus couvre le retour après une notification ou un appel
+    const onFocus     = () => resetScroll();
+
+    document.addEventListener('visibilitychange', onVisibility, { passive: true });
+    window.addEventListener('pageshow',  onPageShow, { passive: true });
+    window.addEventListener('focus',     onFocus,    { passive: true });
+
+    // Bloque tout scroll sur document/body qui recréerait l'offset
+    const preventBodyScroll = (e) => {
+      // Laisser passer les scrolls à l'intérieur des conteneurs dédiés (.page-content)
+      if (e.target.closest('.page-content, .sidebar, .modal-box, .more-sheet')) return;
+      e.preventDefault();
+    };
+    document.addEventListener('touchmove', preventBodyScroll, { passive: false });
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pageshow',  onPageShow);
+      window.removeEventListener('focus',     onFocus);
+      document.removeEventListener('touchmove', preventBodyScroll);
+    };
   }, []);
 }
 
