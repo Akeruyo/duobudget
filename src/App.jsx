@@ -534,7 +534,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .page-content{
     padding:14px;
     padding-top:16px;
-    padding-bottom:calc(68px + env(safe-area-inset-bottom));
+    padding-bottom:calc(60px + env(safe-area-inset-bottom) + 8px);
     padding-left:calc(14px + env(safe-area-inset-left));
     padding-right:calc(14px + env(safe-area-inset-right));
     overflow-x:hidden;
@@ -543,21 +543,32 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   /* ── TAB BAR ── */
   .bottom-nav{
     display:flex;
+    flex-direction:column;
     position:fixed;
     bottom:0; left:0; right:0;
-    /* Solid background, no blur (fixes iOS repaint glitch) */
     background:#0a0818;
     border-top:1px solid rgba(255,255,255,0.09);
+    z-index:250;
+    padding:0;
+  }
+  /* Rangée des icônes — TOUJOURS 60px fixes */
+  .bnav-row{
+    display:flex;
     justify-content:space-around;
     align-items:flex-start;
-    /* 60px content zone + safe area padding below */
+    height:60px;
     padding-top:10px;
-    padding-bottom:env(safe-area-inset-bottom);
     padding-left:env(safe-area-inset-left);
     padding-right:env(safe-area-inset-right);
-    z-index:250;
-    /* Fixed total height so content never overlaps */
-    height:calc(60px + env(safe-area-inset-bottom));
+    width:100%;
+  }
+  /* Spacer safe-area : 0px en browser, ~34px en standalone iOS */
+  .bnav-inset{
+    height:env(safe-area-inset-bottom);
+    min-height:0;
+    background:#0a0818;
+    width:100%;
+    flex-shrink:0;
   }
 
   /* ── TAB ITEM ── */
@@ -788,27 +799,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .app-shell{ padding-top:0; }
   .auth-shell{ padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom); }
 }
-/* ── STANDALONE PWA "Ajouter à l'écran d'accueil" iOS ── */
-@media(display-mode:standalone){
-  .topbar{
-    height:calc(52px + env(safe-area-inset-top)) !important;
-    padding-top:calc(8px + env(safe-area-inset-top)) !important;
-    padding-left:calc(14px + env(safe-area-inset-left)) !important;
-    padding-right:calc(14px + env(safe-area-inset-right)) !important;
-    padding-bottom:8px !important;
-  }
-  .bottom-nav{
-    height:calc(60px + env(safe-area-inset-bottom)) !important;
-    padding-top:10px !important;
-    padding-bottom:env(safe-area-inset-bottom) !important;
-    padding-left:env(safe-area-inset-left) !important;
-    padding-right:env(safe-area-inset-right) !important;
-    align-items:flex-start !important;
-    box-sizing:border-box !important;
-  }
-  .bnav-item{ padding-top:2px !important; padding-bottom:0 !important; }
-  .page-content{ padding-bottom:calc(72px + env(safe-area-inset-bottom)) !important; }
-}
+/* safe-area handled via .bnav-inset spacer — no standalone overrides needed */
 `;
 
 // ═══════════════════════════════════════════════════════════
@@ -910,6 +901,16 @@ function useFavicon() {
       if (!mt) { mt = document.createElement('meta'); mt.name = name; document.head.appendChild(mt); }
       mt.content = content;
     });
+
+    // ── Détection standalone iOS (navigator.standalone) + fallback media query ──
+    const checkStandalone = () => {
+      const isStandalone =
+        window.navigator.standalone === true ||
+        window.matchMedia('(display-mode: standalone)').matches;
+      document.body.classList.toggle('pwa-standalone', isStandalone);
+    };
+    checkStandalone();
+    window.matchMedia('(display-mode: standalone)').addEventListener('change', checkStandalone);
   }, []);
 }
 
@@ -1408,22 +1409,25 @@ export default function App() {
         </div>
 
         <nav className="bottom-nav">
-          {[
-            { id:"dashboard", icon:"🏠", label:"Accueil" },
-            { id:"expenses",  icon:"💳", label:"Dépenses" },
-            { id:"bills",     icon:"📋", label:"Factures", badge:unpaidBills },
-            { id:"stats",     icon:"📊", label:"Stats" },
-          ].map(n => (
-            <div key={n.id} className={`bnav-item ${page===n.id?"active":""}`} onClick={() => navigate(n.id)}>
-              <div className="bnav-icon-wrap"><span className="bnav-icon">{n.icon}</span></div>
-              <span>{n.label}</span>
-              {n.badge>0 && <span style={{ position:"absolute",top:0,right:2,background:overdueBills>0?"var(--red)":"var(--yellow)",color:"white",borderRadius:10,padding:"0 5px",fontSize:9,fontWeight:800,minWidth:16,textAlign:"center" }}>{n.badge}</span>}
+          <div className="bnav-row">
+            {[
+              { id:"dashboard", icon:"🏠", label:"Accueil" },
+              { id:"expenses",  icon:"💳", label:"Dépenses" },
+              { id:"bills",     icon:"📋", label:"Factures", badge:unpaidBills },
+              { id:"stats",     icon:"📊", label:"Stats" },
+            ].map(n => (
+              <div key={n.id} className={`bnav-item ${page===n.id?"active":""}`} onClick={() => navigate(n.id)}>
+                <div className="bnav-icon-wrap"><span className="bnav-icon">{n.icon}</span></div>
+                <span>{n.label}</span>
+                {n.badge>0 && <span style={{ position:"absolute",top:0,right:2,background:overdueBills>0?"var(--red)":"var(--yellow)",color:"white",borderRadius:10,padding:"0 5px",fontSize:9,fontWeight:800,minWidth:16,textAlign:"center" }}>{n.badge}</span>}
+              </div>
+            ))}
+            <div className={`bnav-item ${["incomes","essence","settings"].includes(page)?"active":""}`} onClick={() => setMoreOpen(true)}>
+              <div className="bnav-icon-wrap"><span className="bnav-icon">⋯</span></div>
+              <span>Plus</span>
             </div>
-          ))}
-          <div className={`bnav-item ${["incomes","essence","settings"].includes(page)?"active":""}`} onClick={() => setMoreOpen(true)}>
-            <div className="bnav-icon-wrap"><span className="bnav-icon">⋯</span></div>
-            <span>Plus</span>
           </div>
+          <div className="bnav-inset"/>
         </nav>
 
         {moreOpen && (
@@ -4566,7 +4570,7 @@ function FuelMapLeaflet({ stations, userLat, userLng }) {
             <div style="font-size:11px;color:#64748b;margin-bottom:6px">${s.adresse||""}${s.ville?" · "+s.ville:""}</div>
             ${dist?`<div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px">📍 ${dist}</div>`:""}
             <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:2px">${fuels}</div>
-            <a href="https://maps.google.com/maps?daddr=${s.lat},${s.lng}" target="_blank"
+            <a href="maps://?daddr=${s.lat},${s.lng}&dirflg=d" target="_blank"
               style="display:block;text-align:center;background:linear-gradient(135deg,#a78bfa,#f472b6);color:#fff;padding:9px;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px">🗺️ Démarrer</a>
           </div>`));
       });
@@ -4945,114 +4949,134 @@ function EssencePage() {
             })}
           </div>
 
-          {/* ── Tableau stations – redesign pro ── */}
-          <div style={{borderRadius:20,overflow:"hidden",border:"1px solid var(--border)",
-            boxShadow:"0 4px 24px rgba(0,0,0,0.35)",marginBottom:14}}>
-
-            {/* Header tableau */}
-            <div style={{padding:"16px 22px",background:"linear-gradient(135deg,rgba(251,191,36,0.08),rgba(167,139,250,0.04))",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:36,height:36,borderRadius:11,background:"rgba(251,191,36,0.16)",border:"1px solid rgba(251,191,36,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>📍</div>
+          {/* ── Liste stations – cards mobile-first ── */}
+          <div style={{marginBottom:14}}>
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,padding:"0 2px"}}>
               <div>
                 <div style={{fontWeight:900,fontSize:16}}>Stations à <span style={{color:"var(--yellow)"}}>{stationsWithDist[0]?.ville||citySearch}</span></div>
-                <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>Prix en €/L · Données gouvernementales · Temps réel</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Prix en €/L · Données gouvernementales</div>
               </div>
-              <div style={{marginLeft:"auto",background:"rgba(251,191,36,0.14)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:20,padding:"5px 14px",fontSize:12,color:"var(--yellow)",fontWeight:800,flexShrink:0}}>
+              <div style={{background:"rgba(251,191,36,0.14)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:20,padding:"5px 14px",fontSize:12,color:"var(--yellow)",fontWeight:800,flexShrink:0}}>
                 {stationsWithDist.length} station{stationsWithDist.length>1?"s":""}
               </div>
             </div>
 
-            {/* Colonnes header */}
-            <div style={{display:"grid",gridTemplateColumns:"minmax(130px,2fr) repeat(4,minmax(46px,1fr)) 42px",background:"rgba(0,0,0,0.3)",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-              <div style={{padding:"10px 10px",fontSize:9,fontWeight:900,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1}}>
-                Station / Adresse
-              </div>
-              {Object.entries(FUEL_META).map(([k,m])=>(
-                <div key={k} style={{padding:"8px 0",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3}}>
-                  <div style={{width:32,height:32,borderRadius:10,background:`${m.color}18`,border:`1.5px solid ${m.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{m.icon}</div>
-                  <span style={{fontSize:10,color:m.color,fontWeight:900,letterSpacing:.5}}>{m.label}</span>
-                </div>
-              ))}
-              <div style={{padding:"10px 4px",fontSize:9,fontWeight:900,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,textAlign:"center"}}>Nav</div>
-            </div>
+            {/* Cards */}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {stationsWithDist.map((s,i)=>{
+                const brand=detectBrand(s.nom,s.enseignes,s.adresse);
+                const fuelsAvail=Object.entries(FUEL_META).filter(([k])=>s[k]!=null);
+                const cheapestKey=fuelsAvail.reduce((acc,[k])=>(!acc||s[k]<s[acc])?k:acc,null);
+                const mapsUrl=s.lat?`maps://?daddr=${s.lat},${s.lng}&dirflg=d`:null;
+                return (
+                  <div key={s.id||i}
+                    onClick={()=>mapsUrl&&window.open(mapsUrl,'_blank')}
+                    style={{
+                      background:"rgba(255,255,255,0.03)",
+                      border:"1px solid rgba(255,255,255,0.08)",
+                      borderRadius:16,overflow:"hidden",
+                      cursor:mapsUrl?"pointer":"default",
+                      transition:"transform .15s,box-shadow .15s,border-color .15s",
+                    }}
+                    onTouchStart={e=>e.currentTarget.style.transform="scale(0.985)"}
+                    onTouchEnd={e=>{e.currentTarget.style.transform="";}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(167,139,250,0.3)";e.currentTarget.style.boxShadow="0 4px 20px rgba(167,139,250,0.12)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";e.currentTarget.style.boxShadow="";}}>
 
-            {/* Lignes */}
-            {stationsWithDist.map((s,i)=>{
-              const isEven=i%2===0;
-              const rowBg=isEven?"rgba(255,255,255,0.012)":"transparent";
-              const nomDisplay=(s.nom||"Station").toUpperCase();
-              return (
-                <div key={s.id||i}
-                  style={{display:"grid",gridTemplateColumns:"minmax(130px,2fr) repeat(4,minmax(46px,1fr)) 42px",borderTop:"1px solid rgba(255,255,255,0.04)",background:rowBg,transition:"background .12s",cursor:"pointer"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="rgba(167,139,250,0.06)"}
-                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}
-                  onClick={()=>{if(s.lat){window.open(`maps://?daddr=${s.lat},${s.lng}&dirflg=d`,'_blank');}}}>
+                    {/* Ligne principale */}
+                    <div style={{display:"flex",alignItems:"center",padding:"12px 14px",gap:12}}>
 
-                  {/* Colonne station */}
-                  <div style={{padding:"10px 10px",display:"flex",alignItems:"center",gap:8,position:"relative",minWidth:0}}>
-                    <BrandIcon nom={s.nom} enseignes={s.enseignes} adresse={s.adresse} size={42}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:900,fontSize:12,color:"#fff",letterSpacing:.5,marginBottom:2,textTransform:"uppercase",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {nomDisplay}
+                      {/* Logo marque */}
+                      <div style={{
+                        width:46,height:46,borderRadius:13,flexShrink:0,
+                        background:brand?brand.bg:"rgba(255,255,255,0.08)",
+                        border:"2px solid rgba(255,255,255,0.15)",
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        fontSize:brand?.abbr?.length>2?11:15,fontWeight:900,
+                        color:brand?brand.fg:"#fff",
+                        fontFamily:"'Outfit',sans-serif",letterSpacing:.5,
+                        boxShadow:"0 2px 8px rgba(0,0,0,0.3)",
+                        textAlign:"center",lineHeight:1.1,
+                      }}>
+                        {brand?.abbr||"⛽"}
                       </div>
-                      {!s.nomIsAdresse&&s.adresse&&(
-                        <div style={{fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                          {s.adresse}{s.ville?` — ${s.ville}`:""}
+
+                      {/* Infos station */}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:800,fontSize:13,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:.3}}>
+                          {(s.nom||"Station").toUpperCase()}
                         </div>
-                      )}
-                      {(s.nomIsAdresse||!s.adresse)&&s.ville&&(
-                        <div style={{fontSize:10,color:"var(--text3)"}}>{s.ville}</div>
-                      )}
-                      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
-                        {s.cp&&<span style={{fontSize:9,color:"var(--text3)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"1px 6px",fontWeight:700}}>📮 {s.cp}</span>}
-                        {s._dist!=null&&<span style={{fontSize:9,fontWeight:800,color:"var(--purple)",background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:20,padding:"1px 7px"}}>📍 {fmtKm(s._dist)}</span>}
+                        <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>
+                          {[s.adresse,s.ville].filter(Boolean).join(" · ")}
+                        </div>
+                        <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+                          {s.cp&&<span style={{fontSize:9,color:"var(--text3)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:5,padding:"1px 5px",fontWeight:700}}>📮 {s.cp}</span>}
+                          {s._dist!=null&&<span style={{fontSize:9,fontWeight:800,color:"var(--purple)",background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:10,padding:"1px 7px"}}>📍 {fmtKm(s._dist)}</span>}
+                        </div>
                       </div>
+
+                      {/* Bouton Maps */}
+                      {mapsUrl&&(
+                        <button
+                          onClick={e=>{e.stopPropagation();window.open(mapsUrl,'_blank');}}
+                          style={{
+                            width:42,height:42,borderRadius:12,flexShrink:0,
+                            background:"rgba(167,139,250,0.12)",
+                            border:"1px solid rgba(167,139,250,0.3)",
+                            display:"flex",alignItems:"center",justifyContent:"center",
+                            cursor:"pointer",fontSize:18,transition:"all .15s",
+                          }}
+                          title="Ouvrir dans Plans"
+                          onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.25)";e.currentTarget.style.borderColor="rgba(167,139,250,0.5)";}}
+                          onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.borderColor="rgba(167,139,250,0.3)";}}>
+                          🗺️
+                        </button>
+                      )}
                     </div>
-                  </div>
 
-                  {/* Colonnes prix */}
-                  {Object.entries(FUEL_META).map(([k,m])=>{
-                    const isBest=s[k]!=null&&s[k]===bestStation[k]?.[k]&&stationsWithDist.filter(x=>x[k]!=null).length>1;
-                    return (
-                      <div key={k} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"13px 8px",gap:3}}>
-                        {s[k]!=null?(
-                          <>
-                            <div style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,
-                              color:isBest?m.color:"var(--text)",
-                              textShadow:isBest?`0 0 16px ${m.color}60`:"none",letterSpacing:-.5}}>
-                              {s[k].toFixed(3)}
-                            </div>
-                            {isBest&&(
-                              <span style={{fontSize:9,fontWeight:900,color:m.color,background:`${m.color}16`,
-                                border:`1px solid ${m.color}35`,borderRadius:6,padding:"1px 6px",whiteSpace:"nowrap"}}>
-                                ✓ Moins cher
-                              </span>
+                    {/* Bande prix */}
+                    <div style={{
+                      display:"grid",
+                      gridTemplateColumns:"repeat(4,1fr)",
+                      borderTop:"1px solid rgba(255,255,255,0.05)",
+                      background:"rgba(0,0,0,0.15)",
+                    }}>
+                      {Object.entries(FUEL_META).map(([k,m])=>{
+                        const isBest=k===cheapestKey&&fuelsAvail.length>1;
+                        const hasPrice=s[k]!=null;
+                        return (
+                          <div key={k} style={{
+                            display:"flex",flexDirection:"column",alignItems:"center",
+                            padding:"8px 4px",
+                            borderRight:"1px solid rgba(255,255,255,0.04)",
+                            background:isBest?`${m.color}10`:"transparent",
+                          }}>
+                            <span style={{fontSize:9,color:m.color,fontWeight:700,letterSpacing:.3,marginBottom:2}}>{m.label}</span>
+                            {hasPrice?(
+                              <>
+                                <span style={{
+                                  fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,
+                                  color:isBest?m.color:"var(--text)",
+                                  textShadow:isBest?`0 0 12px ${m.color}50`:"none",
+                                }}>
+                                  {s[k].toFixed(3)}
+                                </span>
+                                {isBest&&<span style={{fontSize:8,color:m.color,fontWeight:800,marginTop:1}}>✓ moins cher</span>}
+                              </>
+                            ):(
+                              <span style={{color:"rgba(255,255,255,0.12)",fontSize:16}}>—</span>
                             )}
-                          </>
-                        ):(
-                          <span style={{color:"rgba(255,255,255,0.1)",fontSize:18}}>—</span>
-                        )}
-                      </div>
-                    );
-                  })}
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                  {/* Bouton navigation */}
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"0 6px"}}
-                    onClick={e=>{e.stopPropagation();if(s.lat){window.open(`maps://?daddr=${s.lat},${s.lng}&dirflg=d`,'_blank');}}}>
-                    {s.lat&&(
-                      <div style={{width:32,height:32,borderRadius:9,background:"rgba(167,139,250,0.1)",
-                        border:"1px solid rgba(167,139,250,0.2)",display:"flex",alignItems:"center",
-                        justifyContent:"center",fontSize:14,cursor:"pointer",transition:"all .15s"}}
-                        onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.22)";e.currentTarget.style.borderColor="rgba(167,139,250,0.4)";}}
-                        onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.1)";e.currentTarget.style.borderColor="rgba(167,139,250,0.2)";}}>
-                        🗺️
-                      </div>
-                    )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-
           <FuelSimulator stations={stationsWithDist} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch}/>
         </div>
       )}
