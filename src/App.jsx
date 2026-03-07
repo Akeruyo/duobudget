@@ -3855,7 +3855,7 @@ function FuelMapLeaflet({ stations, userLat, userLng }) {
         const b = getBrand(s.nom, s.enseignes);
         const dist = (userLat&&userLng) ? fmtKm(haversineKm(userLat,userLng,s.lat,s.lng)) : null;
         const nomCourt = (s.nom||"Station").toUpperCase().slice(0,22);
-        const fuels = ['gazole','sp95','e10','sp98','e85','gplc']
+        const fuels = ['gazole','sp95','e10','sp98']
           .filter(k=>s[k]!=null)
           .map(k=>`<span style="background:#1e293b;color:#e2e8f0;padding:2px 7px;border-radius:5px;font-size:11px;margin:2px 2px 0 0;display:inline-block"><b>${k.toUpperCase()}</b> ${s[k].toFixed(3)}€</span>`)
           .join("");
@@ -3912,8 +3912,6 @@ function EssencePage() {
     sp95:   { label:"SP95",   icon:"⛽", color:"#60a5fa" },
     e10:    { label:"E10",    icon:"🌿", color:"#4ade80" },
     sp98:   { label:"SP98",   icon:"🔵", color:"#a78bfa" },
-    e85:    { label:"E85",    icon:"🌽", color:"#34d399" },
-    gplc:   { label:"GPL",    icon:"💨", color:"#f87171" },
   };
 
   const LS_KEY = "duobudget_fuel_v6";
@@ -4000,27 +3998,51 @@ function EssencePage() {
       const geo=r.geom?.coordinates||r.coordonnees?.coordinates;
       const lat=geo?geo[1]:null;
       const lng=geo?geo[0]:null;
-      // ── Nom réel de l'établissement ──
-      const nomBrut = (r.nom||"").trim();
-      const ens = r.enseignes;
-      // Priorité : nom brut s'il existe et n'est pas une adresse, sinon adresse courte
-      const isAdresse = /^(route|rue|avenue|av\.|chemin|impasse|allée|bd |boulevard|rn\d|rd\d)/i.test(nomBrut);
-      const nom = (nomBrut && !isAdresse)
-        ? nomBrut
-        : (r.adresse||"").split(",")[0].trim() || `Station ${r.cp||""}`;
+
+      // ── Résolution du nom : priorité enseignes → nom propre → adresse ──
+      // L'API retourne souvent l'adresse dans r.nom pour les stations indépendantes
+      const adresse = (r.adresse||"").trim();
+
+      // 1. Enseigne officielle (marque de la chaîne)
+      let ens = r.enseignes;
+      if(typeof ens==="string"){ try{ens=JSON.parse(ens);}catch{ens=ens?[ens]:[];} }
+      const ensStr = Array.isArray(ens) ? ens.filter(Boolean).join(" ").trim() : (ens||"");
+
+      // 2. Nom brut depuis l'API (peut être = adresse)
+      const nomApi = (r.nom||"").trim();
+      // Normalise pour comparer : minuscules, sans virgules/chiffres en tête
+      const norm = s => s.toLowerCase().replace(/[,\.]/g,"").replace(/\s+/g," ").trim();
+      const nomSameAsAddr = norm(nomApi) === norm(adresse) ||
+                            norm(adresse).startsWith(norm(nomApi)) ||
+                            norm(nomApi).startsWith(norm(adresse).slice(0,20));
+
+      // 3. Nom final : enseigne > nom propre (si ≠ adresse) > adresse
+      let nom, nomIsAdresse;
+      if(ensStr) {
+        nom = ensStr;
+        nomIsAdresse = false;
+      } else if(nomApi && !nomSameAsAddr) {
+        nom = nomApi;
+        nomIsAdresse = false;
+      } else {
+        // La station n'a pas de nom propre distinct → on affiche l'adresse une seule fois
+        nom = adresse.split(",")[0].trim() || nomApi || `Station ${r.cp||""}`;
+        nomIsAdresse = true;
+      }
+
       return {
-        id: r.id||r.adresse,
+        id: r.id||adresse,
         nom,
-        nomBrut,
-        enseignes: ens,
-        adresse: r.adresse||"",
+        nomIsAdresse,   // true = nom == adresse → ne pas afficher l'adresse en doublon
+        enseignes: ensStr||nomApi,
+        adresse,
         ville: r.ville||city,
         cp: r.cp||"",
         lat, lng,
         ...fuels,
       };
     }).filter(s=>Object.keys(FUEL_META).some(k=>s[k]!=null));
-  };
+  }
 
   const finalize = async (parsed, city) => {
     // ── Enrichissement OSM : récupère le vrai nom/enseigne de chaque station ──
@@ -4069,7 +4091,7 @@ function EssencePage() {
             if(!best) return s;
             const osmName=best.name;
             if(osmName && !/^\d/.test(osmName) && osmName.length>2){
-              return {...s, nom:osmName, enseignes:osmName};
+              return {...s, nom:osmName, enseignes:osmName, nomIsAdresse:false};
             }
             return s;
           });
@@ -4365,10 +4387,17 @@ function EssencePage() {
                         <div style={{fontWeight:900,fontSize:12,color:"#ffffff",letterSpacing:.4,lineHeight:1.3,marginBottom:4,wordBreak:"break-word",textTransform:"uppercase"}}>
                           {nomAffiche}
                         </div>
-                        {/* Adresse — Ville */}
-                        <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.4,wordBreak:"break-word"}}>
-                          {adresseAffiche}{villeAffiche?` — ${villeAffiche}`:""}
-                        </div>
+                        {/* Adresse — Ville : masquée si doublon du nom */}
+                        {!best.nomIsAdresse && (
+                          <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.4,wordBreak:"break-word"}}>
+                            {adresseAffiche}{villeAffiche?` — ${villeAffiche}`:""}
+                          </div>
+                        )}
+                        {best.nomIsAdresse && villeAffiche && (
+                          <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.4}}>
+                            {villeAffiche}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -4436,10 +4465,17 @@ function EssencePage() {
                               <div style={{fontWeight:900,fontSize:13,color:"#ffffff",letterSpacing:.5,marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textTransform:"uppercase"}}>
                                 {nomDisplay}
                               </div>
-                              {/* Adresse — Ville */}
-                              <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                {s.adresse}{s.ville?` — ${s.ville}`:""}
-                              </div>
+                              {/* Adresse — Ville : masquée si c'est le même que le nom (doublon) */}
+                              {!s.nomIsAdresse && (
+                                <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                  {s.adresse}{s.ville?` — ${s.ville}`:""}
+                                </div>
+                              )}
+                              {s.nomIsAdresse && s.ville && (
+                                <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                  {s.ville}
+                                </div>
+                              )}
                               {s.cp&&<span style={{display:"inline-block",marginTop:3,fontSize:9,color:"var(--text3)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"1px 6px",fontWeight:700}}>📮 {s.cp}</span>}
                             </div>
                             {/* Badge distance en haut à droite */}
