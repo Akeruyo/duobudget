@@ -3815,9 +3815,18 @@ function EssencePage() {
         const brand = extractBrand(r.nom, r.enseignes, r.ville || city);
         const adresse = r.adresse || "";
         const nomFinal = brand || adresse.split(",")[0].trim() || `Station ${r.cp || ""}`.trim();
+        // ── Clé de marque pour l'icône (sans la ville) ──
+        let brandKey = "";
+        {
+          let ens = r.enseignes;
+          if (typeof ens === "string") { try { ens = JSON.parse(ens); } catch { ens = ens ? [ens] : []; } }
+          const ensStr = Array.isArray(ens) ? ens.filter(Boolean).join(" ") : (ens || "");
+          brandKey = (ensStr || r.nom || "").trim();
+        }
         return {
           id: r.id || adresse,
           nom: nomFinal,
+          brandKey,
           adresse,
           ville: r.ville || city,
           cp: r.cp || "",
@@ -3962,6 +3971,61 @@ function EssencePage() {
     return res;
   }, [stations]);
 
+  // ── Données visuelles par enseigne ──
+  const BRAND_VISUAL = {
+    "e.leclerc":       { bg:"#003f8f", fg:"#ffffff", abbr:"E.", full:"E. LECLERC" },
+    "leclerc":         { bg:"#003f8f", fg:"#ffffff", abbr:"E.", full:"E. LECLERC" },
+    "petro est":       { bg:"#003f8f", fg:"#ffffff", abbr:"E.", full:"E. LECLERC" },
+    "sodibrag":        { bg:"#003f8f", fg:"#ffffff", abbr:"E.", full:"E. LECLERC" },
+    "galec":           { bg:"#003f8f", fg:"#ffffff", abbr:"E.", full:"E. LECLERC" },
+    "sodia":           { bg:"#003f8f", fg:"#ffffff", abbr:"E.", full:"E. LECLERC" },
+    "intermarche":     { bg:"#E30613", fg:"#ffffff", abbr:"IN", full:"INTERMARCHÉ" },
+    "intermarché":     { bg:"#E30613", fg:"#ffffff", abbr:"IN", full:"INTERMARCHÉ" },
+    "jeandeline":      { bg:"#E30613", fg:"#ffffff", abbr:"IN", full:"INTERMARCHÉ" },
+    "vert-bois":       { bg:"#E30613", fg:"#ffffff", abbr:"IN", full:"INTERMARCHÉ" },
+    "vert bois":       { bg:"#E30613", fg:"#ffffff", abbr:"IN", full:"INTERMARCHÉ" },
+    "totalenergies":   { bg:"#E8000D", fg:"#ffffff", abbr:"TE", full:"TOTALENERGIES" },
+    "total access":    { bg:"#E8000D", fg:"#ffffff", abbr:"TA", full:"TOTAL ACCESS" },
+    "total":           { bg:"#E8000D", fg:"#ffffff", abbr:"TO", full:"TOTAL" },
+    "esso express":    { bg:"#003399", fg:"#ffffff", abbr:"ES", full:"ESSO EXPRESS" },
+    "esso":            { bg:"#003399", fg:"#ffffff", abbr:"ES", full:"ESSO" },
+    "shell":           { bg:"#FBCE07", fg:"#1a1a1a", abbr:"SH", full:"SHELL" },
+    "bp":              { bg:"#006900", fg:"#ffffff", abbr:"BP", full:"BP" },
+    "carrefour market":{ bg:"#0070f0", fg:"#ffffff", abbr:"CF", full:"CARREFOUR MARKET" },
+    "carrefour contact":{ bg:"#0070f0", fg:"#ffffff", abbr:"CF", full:"CARREFOUR CONTACT" },
+    "carrefour":       { bg:"#0070f0", fg:"#ffffff", abbr:"CF", full:"CARREFOUR" },
+    "auchan":          { bg:"#e63226", fg:"#ffffff", abbr:"AU", full:"AUCHAN" },
+    "cora":            { bg:"#e8751a", fg:"#ffffff", abbr:"CO", full:"CORA" },
+    "super u":         { bg:"#005baf", fg:"#ffffff", abbr:"SU", full:"SUPER U" },
+    "hyper u":         { bg:"#005baf", fg:"#ffffff", abbr:"HU", full:"HYPER U" },
+    "u express":       { bg:"#005baf", fg:"#ffffff", abbr:"UE", full:"U EXPRESS" },
+    "système u":       { bg:"#005baf", fg:"#ffffff", abbr:"SY", full:"SYSTÈME U" },
+    "géant casino":    { bg:"#e31e24", fg:"#ffffff", abbr:"GC", full:"GÉANT CASINO" },
+    "casino":          { bg:"#e31e24", fg:"#ffffff", abbr:"CA", full:"CASINO" },
+    "lidl":            { bg:"#0050aa", fg:"#FBCE07", abbr:"LI", full:"LIDL" },
+    "netto":           { bg:"#e63226", fg:"#ffffff", abbr:"NE", full:"NETTO" },
+    "colruyt":         { bg:"#e63226", fg:"#ffffff", abbr:"CL", full:"COLRUYT" },
+    "simply market":   { bg:"#ff6600", fg:"#ffffff", abbr:"SM", full:"SIMPLY MARKET" },
+    "dyneff":          { bg:"#ff6600", fg:"#ffffff", abbr:"DY", full:"DYNEFF" },
+    "vito":            { bg:"#7c3aed", fg:"#ffffff", abbr:"VI", full:"VITO" },
+    "relais":          { bg:"#f59e0b", fg:"#1a1a1a", abbr:"RL", full:"RELAIS" },
+    "elan":            { bg:"#0ea5e9", fg:"#ffffff", abbr:"EL", full:"ÉLAN" },
+    "oil!":            { bg:"#ff6600", fg:"#ffffff", abbr:"OI", full:"OIL!" },
+    "sarl brivot":     { bg:"#374151", fg:"#ffffff", abbr:"SB", full:"SARL BRIVOT" },
+    "relais du der":   { bg:"#f59e0b", fg:"#1a1a1a", abbr:"RD", full:"RELAIS DU DER" },
+  };
+
+  const getBrandVisual = (nom, brandKey) => {
+    const haystack = `${nom || ""} ${brandKey || ""}`.toLowerCase();
+    for (const [key, val] of Object.entries(BRAND_VISUAL)) {
+      if (haystack.includes(key)) return val;
+    }
+    // Fallback: initiales sur fond neutre
+    const clean = (nom || "Station").replace(/\s*—\s*.*$/, "").trim();
+    const abbr  = clean.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 2) || "⛽";
+    return { bg:"#374151", fg:"#ffffff", abbr, full: clean.toUpperCase() };
+  };
+
   const fmtUpd = d => d ? d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) + " à " + d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : null;
   const mm = String(Math.floor(countdown/60)).padStart(2,"0");
   const ss2 = String(countdown%60).padStart(2,"0");
@@ -4061,7 +4125,13 @@ function EssencePage() {
                   </div>
                   {/* Station */}
                   <div style={{ borderTop:`1px solid ${meta.color}12`,paddingTop:9 }}>
-                    <div style={{ fontWeight:800,fontSize:11,color:"var(--text)",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{best.nom}</div>
+                    {/* Icône de marque + nom en CAPS */}
+                    {(()=>{ const bv=getBrandVisual(best.nom, best.brandKey); const dn=(best.nom||"STATION").replace(/\s*—\s*.*$/,"").trim().toUpperCase(); return (
+                      <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:4 }}>
+                        <div style={{ width:22,height:22,borderRadius:7,background:bv.bg,color:bv.fg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:900,flexShrink:0 }}>{bv.abbr}</div>
+                        <div style={{ fontWeight:900,fontSize:11,color:"#ffffff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:0.3 }}>{dn}</div>
+                      </div>
+                    );})()}
                     <div style={{ fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{best.adresse}</div>
                   </div>
                 </div>
@@ -4104,17 +4174,32 @@ function EssencePage() {
                   {stations.map((s,i)=>{
                     const isEven = i%2===0;
                     const rowBg = isEven ? "rgba(255,255,255,0.015)" : "transparent";
+                    const bv = getBrandVisual(s.nom, s.brandKey);
+                    // Nom affiché : enseigne seulement (sans "— Ville"), en majuscules
+                    const displayNom = (s.nom || "STATION").replace(/\s*—\s*.*$/, "").trim().toUpperCase();
                     return (
                       <tr key={s.id||i}
                         style={{ borderTop:"1px solid rgba(255,255,255,0.04)",background:rowBg,transition:"all .15s",cursor:"default" }}
                         onMouseEnter={e=>e.currentTarget.style.background="rgba(167,139,250,0.07)"}
                         onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
-                        <td style={{ padding:"14px 18px",minWidth:200 }}>
-                          <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-                            <div style={{ width:38,height:38,borderRadius:11,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.18)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0 }}>⛽</div>
-                            <div>
-                              <div style={{ fontWeight:800,fontSize:13,marginBottom:2 }}>{s.nom}</div>
-                              <div style={{ fontSize:11,color:"var(--text3)" }}>{s.adresse}</div>
+                        <td style={{ padding:"14px 18px",minWidth:220 }}>
+                          <div style={{ display:"flex",alignItems:"center",gap:11 }}>
+                            {/* Icône de marque colorée */}
+                            <div style={{
+                              width:40, height:40, borderRadius:12,
+                              background:bv.bg, color:bv.fg,
+                              display:"flex", alignItems:"center", justifyContent:"center",
+                              fontSize:13, fontWeight:900, letterSpacing:-0.5,
+                              flexShrink:0, boxShadow:`0 3px 12px ${bv.bg}60`,
+                              fontFamily:"'Outfit',sans-serif",
+                            }}>{bv.abbr}</div>
+                            <div style={{ minWidth:0 }}>
+                              {/* Nom en BLANC MAJUSCULES */}
+                              <div style={{ fontWeight:900, fontSize:13, color:"#ffffff", letterSpacing:0.4, marginBottom:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                                {displayNom}
+                              </div>
+                              {/* Adresse en gris */}
+                              <div style={{ fontSize:10, color:"var(--text3)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.adresse}</div>
                               {s.cp&&<span style={{ display:"inline-block",marginTop:3,fontSize:9,color:"var(--text3)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"1px 6px",fontWeight:700 }}>📮 {s.cp}</span>}
                             </div>
                           </div>
