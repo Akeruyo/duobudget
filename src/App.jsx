@@ -50,8 +50,14 @@ const generateInviteCode = () => {
 };
 
 const saveInviteCode = async (uid, code) => {
-  try { await setDoc(getInviteRef(code), { ownerUID: uid, createdAt: Date.now() }); return true; }
+  const normalized = code.toUpperCase();
+  // Ecriture dans userMeta/{uid} — l'utilisateur a accès garanti à son propre doc
+  try { await setDoc(getUserMetaRef(uid), { inviteCode: normalized, inviteCreatedAt: Date.now() }, { merge: true }); }
   catch { return false; }
+  // Tentative supplémentaire sur inviteCodes (lookup direct) — non bloquant si les règles Firestore le refusent
+  try { await setDoc(getInviteRef(normalized), { ownerUID: uid, createdAt: Date.now() }); }
+  catch { /* règles Firestore trop strictes sur inviteCodes — le fallback query sur userMeta prend le relais */ }
+  return true;
 };
 
 const getLinkedUID = async (uid) => {
@@ -67,10 +73,19 @@ const setLinkedUID = async (uid, linkedUID) => {
 };
 
 const resolveInviteCode = async (code) => {
+  const normalized = code.trim().toUpperCase();
+  // Méthode 1 : lookup direct dans inviteCodes (rapide, si les règles Firestore le permettent)
   try {
-    const snap = await getDoc(getInviteRef(code.trim().toUpperCase()));
-    return snap.exists() ? snap.data().ownerUID : null;
-  } catch { return null; }
+    const snap = await getDoc(getInviteRef(normalized));
+    if (snap.exists()) return snap.data().ownerUID;
+  } catch {}
+  // Méthode 2 : fallback — chercher dans userMeta où inviteCode == code (fonctionne toujours)
+  try {
+    const q = query(collection(db, "userMeta"), where("inviteCode", "==", normalized));
+    const qs = await getDocs(q);
+    if (!qs.empty) return qs.docs[0].id;
+  } catch {}
+  return null;
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -214,6 +229,17 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
 button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;}
+/* ── Animation calendrier globale (mobile + desktop) ── */
+@keyframes calPulse{
+  0%,100%{transform:scale(1) rotate(0deg);}
+  30%{transform:scale(1.18) rotate(-8deg);}
+  60%{transform:scale(1.1) rotate(6deg);}
+}
+.cal-animated{
+  display:inline-flex;align-items:center;
+  animation:calPulse 2.5s ease-in-out infinite;
+  flex-shrink:0;
+}
 /* ── iOS PWA : empêche tout décalage de scroll sur le document racine ── */
 html,body{ touch-action:none; }
 /* Mais on autorise le scroll dans les zones scrollables de l'app */
@@ -1479,7 +1505,7 @@ export default function App() {
 
           <div style={{ padding:"12px 14px",borderBottom:"1px solid var(--border)" }}>
             <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.6,fontWeight:800,marginBottom:7,display:"flex",alignItems:"center",gap:6 }}>
-              <span>📅</span> Période
+              <span className="topbar-month-icon cal-animated" style={{fontSize:16}}>🗓️</span> Période
             </div>
             <select value={selMonth} onChange={e => setSelMonth(e.target.value)} className="tip" data-tip="Changer le mois affiché"
               style={{ background:"rgba(167,139,250,0.08)",border:"1px solid rgba(167,139,250,0.22)",borderRadius:10,color:"var(--text)",padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%" }}>
@@ -6150,7 +6176,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
   const availableFuels = Object.keys(FUEL_META).filter(k => avgPrices[k] != null || stations.some(s => s[k] != null));
   const [fuel, setFuel]           = useState(availableFuels[0] || "gazole");
   const [liters, setLiters]       = useState(50);
-  const [stationId, setStationId] = useState("__avg__");
+  const [stationId, setStationId] = useState("__best__");
   const [selMake, setSelMake]     = useState("");
   const [selModel, setSelModel]   = useState("");
   const [manualConso, setManualConso] = useState(7);
@@ -6160,9 +6186,11 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
   const effectiveConso = vehicleConso ?? manualConso;
 
   const eligibleStations = stations.filter(s => s[fuel] != null);
-  const selectedStation  = stationId === "__avg__" ? null : eligibleStations.find(s => s.id === stationId);
-  const price  = selectedStation ? selectedStation[fuel] : avgPrices[fuel];
   const bestS  = eligibleStations.length > 0 ? eligibleStations.reduce((a,b) => a[fuel]<b[fuel]?a:b) : null;
+  const selectedStation  = (stationId === "__best__" || stationId === "__avg__")
+    ? bestS
+    : (eligibleStations.find(s => s.id === stationId) ?? bestS);
+  const price  = selectedStation ? selectedStation[fuel] : null;
   const total  = price != null ? price * liters : null;
   const per100 = price != null ? price * effectiveConso : null;
   const saving = bestS && selectedStation && bestS.id !== selectedStation.id
@@ -6222,7 +6250,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
             <select value={stationId} onChange={e=>setStationId(e.target.value)}
               style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
                 borderRadius:11,padding:"9px 12px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:13 }}>
-              <option value="__avg__">📊 Prix moyen · {eligibleStations.length} stations</option>
+              <option value="__best__">⭐ {bestS ? (() => { const {nom} = resolveNom(bestS); return `${nom} · ${bestS[fuel]?.toFixed(3)}€/L (moins chère)`; })() : "Meilleure station"}</option>
               {eligibleStations.map(s => {
                 const {nom:n}=resolveNom(s);
                 return <option key={s.id} value={s.id}>{n} · {s[fuel]?.toFixed(3)}€</option>;
@@ -6328,7 +6356,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
                 {[
                   { icon:"🛣️", label:"/ 100 km",    val:`${per100?.toFixed(2)}€`, sub:`${effectiveConso}L/100`, color:m.color },
-                  { icon:"⛽", label:"Prix / L",     val:`${price.toFixed(3)}€`,  sub:selectedStation ? (resolveNom(selectedStation).nom||"Station").slice(0,16) : `Moy. ${eligibleStations.length} stations`, color:m.color, highlight:true },
+                  { icon:"⛽", label:"Prix / L",     val:`${price.toFixed(3)}€`,  sub:(stationId==="__best__"||stationId==="__avg__") ? "moins chère" : (resolveNom(selectedStation).nom||"Station").slice(0,16), color:m.color, highlight:true },
                   ...(distancePossible ? [{ icon:"📍", label:"Distance",  val:`≈${distancePossible}km`, sub:`avec ${liters}L`, color:"#60a5fa" }] : []),
                   ...(saving           ? [{ icon:"💸", label:"Économie",  val:`-${saving.toFixed(2)}€`, sub:"vs cette station", color:"#4ade80" }] : []),
                 ].map((s,i)=>(
