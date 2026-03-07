@@ -639,7 +639,7 @@ export default function App() {
 
           <nav style={{ flex: 1, paddingTop: 4, overflowY: "auto" }}>
             <div className="nav-section-label">Navigation</div>
-            {navItems.slice(0, 5).map(n => (
+            {navItems.slice(0, 6).map(n => (
               <div key={n.id} className={`nav-item ${page === n.id ? "active" : ""}`} onClick={() => navigate(n.id)}>
                 <span className="nav-icon">{n.icon}</span>
                 <span>{n.label}</span>
@@ -681,8 +681,13 @@ export default function App() {
               {page === "incomes"  && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: "addRecurringIncome" })}>+ Récurrent</button>}
               {/* Sync dot in topbar (mobile) */}
               <div className={`sync-dot ${syncStatus}`} title={syncLabel[syncStatus]} />
-              <div style={{ fontSize: 11, color: "var(--text3)", background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 8, padding: "5px 10px", whiteSpace: "nowrap" }}>
-                {new Date().toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 10, padding: "5px 12px", whiteSpace: "nowrap", gap:1 }}>
+                <div style={{ fontFamily:"'Fraunces',serif", fontSize: 13, fontWeight:700, color:"var(--text)", lineHeight:1 }}>
+                  {new Date().toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}
+                </div>
+                <div style={{ fontSize:10, color:"var(--text3)", lineHeight:1 }}>
+                  {new Date().toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" })}
+                </div>
               </div>
             </div>
           </div>
