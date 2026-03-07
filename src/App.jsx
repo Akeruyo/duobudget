@@ -1435,16 +1435,18 @@ export default function App() {
 
         <div className="main-area">
           <div className="topbar">
-            <button className="menu-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">☰</button>
-            <div style={{ fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:700,color:"var(--text)",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{pageTitles[page]}</div>
-            <div className="topbar-month">
-              <span style={{fontSize:14}}>📅</span>
-              <select value={selMonth} onChange={e => setSelMonth(e.target.value)}
-                style={{fontVariantNumeric:"tabular-nums",letterSpacing:"0.02em"}}>
-                {allMonths.map(k => <option key={k} value={k}>{monthLabelShort(k)}</option>)}
-              </select>
+            {/* Zone gauche : menu + titre + mois */}
+            <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
+              <button className="menu-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">☰</button>
+              <div className="topbar-month">
+                <span style={{fontSize:13}}>📅</span>
+                <select value={selMonth} onChange={e => setSelMonth(e.target.value)}
+                  style={{fontVariantNumeric:"tabular-nums",letterSpacing:"0.02em"}}>
+                  {allMonths.map(k => <option key={k} value={k}>{monthLabelShort(k)}</option>)}
+                </select>
+              </div>
             </div>
-            <div style={{ display:"flex",alignItems:"center",gap:8,flexShrink:0 }}>
+            <div style={{ display:"flex",alignItems:"center",gap:6,flexShrink:0 }}>hrink:0 }}>
               {page==="expenses" && (
                 <>
                   <button className="topbar-action-btn tip" data-tip="Exporter en CSV"
@@ -2835,10 +2837,16 @@ function Bills({ data, update, selMonth, mdata, setModal }) {
 
   const clearAllBills = () => {
     update(d => {
+      // 1. Supprimer les transactions issues de factures pour ce mois
       if (d.monthsData[selMonth]) {
         d.monthsData[selMonth].transactions = (d.monthsData[selMonth].transactions||[]).filter(t => !t.fromBill);
       }
-      d.bills.forEach(b => { if (b.paid) delete b.paid[selMonth]; });
+      // 2. Réinitialiser TOUTES les factures du mois (paid + paidAt + tout statut custom)
+      d.bills.forEach(b => {
+        if (b.paid) delete b.paid[selMonth];
+        if (b.paidAt) delete b.paidAt[selMonth];
+        if (b.customStatus) delete b.customStatus[selMonth];
+      });
     });
     setConfirmClear(false);
   };
@@ -3088,32 +3096,56 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
             </div>
           </div>
 
-        {/* Actions */}
-        <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+        {/* Actions — barre complète alignée */}
+        <div style={{ display:"flex",gap:8,alignItems:"stretch",padding:"12px 14px 14px",borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+          {/* Bouton paiement — pleine largeur */}
           <button onClick={() => {
-              if(!isPaid){ setJustPaid(true); setTimeout(()=>setJustPaid(false), 1800); }
+              if(!isPaid){ setJustPaid(true); setTimeout(()=>setJustPaid(false),1800); }
               onToggle(bill.id);
-            }} style={{
-            flex:1,padding:"11px",borderRadius:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:14,
-            background:justPaid?"rgba(74,222,128,0.25)":isPaid?"rgba(74,222,128,0.12)":"rgba(167,139,250,0.12)",
-            border:`1px solid ${justPaid?"rgba(74,222,128,0.6)":isPaid?"rgba(74,222,128,0.35)":"rgba(167,139,250,0.35)"}`,
-            color:justPaid||isPaid?"var(--green)":"var(--purple)",
-            transition:"all .3s",transform:justPaid?"scale(1.03)":"scale(1)",
+            }}
+            style={{
+              flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+              height:38,borderRadius:11,cursor:"pointer",
+              fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,
+              background:justPaid
+                ? "linear-gradient(135deg,rgba(74,222,128,0.3),rgba(74,222,128,0.15))"
+                : isPaid
+                  ? "linear-gradient(135deg,rgba(74,222,128,0.2),rgba(74,222,128,0.08))"
+                  : "linear-gradient(135deg,rgba(167,139,250,0.2),rgba(167,139,250,0.08))",
+              border:`1.5px solid ${justPaid?"rgba(74,222,128,0.6)":isPaid?"rgba(74,222,128,0.4)":"rgba(167,139,250,0.4)"}`,
+              color:justPaid||isPaid?"var(--green)":"var(--purple)",
+              transition:"all .3s",transform:justPaid?"scale(1.02)":"scale(1)",
+              boxShadow:justPaid?"0 0 16px rgba(74,222,128,0.25)":undefined,
           }}>
             {justPaid ? "✅ Payée !" : isPaid ? "↩️ Annuler" : "❓ Déjà payée ?"}
           </button>
-          <div className="bill-hover-actions" style={{ display:"flex",gap:6 }}>
-            <button onClick={() => setModal({ type:"editBill",bill })}
-              className="tip action-btn action-btn-edit" data-tip="Modifier cette facture"
-              style={{ display:"flex",alignItems:"center",gap:5,padding:"9px 14px",borderRadius:11,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",transition:"all .2s",whiteSpace:"nowrap" }}>
-              ✏️ Modifier
-            </button>
-            <button onClick={() => onDelete(bill.id)}
-              className="tip action-btn action-btn-del" data-tip="Supprimer cette facture définitivement"
-              style={{ display:"flex",alignItems:"center",gap:5,padding:"9px 14px",borderRadius:11,border:"1px solid rgba(248,113,113,0.3)",background:"rgba(248,113,113,0.08)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",transition:"all .2s",whiteSpace:"nowrap" }}>
-              🗑 Supprimer
-            </button>
-          </div>
+          {/* Modifier */}
+          <button onClick={() => setModal({ type:"editBill",bill })}
+            style={{
+              display:"flex",alignItems:"center",justifyContent:"center",gap:5,
+              height:38,padding:"0 14px",borderRadius:11,cursor:"pointer",
+              fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,
+              background:"linear-gradient(135deg,rgba(96,165,250,0.15),rgba(96,165,250,0.06))",
+              border:"1.5px solid rgba(96,165,250,0.35)",
+              color:"#60a5fa",transition:"all .2s",whiteSpace:"nowrap",
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(96,165,250,0.25)";}}
+            onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(96,165,250,0.15),rgba(96,165,250,0.06))";}}>
+            ✏️ Modifier
+          </button>
+          {/* Supprimer */}
+          <button onClick={() => { if(window.confirm('Supprimer cette facture ?')) onDelete(bill.id); }}
+            style={{
+              display:"flex",alignItems:"center",justifyContent:"center",
+              height:38,width:38,borderRadius:11,cursor:"pointer",flexShrink:0,
+              background:"linear-gradient(135deg,rgba(248,113,113,0.15),rgba(248,113,113,0.06))",
+              border:"1.5px solid rgba(248,113,113,0.3)",
+              color:"var(--red)",fontSize:16,transition:"all .2s",
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(248,113,113,0.3)";}}
+            onMouseLeave={e=>{e.currentTarget.style.background="linear-gradient(135deg,rgba(248,113,113,0.15),rgba(248,113,113,0.06))";}}>
+            🗑
+          </button>
         </div>
       </div>
     </div>
@@ -3870,13 +3902,34 @@ function EditBillModal({ close, data, update, bill }) {
   const [catId, setCatId]       = useState(bill.categoryId || (data.categories[0]?.id || ""));
   const [dueDate, setDueDate]   = useState(bill.dueDate ? new Date(bill.dueDate).toISOString().slice(0,10) : "");
   const [recurring, setRecurring] = useState(bill.recurring ?? true);
+  const [selMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  });
+  const [customStatus, setCustomStatus] = useState(() => {
+    return bill.customStatus?.[selMonth] || "auto";
+  });
   const save = () => {
     if (!name.trim()) return;
     update(d => {
       const idx = d.bills.findIndex(b => b.id===bill.id);
       if (idx>=0) {
-        d.bills[idx] = { ...d.bills[idx], name:name.trim(), amount:parseFloat(amount)||0, icon, profileId:profId, categoryId:catId,
+        const updated = { ...d.bills[idx], name:name.trim(), amount:parseFloat(amount)||0, icon, profileId:profId, categoryId:catId,
           dueDate:dueDate ? new Date(dueDate).toISOString() : null, recurring };
+        // Statut manuel pour ce mois
+        if (customStatus !== "auto") {
+          if (!updated.customStatus) updated.customStatus = {};
+          updated.customStatus[selMonth] = customStatus;
+          // Si "paid" manuel, marquer comme payée
+          if (customStatus === "paid" && !updated.paid?.[selMonth]) {
+            if (!updated.paid) updated.paid = {};
+            updated.paid[selMonth] = true;
+          }
+        } else {
+          if (updated.customStatus) delete updated.customStatus[selMonth];
+          // Laisser isPaid tel quel
+        }
+        d.bills[idx] = updated;
       }
     });
     close();
@@ -3926,6 +3979,30 @@ function EditBillModal({ close, data, update, bill }) {
       <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:20,background:"rgba(167,139,250,0.08)",borderRadius:12,padding:13 }}>
         <input type="checkbox" id="rec-edit" checked={recurring} onChange={e => setRecurring(e.target.checked)} style={{ width:"auto",cursor:"pointer" }}/>
         <label htmlFor="rec-edit" style={{ margin:0,cursor:"pointer",fontSize:13,color:"var(--text)" }}>🔄 Facture récurrente mensuelle</label>
+      </div>
+      {/* Statut manuel pour ce mois */}
+      <div style={{ marginBottom:16 }}>
+        <label>Statut ce mois-ci</label>
+        <div style={{ display:"flex",gap:8,flexWrap:"wrap",marginTop:8 }}>
+          {[
+            { val:"auto",    label:"🔄 Auto",       bg:"rgba(167,139,250,0.2)",  border:"rgba(167,139,250,0.4)"  },
+            { val:"paid",    label:"✅ Payée",       bg:"rgba(74,222,128,0.2)",   border:"rgba(74,222,128,0.4)"   },
+            { val:"pending", label:"⏳ En attente",  bg:"rgba(251,191,36,0.18)",  border:"rgba(251,191,36,0.4)"   },
+            { val:"overdue", label:"⚠️ En retard",  bg:"rgba(248,113,113,0.2)",  border:"rgba(248,113,113,0.4)"  },
+          ].map(opt=>(
+            <button key={opt.val} onClick={()=>setCustomStatus(opt.val)}
+              style={{
+                padding:"8px 14px",borderRadius:10,cursor:"pointer",
+                fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12,
+                background:customStatus===opt.val ? opt.bg : "rgba(255,255,255,0.04)",
+                border:`1.5px solid ${customStatus===opt.val ? opt.border : "rgba(255,255,255,0.1)"}`,
+                color:customStatus===opt.val ? "var(--text)" : "var(--text3)",
+                transition:"all .15s",
+              }}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div style={{ display:"flex",gap:10 }}>
         <button className="btn btn-ghost" onClick={close} style={{ flex:1 }}>Annuler</button>
@@ -4775,7 +4852,9 @@ function FuelMapLeaflet({ stations, userLat, userLng }) {
 
 
 // ═══════════════════════════════════════════════════════════
-//  PAGE MÉTÉO — données Open-Meteo (source Météo-France)
+//  PA
+// ═══════════════════════════════════════════════════════════
+//  PAGE MÉTÉO v2 — Open-Meteo · Météo-France · Design pro
 // ═══════════════════════════════════════════════════════════
 const WMO_ICONS = {
   0:"☀️",1:"🌤️",2:"⛅",3:"☁️",
@@ -4797,37 +4876,52 @@ const WMO_LABELS = {
   85:"Averses de neige",86:"Averses de neige fortes",
   95:"Orage",96:"Orage avec grêle",99:"Orage avec forte grêle",
 };
+const WMO_BG = {
+  0:"linear-gradient(160deg,#1a4a7a,#2d7dd2)",
+  1:"linear-gradient(160deg,#1a3a6a,#2d6ab2)",
+  2:"linear-gradient(160deg,#2a3a5a,#4a5a8a)",
+  3:"linear-gradient(160deg,#1a1a3a,#3a3a5a)",
+  45:"linear-gradient(160deg,#2a2a4a,#4a4a6a)",48:"linear-gradient(160deg,#2a2a4a,#4a4a6a)",
+  51:"linear-gradient(160deg,#1a2a4a,#2a4a6a)",53:"linear-gradient(160deg,#1a2a4a,#2a4a6a)",
+  55:"linear-gradient(160deg,#12203a,#1a3a5a)",
+  61:"linear-gradient(160deg,#122030,#1a3050)",63:"linear-gradient(160deg,#0e1828,#162040)",
+  65:"linear-gradient(160deg,#0a1020,#121830)",
+  71:"linear-gradient(160deg,#2a3a5a,#6a8aaa)",73:"linear-gradient(160deg,#3a4a6a,#7a9aba)",
+  75:"linear-gradient(160deg,#4a5a7a,#8aaaca)",
+  80:"linear-gradient(160deg,#122030,#1a3050)",81:"linear-gradient(160deg,#0e1828,#162040)",
+  82:"linear-gradient(160deg,#1a0a2a,#3a1a5a)",
+  95:"linear-gradient(160deg,#1a0a2a,#2a1a4a)",96:"linear-gradient(160deg,#2a0a1a,#4a1a3a)",
+};
 
 function MeteoPage() {
   const [city, setCity]           = useState("Saint-Dizier");
   const [cityInput, setCityInput] = useState("Saint-Dizier");
   const [coords, setCoords]       = useState({ lat:48.638, lng:4.946 });
   const [weather, setWeather]     = useState(null);
-  const [loading, setLoading]     = useState(false);
+  const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
   const [geoActive, setGeoActive] = useState(false);
   const [locating, setLocating]   = useState(false);
   const [hourlyIdx, setHourlyIdx] = useState(null);
 
-  // Fetch météo depuis Open-Meteo (données Météo-France pour FR)
   const fetchWeather = async (lat, lng, cityName) => {
     setLoading(true); setError("");
     try {
       const url = `https://api.open-meteo.com/v1/meteofrance?` +
         `latitude=${lat}&longitude=${lng}` +
         `&current=temperature_2m,relative_humidity_2m,apparent_temperature,` +
-        `precipitation,weather_code,wind_speed_10m,wind_direction_10m,uv_index` +
+        `precipitation,weather_code,wind_speed_10m,wind_direction_10m,uv_index,` +
+        `surface_pressure,visibility,is_day` +
         `&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,` +
-        `weather_code,wind_speed_10m` +
+        `weather_code,wind_speed_10m,apparent_temperature` +
         `&daily=weather_code,temperature_2m_max,temperature_2m_min,` +
-        `precipitation_sum,uv_index_max,sunrise,sunset` +
+        `precipitation_sum,uv_index_max,sunrise,sunset,wind_speed_10m_max` +
         `&wind_speed_unit=kmh&timezone=Europe%2FParis&forecast_days=7`;
       const r = await fetch(url);
       const d = await r.json();
       if (d.error) throw new Error(d.reason||"Erreur API");
       setWeather(d);
       setCity(cityName);
-      // Trouver l'heure actuelle dans le tableau horaire
       const now = new Date();
       const nowH = now.getHours();
       const todayStr = now.toISOString().slice(0,10);
@@ -4840,7 +4934,6 @@ function MeteoPage() {
 
   useEffect(() => { fetchWeather(coords.lat, coords.lng, city); }, []);
 
-  // Géocodage via Open-Meteo geocoding
   const searchCity = async () => {
     if (!cityInput.trim()) return;
     setLoading(true); setError("");
@@ -4849,8 +4942,7 @@ function MeteoPage() {
       const d = await r.json();
       if (!d.results?.length) { setError("Ville introuvable."); setLoading(false); return; }
       const res = d.results[0];
-      const newCoords = { lat: res.latitude, lng: res.longitude };
-      setCoords(newCoords);
+      setCoords({ lat:res.latitude, lng:res.longitude });
       setGeoActive(false);
       await fetchWeather(res.latitude, res.longitude, res.name);
     } catch { setError("Erreur de géocodage."); setLoading(false); }
@@ -4861,228 +4953,345 @@ function MeteoPage() {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(async pos => {
       const lat = pos.coords.latitude, lng = pos.coords.longitude;
-      setCoords({ lat, lng });
-      setGeoActive(true);
-      // Reverse geocoding
-      try {
-        const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${lat},${lng}&count=1&language=fr&format=json`);
-      } catch {}
+      setCoords({ lat, lng }); setGeoActive(true);
       await fetchWeather(lat, lng, "Ma position");
       setLocating(false);
     }, () => { setError("Géolocalisation refusée."); setLocating(false); });
   };
 
-  const disableGeo = () => { setGeoActive(false); };
-
   const cur = weather?.current;
   const daily = weather?.daily;
   const hourly = weather?.hourly;
+  const bgGrad = WMO_BG[cur?.weather_code] || "linear-gradient(160deg,#1a2a4a,#2a3a6a)";
+  const isDay = cur?.is_day ?? 1;
 
-  const windDir = (deg) => {
-    const dirs = ["N","NE","E","SE","S","SO","O","NO"];
-    return dirs[Math.round(deg/45)%8];
-  };
-
+  const windDir = (deg) => ["N","NE","E","SE","S","SO","O","NO"][Math.round(deg/45)%8];
   const uvColor = (uv) => uv<=2?"#4ade80":uv<=5?"#fbbf24":uv<=7?"#f97316":uv<=10?"#f87171":"#c084fc";
   const uvLabel = (uv) => uv<=2?"Faible":uv<=5?"Modéré":uv<=7?"Élevé":uv<=10?"Très élevé":"Extrême";
-
   const JOURS = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+  const MOIS_FR = ["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
   const dayLabel = (dateStr) => {
     const d = new Date(dateStr+"T12:00:00");
     const today = new Date(); today.setHours(12,0,0,0);
     const diff = Math.round((d-today)/86400000);
     if(diff===0) return "Aujourd'hui";
     if(diff===1) return "Demain";
-    return JOURS[d.getDay()];
+    return `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS_FR[d.getMonth()]}`;
   };
 
+  const humidColor = (h) => h<40?"#fbbf24":h<60?"#4ade80":h<80?"#60a5fa":"#a78bfa";
+  const rainColor  = (p) => p<20?"#94a3b8":p<50?"#60a5fa":p<80?"#3b82f6":"#1d4ed8";
+
   return (
-    <div style={{maxWidth:680,margin:"0 auto",paddingBottom:16}}>
+    <div style={{maxWidth:700,margin:"0 auto",paddingBottom:24}}>
 
-      {/* ── En-tête + recherche ── */}
-      <div className="card" style={{marginBottom:16,background:"linear-gradient(135deg,rgba(96,165,250,0.08),rgba(167,139,250,0.06))"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-          <div style={{width:48,height:48,borderRadius:15,background:"linear-gradient(135deg,rgba(96,165,250,0.25),rgba(167,139,250,0.2))",
-            display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,
-            border:"1.5px solid rgba(96,165,250,0.3)"}}>🌤️</div>
-          <div>
-            <div style={{fontWeight:900,fontSize:18}}>Météo</div>
-            <div style={{fontSize:11,color:"var(--text3)"}}>Source : Météo-France · Open-Meteo</div>
+      {/* ── Hero météo actuelle ── */}
+      {cur ? (
+        <div style={{
+          borderRadius:24,overflow:"hidden",marginBottom:16,position:"relative",
+          background:bgGrad,
+          boxShadow:"0 16px 48px rgba(0,0,0,0.4)",
+          border:"1px solid rgba(255,255,255,0.1)",
+        }}>
+          {/* Barre de recherche */}
+          <div style={{ padding:"14px 18px",background:"rgba(0,0,0,0.2)",backdropFilter:"blur(10px)",
+            borderBottom:"1px solid rgba(255,255,255,0.1)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center" }}>
+            <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&searchCity()}
+              placeholder="Ville ou lieu-dit…"
+              style={{ flex:1,minWidth:120,background:"rgba(255,255,255,0.15)",
+                border:"1px solid rgba(255,255,255,0.25)",borderRadius:10,padding:"8px 13px",
+                color:"#fff",fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none" }}/>
+            <button onClick={searchCity} disabled={loading}
+              style={{ padding:"8px 16px",borderRadius:10,background:"rgba(255,255,255,0.25)",
+                border:"1px solid rgba(255,255,255,0.3)",color:"#fff",cursor:"pointer",
+                fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap" }}>
+              {loading?"⟳":"🔍"} Chercher
+            </button>
+            <button onClick={geoActive?()=>setGeoActive(false):locateUser} disabled={locating}
+              style={{ padding:"8px 13px",borderRadius:10,
+                background:geoActive?"rgba(74,222,128,0.25)":"rgba(255,255,255,0.12)",
+                border:geoActive?"1px solid rgba(74,222,128,0.5)":"1px solid rgba(255,255,255,0.2)",
+                color:geoActive?"#4ade80":"#fff",cursor:"pointer",
+                fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13 }}>
+              {locating?"⟳ …":geoActive?"📍 Désactiver":"📍 GPS"}
+            </button>
           </div>
-        </div>
 
-        {/* Barre de recherche */}
-        <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-          <input
-            value={cityInput} onChange={e=>setCityInput(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&searchCity()}
-            placeholder="Ville ou code postal…"
-            style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
-              borderRadius:11,padding:"10px 14px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",
-              fontSize:14,outline:"none"}}/>
-          <button onClick={searchCity} disabled={loading}
-            style={{padding:"10px 18px",borderRadius:11,background:"var(--grad-main)",color:"#fff",
-              border:"none",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,
-              whiteSpace:"nowrap",opacity:loading?0.7:1}}>
-            {loading?"⟳ …":"🔍 Chercher"}
-          </button>
-          <button onClick={geoActive?disableGeo:locateUser} disabled={locating}
-            style={{padding:"10px 14px",borderRadius:11,
-              border:geoActive?"1px solid rgba(74,222,128,0.4)":"1px solid rgba(167,139,250,0.35)",
-              background:geoActive?"rgba(74,222,128,0.1)":"rgba(255,255,255,0.05)",
-              color:geoActive?"var(--green)":"var(--text2)",
-              cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>
-            {locating?"⟳ …":geoActive?"📍 Désactiver GPS":"📍 Me localiser"}
-          </button>
-        </div>
-
-        {error && <div style={{color:"var(--red)",fontSize:12,padding:"8px 12px",background:"rgba(248,113,113,0.07)",borderRadius:9}}>{error}</div>}
-      </div>
-
-      {loading && !weather && (
-        <div style={{textAlign:"center",padding:60}}>
-          <div style={{fontSize:36,animation:"spin .8s linear infinite",display:"inline-block"}}>⟳</div>
-        </div>
-      )}
-
-      {weather && cur && (
-        <>
-          {/* ── Météo actuelle ── */}
-          <div className="card" style={{marginBottom:16,background:`linear-gradient(160deg,rgba(96,165,250,0.12),rgba(167,139,250,0.06))`}}>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
+          {/* Contenu principal */}
+          <div style={{ padding:"28px 24px 24px" }}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:16 }}>
+              {/* Temp + condition */}
               <div>
-                <div style={{fontSize:13,color:"var(--text3)",fontWeight:700,marginBottom:4}}>📍 {city}</div>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <span style={{fontSize:72,lineHeight:1}}>{WMO_ICONS[cur.weather_code]||"🌡️"}</span>
+                <div style={{ fontSize:12,color:"rgba(255,255,255,0.65)",fontWeight:700,marginBottom:10,
+                  display:"flex",alignItems:"center",gap:6 }}>
+                  <span>📍</span>{city}
+                  {geoActive&&<span style={{fontSize:10,background:"rgba(74,222,128,0.3)",
+                    border:"1px solid rgba(74,222,128,0.5)",borderRadius:20,padding:"1px 7px",color:"#4ade80"}}>GPS</span>}
+                </div>
+                <div style={{ display:"flex",alignItems:"flex-start",gap:10 }}>
+                  <span style={{ fontSize:80,lineHeight:1,filter:"drop-shadow(0 4px 12px rgba(0,0,0,0.3))" }}>
+                    {WMO_ICONS[cur.weather_code]||"🌡️"}
+                  </span>
                   <div>
-                    <div style={{fontFamily:"'Fraunces',serif",fontSize:58,fontWeight:900,lineHeight:1,
-                      background:"linear-gradient(135deg,#93c5fd,#c4b5fd)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
-                      {Math.round(cur.temperature_2m)}°
+                    <div style={{ display:"flex",alignItems:"flex-start",gap:0 }}>
+                      <span style={{ fontFamily:"'Fraunces',serif",fontSize:76,fontWeight:900,lineHeight:1,
+                        color:"#fff",textShadow:"0 2px 20px rgba(0,0,0,0.3)" }}>
+                        {Math.round(cur.temperature_2m)}
+                      </span>
+                      <span style={{ fontFamily:"'Fraunces',serif",fontSize:38,fontWeight:700,color:"rgba(255,255,255,0.7)",marginTop:8 }}>°C</span>
                     </div>
-                    <div style={{fontSize:13,color:"var(--text3)",marginTop:2}}>
-                      Ressenti {Math.round(cur.apparent_temperature)}°
+                    <div style={{ color:"rgba(255,255,255,0.6)",fontSize:13,marginTop:2 }}>
+                      Ressenti <strong style={{color:"#fff"}}>{Math.round(cur.apparent_temperature)}°</strong>
                     </div>
                   </div>
                 </div>
-                <div style={{fontWeight:700,fontSize:15,marginTop:8,color:"var(--text2)"}}>
+                <div style={{ fontWeight:700,fontSize:18,color:"rgba(255,255,255,0.95)",marginTop:10 }}>
                   {WMO_LABELS[cur.weather_code]||""}
                 </div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"flex-end"}}>
-                {daily && (
-                  <>
-                    <div style={{fontSize:12,color:"var(--text3)",fontWeight:600}}>
-                      ↑ {Math.round(daily.temperature_2m_max[0])}° / ↓ {Math.round(daily.temperature_2m_min[0])}°
-                    </div>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>
-                      🌅 {daily.sunrise[0]?.slice(11,16)} · 🌇 {daily.sunset[0]?.slice(11,16)}
-                    </div>
-                  </>
+                {daily&&(
+                  <div style={{ marginTop:8,fontSize:13,color:"rgba(255,255,255,0.6)" }}>
+                    ↑ <strong style={{color:"#fff"}}>{Math.round(daily.temperature_2m_max[0])}°</strong>
+                    &nbsp;/&nbsp;
+                    ↓ <strong style={{color:"rgba(255,255,255,0.8)"}}>{Math.round(daily.temperature_2m_min[0])}°</strong>
+                    {daily.sunrise[0]&&(
+                      <span style={{marginLeft:12}}>
+                        🌅 {daily.sunrise[0].slice(11,16)} · 🌇 {daily.sunset[0].slice(11,16)}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
 
-            {/* Indicateurs */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
-              {[
-                { icon:"💧", label:"Humidité", val:`${cur.relative_humidity_2m}%` },
-                { icon:"💨", label:"Vent", val:`${Math.round(cur.wind_speed_10m)} km/h ${windDir(cur.wind_direction_10m)}` },
-                { icon:"🌧️", label:"Précip.", val:`${(cur.precipitation||0).toFixed(1)} mm` },
-                { icon:"☀️", label:`UV — ${uvLabel(Math.round(cur.uv_index||0))}`, val:Math.round(cur.uv_index||0), valColor:uvColor(Math.round(cur.uv_index||0)) },
-              ].map((item,i) => (
-                <div key={i} style={{background:"rgba(255,255,255,0.04)",borderRadius:12,
-                  padding:"10px 8px",border:"1px solid rgba(255,255,255,0.07)",textAlign:"center"}}>
-                  <div style={{fontSize:18,marginBottom:4}}>{item.icon}</div>
-                  <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,marginBottom:2,lineHeight:1.2}}>{item.label}</div>
-                  <div style={{fontWeight:900,fontSize:13,color:item.valColor||"var(--text)"}}>{item.val}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Prévisions horaires (aujourd'hui) ── */}
-          {hourly && hourlyIdx!==null && (
-            <div className="card" style={{marginBottom:16}}>
-              <div style={{fontWeight:800,fontSize:14,marginBottom:12,color:"var(--text2)"}}>⏱️ Aujourd'hui — heure par heure</div>
-              <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:6,WebkitOverflowScrolling:"touch"}}>
-                {Array.from({length:24},(_, offset)=>{
-                  const i=hourlyIdx+offset;
-                  if(i>=hourly.time.length) return null;
-                  const h=parseInt(hourly.time[i].slice(11,13));
-                  const isNow=offset===0;
-                  return (
-                    <div key={i} style={{
-                      display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-                      minWidth:56,padding:"10px 6px",borderRadius:12,flexShrink:0,
-                      background:isNow?"rgba(96,165,250,0.18)":"rgba(255,255,255,0.03)",
-                      border:isNow?"1px solid rgba(96,165,250,0.4)":"1px solid rgba(255,255,255,0.06)",
-                    }}>
-                      <div style={{fontSize:10,color:isNow?"#93c5fd":"var(--text3)",fontWeight:700}}>{isNow?"Maint.":h+"h"}</div>
-                      <div style={{fontSize:20}}>{WMO_ICONS[hourly.weather_code[i]]||"?"}</div>
-                      <div style={{fontWeight:800,fontSize:13,color:"var(--text)"}}>{Math.round(hourly.temperature_2m[i])}°</div>
-                      <div style={{fontSize:10,color:"#60a5fa",fontWeight:700}}>
-                        {hourly.precipitation_probability[i]}%
-                      </div>
-                      <div style={{fontSize:9,color:"var(--text3)"}}>{Math.round(hourly.wind_speed_10m[i])}km/h</div>
-                    </div>
-                  );
-                }).filter(Boolean)}
-              </div>
-            </div>
-          )}
-
-          {/* ── Prévisions 7 jours ── */}
-          {daily && (
-            <div className="card" style={{marginBottom:16}}>
-              <div style={{fontWeight:800,fontSize:14,marginBottom:12,color:"var(--text2)"}}>📅 Prévisions 7 jours</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {daily.time.map((dateStr,i) => (
+              {/* Indicateurs droite */}
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,minWidth:200 }}>
+                {[
+                  { icon:"💧", label:"Humidité",    val:`${cur.relative_humidity_2m}%`,
+                    color:humidColor(cur.relative_humidity_2m) },
+                  { icon:"💨", label:"Vent",         val:`${Math.round(cur.wind_speed_10m)} km/h`,
+                    sub:windDir(cur.wind_direction_10m), color:"#93c5fd" },
+                  { icon:"🌧️", label:"Précip.",     val:`${(cur.precipitation||0).toFixed(1)} mm`,
+                    color:"#60a5fa" },
+                  { icon:"☀️", label:"Indice UV",   val:Math.round(cur.uv_index||0),
+                    sub:uvLabel(Math.round(cur.uv_index||0)), color:uvColor(Math.round(cur.uv_index||0)) },
+                  { icon:"🌬️", label:"Pression",    val:`${Math.round(cur.surface_pressure||1013)} hPa`,
+                    color:"#c4b5fd" },
+                  { icon:"👁️", label:"Visibilité",  val:cur.visibility>=10000?"Excellente":`${(cur.visibility/1000).toFixed(1)}km`,
+                    color:"#a3e635" },
+                ].map((item,i) => (
                   <div key={i} style={{
-                    display:"flex",alignItems:"center",gap:12,padding:"10px 12px",
-                    borderRadius:12,background:i===0?"rgba(96,165,250,0.08)":"rgba(255,255,255,0.02)",
-                    border:i===0?"1px solid rgba(96,165,250,0.2)":"1px solid rgba(255,255,255,0.05)",
+                    background:"rgba(0,0,0,0.2)",backdropFilter:"blur(8px)",
+                    borderRadius:14,padding:"10px 12px",
+                    border:"1px solid rgba(255,255,255,0.12)",
                   }}>
-                    <div style={{width:56,fontWeight:i===0?900:700,fontSize:13,color:i===0?"#93c5fd":"var(--text2)",flexShrink:0}}>{dayLabel(dateStr)}</div>
-                    <div style={{fontSize:22,width:28,textAlign:"center"}}>{WMO_ICONS[daily.weather_code[i]]||"?"}</div>
-                    <div style={{flex:1,fontSize:12,color:"var(--text3)"}}>{WMO_LABELS[daily.weather_code[i]]||""}</div>
-                    <div style={{fontSize:10,color:"#60a5fa",fontWeight:700,flexShrink:0}}>
-                      💧 {Math.round(daily.precipitation_sum[i]||0)}mm
-                    </div>
-                    <div style={{display:"flex",gap:6,flexShrink:0}}>
-                      <span style={{fontWeight:800,fontSize:14,color:"var(--text)"}}>{Math.round(daily.temperature_2m_max[i])}°</span>
-                      <span style={{fontWeight:600,fontSize:14,color:"var(--text3)"}}>{Math.round(daily.temperature_2m_min[i])}°</span>
-                    </div>
+                    <div style={{ fontSize:18,marginBottom:3 }}>{item.icon}</div>
+                    <div style={{ fontSize:9,color:"rgba(255,255,255,0.5)",fontWeight:700,
+                      textTransform:"uppercase",letterSpacing:.8,marginBottom:2 }}>{item.label}</div>
+                    <div style={{ fontWeight:900,fontSize:14,color:item.color||"#fff" }}>{item.val}</div>
+                    {item.sub&&<div style={{ fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1 }}>{item.sub}</div>}
                   </div>
                 ))}
               </div>
             </div>
-          )}
+          </div>
 
-          {/* ── Humidité détaillée ── */}
-          {hourly && hourlyIdx!==null && (
-            <div className="card" style={{marginBottom:16}}>
-              <div style={{fontWeight:800,fontSize:14,marginBottom:12,color:"var(--text2)"}}>💧 Humidité — 12 prochaines heures</div>
-              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
-                {Array.from({length:12},(_,offset)=>{
-                  const i=hourlyIdx+offset;
-                  if(i>=hourly.time.length) return null;
-                  const h=parseInt(hourly.time[i].slice(11,13));
-                  const hum=hourly.relative_humidity_2m[i];
-                  const color=hum<40?"#fbbf24":hum<60?"#4ade80":hum<80?"#60a5fa":"#a78bfa";
-                  return (
-                    <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-                      minWidth:50,flexShrink:0}}>
-                      <div style={{fontSize:9,color:"var(--text3)",fontWeight:600}}>{offset===0?"Maint.":h+"h"}</div>
-                      <div style={{width:36,height:Math.max(12,Math.round(hum*0.6)),
-                        background:`linear-gradient(to top,${color},${color}66)`,
-                        borderRadius:"4px 4px 0 0",minHeight:8,transition:"height .3s"}}/>
-                      <div style={{fontSize:10,fontWeight:800,color}}>{hum}%</div>
+          {/* Source */}
+          <div style={{ padding:"8px 18px",background:"rgba(0,0,0,0.15)",textAlign:"right",
+            fontSize:9,color:"rgba(255,255,255,0.35)",fontWeight:600 }}>
+            Source : Météo-France · Open-Meteo · Données actualisées
+          </div>
+        </div>
+      ) : loading ? (
+        <div style={{ height:220,borderRadius:24,background:"linear-gradient(160deg,#1a2a4a,#2a3a6a)",
+          display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16,
+          border:"1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ textAlign:"center",color:"rgba(255,255,255,0.6)" }}>
+            <div style={{ fontSize:36,animation:"spin .8s linear infinite",display:"inline-block",marginBottom:12 }}>⟳</div>
+            <div style={{ fontWeight:700 }}>Chargement de la météo…</div>
+            <div style={{ fontSize:12,marginTop:4 }}>📍 {city}</div>
+          </div>
+        </div>
+      ) : null}
+
+      {error&&<div style={{ padding:"10px 14px",borderRadius:12,background:"rgba(248,113,113,0.12)",
+        border:"1px solid rgba(248,113,113,0.3)",color:"var(--red)",fontSize:12,fontWeight:700,marginBottom:12 }}>
+        ⚠️ {error}
+      </div>}
+
+      {weather && hourly && hourlyIdx !== null && (
+        <>
+          {/* ── Prévisions horaires ── */}
+          <div style={{ borderRadius:20,overflow:"hidden",marginBottom:12,
+            background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.08)",
+            boxShadow:"0 4px 24px rgba(0,0,0,0.2)" }}>
+            <div style={{ padding:"14px 18px 10px",borderBottom:"1px solid rgba(255,255,255,0.06)",
+              display:"flex",alignItems:"center",gap:8 }}>
+              <span style={{ fontSize:20 }}>⏱️</span>
+              <span style={{ fontWeight:800,fontSize:15,color:"var(--text)" }}>Aujourd'hui — heure par heure</span>
+            </div>
+            <div style={{ display:"flex",gap:0,overflowX:"auto",paddingBottom:0,WebkitOverflowScrolling:"touch" }}>
+              {Array.from({length:Math.min(24,hourly.time.length-hourlyIdx)},(_,offset)=>{
+                const i=hourlyIdx+offset;
+                if(i>=hourly.time.length) return null;
+                const h=parseInt(hourly.time[i].slice(11,13));
+                const isNow=offset===0;
+                const rainP=hourly.precipitation_probability[i]||0;
+                const wcode=hourly.weather_code[i];
+                return (
+                  <div key={i} style={{
+                    display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                    minWidth:62,padding:"14px 6px 12px",flexShrink:0,
+                    background:isNow?"rgba(96,165,250,0.15)":"transparent",
+                    borderRight:"1px solid rgba(255,255,255,0.04)",
+                    borderBottom:isNow?"2px solid #60a5fa":"2px solid transparent",
+                    transition:"background .2s",cursor:"default",
+                  }}>
+                    <div style={{ fontSize:10,color:isNow?"#93c5fd":"rgba(255,255,255,0.35)",
+                      fontWeight:isNow?900:600,letterSpacing:.3 }}>
+                      {isNow?"Maint.":h+"h"}
                     </div>
-                  );
-                }).filter(Boolean)}
+                    <div style={{ fontSize:22,margin:"2px 0" }}>{WMO_ICONS[wcode]||"?"}</div>
+                    <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,color:"#fff" }}>
+                      {Math.round(hourly.temperature_2m[i])}°
+                    </div>
+                    {/* Barre pluie */}
+                    <div style={{ width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.08)",overflow:"hidden" }}>
+                      <div style={{ height:"100%",width:`${rainP}%`,background:rainColor(rainP),transition:"width .3s" }}/>
+                    </div>
+                    <div style={{ fontSize:9,color:rainColor(rainP),fontWeight:700 }}>
+                      {rainP}%
+                    </div>
+                    <div style={{ fontSize:8,color:"rgba(255,255,255,0.3)" }}>
+                      {Math.round(hourly.wind_speed_10m[i])}km/h
+                    </div>
+                  </div>
+                );
+              }).filter(Boolean)}
+            </div>
+          </div>
+
+          {/* ── 7 jours ── */}
+          {daily && (
+            <div style={{ borderRadius:20,overflow:"hidden",marginBottom:12,
+              background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ padding:"14px 18px 12px",borderBottom:"1px solid rgba(255,255,255,0.06)",
+                display:"flex",alignItems:"center",gap:8 }}>
+                <span style={{ fontSize:20 }}>📅</span>
+                <span style={{ fontWeight:800,fontSize:15,color:"var(--text)" }}>Prévisions 7 jours</span>
               </div>
+              {daily.time.map((dateStr,i) => {
+                const maxT=Math.round(daily.temperature_2m_max[i]);
+                const minT=Math.round(daily.temperature_2m_min[i]);
+                const allMax=daily.temperature_2m_max.map(Math.round);
+                const allMin=daily.temperature_2m_min.map(Math.round);
+                const globalMax=Math.max(...allMax), globalMin=Math.min(...allMin);
+                const barL=((minT-globalMin)/(globalMax-globalMin+1))*100;
+                const barW=((maxT-minT)/(globalMax-globalMin+1))*100;
+                const wcode=daily.weather_code[i];
+                return (
+                  <div key={i} style={{
+                    display:"flex",alignItems:"center",gap:12,padding:"12px 18px",
+                    background:i===0?"rgba(96,165,250,0.08)":"transparent",
+                    borderBottom:i<daily.time.length-1?"1px solid rgba(255,255,255,0.04)":"none",
+                    transition:"background .15s",
+                  }}
+                  onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}
+                  onMouseLeave={e=>e.currentTarget.style.background=i===0?"rgba(96,165,250,0.08)":"transparent"}>
+                    <div style={{ width:80,fontWeight:i===0?900:600,fontSize:13,
+                      color:i===0?"#93c5fd":"var(--text2)",flexShrink:0 }}>{dayLabel(dateStr)}</div>
+                    <div style={{ fontSize:22,width:30,textAlign:"center",flexShrink:0 }}>{WMO_ICONS[wcode]||"?"}</div>
+                    <div style={{ flex:1,display:"flex",alignItems:"center",gap:8 }}>
+                      <span style={{ fontSize:12,color:"rgba(255,255,255,0.4)",width:28,textAlign:"right",flexShrink:0 }}>{minT}°</span>
+                      <div style={{ flex:1,height:6,borderRadius:3,background:"rgba(255,255,255,0.08)",position:"relative" }}>
+                        <div style={{
+                          position:"absolute",left:`${barL}%`,width:`${Math.max(barW,8)}%`,
+                          height:"100%",borderRadius:3,
+                          background:`linear-gradient(90deg,#60a5fa,#f97316)`,
+                        }}/>
+                      </div>
+                      <span style={{ fontSize:13,fontWeight:800,color:"#fff",width:28,flexShrink:0 }}>{maxT}°</span>
+                    </div>
+                    <div style={{ fontSize:10,color:"#60a5fa",fontWeight:700,width:40,textAlign:"right",flexShrink:0 }}>
+                      {Math.round(daily.precipitation_sum[i]||0)}mm
+                    </div>
+                    <div style={{ fontSize:9,color:uvColor(Math.round(daily.uv_index_max[i]||0)),
+                      fontWeight:700,width:26,textAlign:"right",flexShrink:0 }}>
+                      UV{Math.round(daily.uv_index_max[i]||0)}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
+
+          {/* ── Humidité et pluie horaires ── */}
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12 }}>
+            {/* Humidité */}
+            <div style={{ borderRadius:20,overflow:"hidden",
+              background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ padding:"12px 14px 10px",borderBottom:"1px solid rgba(255,255,255,0.06)",
+                display:"flex",alignItems:"center",gap:6 }}>
+                <span style={{fontSize:16}}>💧</span>
+                <span style={{ fontWeight:800,fontSize:13 }}>Humidité 12h</span>
+              </div>
+              <div style={{ padding:"12px 14px 14px" }}>
+                <div style={{ display:"flex",gap:5,alignItems:"flex-end",height:60 }}>
+                  {Array.from({length:12},(_,offset)=>{
+                    const i=hourlyIdx+offset;
+                    if(i>=hourly.time.length) return null;
+                    const h=hourly.relative_humidity_2m[i];
+                    const color=humidColor(h);
+                    const isNow=offset===0;
+                    return (
+                      <div key={i} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2 }}>
+                        <div style={{ width:"100%",height:Math.max(6,Math.round(h*0.55)),
+                          background:`linear-gradient(to top,${color},${color}88)`,
+                          borderRadius:"3px 3px 0 0",
+                          border:isNow?`1px solid ${color}`:"none",
+                        }}/>
+                        <div style={{ fontSize:8,fontWeight:isNow?800:600,color:isNow?color:"rgba(255,255,255,0.3)" }}>
+                          {h}%
+                        </div>
+                      </div>
+                    );
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            </div>
+
+            {/* Probabilité pluie */}
+            <div style={{ borderRadius:20,overflow:"hidden",
+              background:"rgba(255,255,255,0.025)",border:"1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ padding:"12px 14px 10px",borderBottom:"1px solid rgba(255,255,255,0.06)",
+                display:"flex",alignItems:"center",gap:6 }}>
+                <span style={{fontSize:16}}>🌧️</span>
+                <span style={{ fontWeight:800,fontSize:13 }}>Pluie 12h</span>
+              </div>
+              <div style={{ padding:"12px 14px 14px" }}>
+                <div style={{ display:"flex",gap:5,alignItems:"flex-end",height:60 }}>
+                  {Array.from({length:12},(_,offset)=>{
+                    const i=hourlyIdx+offset;
+                    if(i>=hourly.time.length) return null;
+                    const p=hourly.precipitation_probability[i]||0;
+                    const color=rainColor(p);
+                    const isNow=offset===0;
+                    return (
+                      <div key={i} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2 }}>
+                        <div style={{ width:"100%",height:Math.max(4,Math.round(p*0.55)),
+                          background:`linear-gradient(to top,${color},${color}88)`,
+                          borderRadius:"3px 3px 0 0",
+                          border:isNow?`1px solid ${color}`:"none",
+                        }}/>
+                        <div style={{ fontSize:8,fontWeight:isNow?800:600,color:isNow?color:"rgba(255,255,255,0.3)" }}>
+                          {p}%
+                        </div>
+                      </div>
+                    );
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            </div>
+          </div>
         </>
       )}
     </div>
@@ -5493,8 +5702,16 @@ function EssencePage() {
                     }}
                     onTouchStart={e=>{e.currentTarget.style.transform="scale(0.985)";}}
                     onTouchEnd={e=>{e.currentTarget.style.transform="";}}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(167,139,250,0.3)";e.currentTarget.style.boxShadow="0 4px 20px rgba(167,139,250,0.12)";}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";e.currentTarget.style.boxShadow="";}}>
+                    onMouseEnter={e=>{
+                      e.currentTarget.style.borderColor="rgba(167,139,250,0.45)";
+                      e.currentTarget.style.boxShadow="0 8px 32px rgba(167,139,250,0.18),0 0 0 1px rgba(167,139,250,0.1)";
+                      e.currentTarget.style.transform="translateY(-2px)";
+                    }}
+                    onMouseLeave={e=>{
+                      e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";
+                      e.currentTarget.style.boxShadow="";
+                      e.currentTarget.style.transform="";
+                    }}>
 
                     {/* Ligne principale */}
                     <div style={{display:"flex",alignItems:"center",padding:"12px 14px",gap:12}}>
@@ -5538,37 +5755,55 @@ function EssencePage() {
                       )}
                     </div>
 
-                    {/* Bande prix */}
+                    {/* Bande prix — redesign coloré */}
                     <div style={{
-                      display:"grid",
-                      gridTemplateColumns:"repeat(4,1fr)",
-                      borderTop:"1px solid rgba(255,255,255,0.05)",
-                      background:"rgba(0,0,0,0.15)",
+                      display:"grid",gridTemplateColumns:"repeat(4,1fr)",
+                      borderTop:"1px solid rgba(255,255,255,0.06)",
                     }}>
-                      {Object.entries(FUEL_META).map(([k,m])=>{
+                      {Object.entries(FUEL_META).map(([k,m],ki)=>{
                         const isBest=isBestFor(k);
                         const hasPrice=s[k]!=null;
                         return (
                           <div key={k} style={{
                             display:"flex",flexDirection:"column",alignItems:"center",
-                            padding:"8px 4px",
-                            borderRight:"1px solid rgba(255,255,255,0.04)",
-                            background:isBest?`${m.color}10`:"transparent",
+                            padding:"10px 4px 8px",
+                            borderRight:ki<3?"1px solid rgba(255,255,255,0.05)":"none",
+                            background:isBest
+                              ?`linear-gradient(180deg,${m.color}18,${m.color}08)`
+                              :"transparent",
+                            position:"relative",
+                            transition:"background .2s",
                           }}>
-                            <span style={{fontSize:9,color:m.color,fontWeight:700,letterSpacing:.3,marginBottom:2}}>{m.label}</span>
+                            {/* Badge "meilleur prix" en haut */}
+                            {isBest&&(
+                              <div style={{
+                                position:"absolute",top:0,left:"50%",transform:"translateX(-50%) translateY(-50%)",
+                                background:m.color,color:"#000",fontSize:7,fontWeight:900,
+                                padding:"1px 6px",borderRadius:20,letterSpacing:.5,whiteSpace:"nowrap",
+                              }}>✓ MOINS CHER</div>
+                            )}
+                            {/* Label carburant */}
+                            <span style={{
+                              fontSize:9,color:isBest?m.color:"rgba(255,255,255,0.4)",
+                              fontWeight:800,letterSpacing:.5,marginBottom:4,
+                              textTransform:"uppercase",
+                            }}>{m.label}</span>
+                            {/* Prix */}
                             {hasPrice?(
-                              <>
-                                <span style={{
-                                  fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,
-                                  color:isBest?m.color:"var(--text)",
-                                  textShadow:isBest?`0 0 12px ${m.color}50`:"none",
-                                }}>
-                                  {s[k].toFixed(3)}
-                                </span>
-                                {isBest&&<span style={{fontSize:8,color:m.color,fontWeight:800,marginTop:1}}>✓ moins cher</span>}
-                              </>
+                              <span style={{
+                                fontFamily:"'Fraunces',serif",fontWeight:900,
+                                fontSize:isBest?17:15,
+                                color:isBest?m.color:"var(--text2)",
+                                textShadow:isBest?`0 0 16px ${m.color}60`:"none",
+                                transition:"all .2s",
+                              }}>
+                                {s[k].toFixed(3)}
+                              </span>
                             ):(
-                              <span style={{color:"rgba(255,255,255,0.12)",fontSize:16}}>—</span>
+                              <span style={{color:"rgba(255,255,255,0.1)",fontSize:18,lineHeight:1}}>—</span>
+                            )}
+                            {hasPrice&&(
+                              <span style={{fontSize:8,color:"rgba(255,255,255,0.25)",marginTop:2}}>€/L</span>
                             )}
                           </div>
                         );
@@ -5757,128 +5992,200 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
     ? (selectedStation[fuel] - bestS[fuel]) * liters : null;
   const m = FUEL_META[fuel] || {};
 
+  const m = FUEL_META[fuel] || {};
+  const totalCost = total;
+  const distancePossible = effectiveConso > 0 ? Math.round((liters / effectiveConso) * 100) : null;
+
   return (
-    <div style={{ borderRadius:18,overflow:"hidden",border:`1px solid ${m.color||"var(--border)"}25`,marginBottom:14,background:"rgba(255,255,255,0.018)" }}>
-      <div style={{ padding:"13px 18px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}0d,transparent)`,borderBottom:`1px solid ${m.color||"var(--border)"}15`,display:"flex",alignItems:"center",gap:10 }}>
-        <div style={{ width:36,height:36,borderRadius:11,background:`${m.color||"#a78bfa"}16`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18 }}>🧮</div>
+    <div style={{ borderRadius:20,overflow:"hidden",border:`1.5px solid ${m.color||"#a78bfa"}22`,marginBottom:14,
+      background:"linear-gradient(145deg,rgba(255,255,255,0.025),rgba(0,0,0,0.05))",
+      boxShadow:`0 8px 32px ${m.color||"#a78bfa"}12` }}>
+
+      {/* Header simulateur */}
+      <div style={{ padding:"14px 18px 10px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}15,transparent)`,
+        borderBottom:`1px solid ${m.color||"#a78bfa"}18`,display:"flex",alignItems:"center",gap:12 }}>
+        <div style={{ width:44,height:44,borderRadius:13,background:`${m.color||"#a78bfa"}22`,
+          border:`1.5px solid ${m.color||"#a78bfa"}44`,display:"flex",alignItems:"center",
+          justifyContent:"center",fontSize:22,flexShrink:0 }}>⛽</div>
         <div>
-          <div style={{ fontWeight:900,fontSize:14 }}>Simulateur de plein</div>
-          <div style={{ fontSize:10,color:"var(--text3)",marginTop:1 }}>
+          <div style={{ fontWeight:900,fontSize:15,color:"var(--text)" }}>Simulateur de plein</div>
+          <div style={{ fontSize:11,color:"var(--text3)",marginTop:2 }}>
             {citySearch} · {vehicleConso ? `${selMake} · ${vehicleConso}L/100` : `${effectiveConso}L/100 (manuel)`}
           </div>
         </div>
       </div>
 
-      <div className="fuel-sim-grid" style={{ padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
-        <div style={{ display:"flex",flexDirection:"column",gap:13 }}>
+      <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:0 }}>
 
-          <div>
-            <label style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,display:"block",marginBottom:6 }}>Carburant</label>
-            <div style={{ display:"flex",gap:5,flexWrap:"wrap" }}>
-              {availableFuels.map(k=>{ const fm=FUEL_META[k]; const s=fuel===k;
-                return <button key={k} onClick={()=>{setFuel(k);setStationId("__avg__");}}
-                  style={{ padding:"5px 10px",borderRadius:9,border:s?`1.5px solid ${fm.color}`:"1px solid var(--border)",background:s?`${fm.color}16`:"var(--glass)",color:s?fm.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:s?800:600,fontSize:11,transition:"all .15s" }}>
-                  {fm.icon} {fm.label}
-                </button>;
+        {/* ── Panneau gauche : paramètres ── */}
+        <div style={{ padding:"18px 16px",borderRight:`1px solid rgba(255,255,255,0.06)` }}>
+
+          {/* Carburant */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:8 }}>Carburant</div>
+            <div style={{ display:"flex",flexWrap:"wrap",gap:6 }}>
+              {availableFuels.map(k => {
+                const fm = FUEL_META[k]||{};
+                return (
+                  <button key={k} onClick={()=>setFuel(k)} style={{
+                    padding:"6px 12px",borderRadius:20,cursor:"pointer",fontSize:12,fontWeight:800,
+                    background:fuel===k ? `${fm.color||"#a78bfa"}25` : "rgba(255,255,255,0.04)",
+                    border:`1.5px solid ${fuel===k ? fm.color||"#a78bfa" : "rgba(255,255,255,0.1)"}`,
+                    color:fuel===k ? fm.color||"#a78bfa" : "var(--text3)",
+                    transition:"all .15s",
+                  }}>
+                    <span style={{marginRight:4}}>{fm.icon||"⛽"}</span>{fm.label||k.toUpperCase()}
+                  </button>
+                );
               })}
             </div>
           </div>
 
-          {eligibleStations.length > 0 && (
-            <div>
-              <label style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,display:"block",marginBottom:6 }}>Station</label>
-              <select value={stationId} onChange={e=>setStationId(e.target.value)}
-                style={{ width:"100%",background:"rgba(255,255,255,0.05)",border:`1px solid ${m.color||"var(--border)"}30`,borderRadius:10,padding:"8px 11px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:12,cursor:"pointer" }}>
-                <option value="__avg__">📊 Prix moyen · {eligibleStations.length} stations</option>
-                {eligibleStations.map(s=><option key={s.id} value={s.id}>{s.nom} — {s[fuel]?.toFixed(3)}€{bestS?.id===s.id?" ⭐":""}</option>)}
-              </select>
-              {bestS && <div style={{ marginTop:4,fontSize:10,color:"var(--green)",fontWeight:700 }}>⭐ {bestS.nom} · {bestS[fuel]?.toFixed(3)} €/L</div>}
-            </div>
-          )}
+          {/* Station */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:8 }}>Station</div>
+            <select value={stationId} onChange={e=>setStationId(e.target.value)}
+              style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
+                borderRadius:11,padding:"9px 12px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:13 }}>
+              <option value="__avg__">📊 Prix moyen · {eligibleStations.length} stations</option>
+              {eligibleStations.map(s => {
+                const {nom:n}=resolveNom(s);
+                return <option key={s.id} value={s.id}>{n} · {s[fuel]?.toFixed(3)}€</option>;
+              })}
+            </select>
+            {bestS && (
+              <div style={{ marginTop:6,fontSize:11,fontWeight:700,color:"var(--yellow)",display:"flex",alignItems:"center",gap:5 }}>
+                <span>⭐</span>
+                <span>{(() => {const {nom}=resolveNom(bestS); return nom;})()}</span>
+                <span style={{ color:"var(--text3)"}}>·</span>
+                <span>{bestS[fuel]?.toFixed(3)} €/L</span>
+              </div>
+            )}
+          </div>
 
-          <div>
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6 }}>
-              <label style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800 }}>Volume</label>
-              <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:18,color:m.color||"var(--purple)" }}>{liters} L</span>
+          {/* Volume */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8 }}>
+              <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase" }}>Volume</div>
+              <div style={{ fontFamily:"'Fraunces',serif",fontSize:20,fontWeight:900,color:m.color||"#a78bfa" }}>{liters} L</div>
             </div>
-            <input type="range" min={5} max={120} step={5} value={liters} onChange={e=>setLiters(+e.target.value)}
-              style={{ width:"100%",accentColor:m.color||"var(--purple)",cursor:"pointer",marginBottom:6 }}/>
-            <div style={{ display:"flex",gap:5 }}>
-              {[20,35,50,70,100].map(v=>(
+            <input type="range" min={5} max={120} value={liters} onChange={e=>setLiters(+e.target.value)}
+              style={{ width:"100%",accentColor:m.color||"#a78bfa",height:5,borderRadius:4,cursor:"pointer",marginBottom:8 }}/>
+            <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+              {[20,35,50,70,100].map(v => (
                 <button key={v} onClick={()=>setLiters(v)}
-                  style={{ flex:1,padding:"4px 2px",borderRadius:8,border:`1px solid ${liters===v?(m.color||"#a78bfa")+"40":"rgba(255,255,255,0.08)"}`,background:liters===v?`${m.color||"#a78bfa"}18`:"rgba(255,255,255,0.04)",color:liters===v?(m.color||"var(--purple)"):"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:10 }}>
+                  style={{ flex:1,padding:"6px 4px",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,
+                    background:liters===v?`${m.color||"#a78bfa"}20`:"rgba(255,255,255,0.04)",
+                    border:`1px solid ${liters===v?(m.color||"#a78bfa")+"55":"rgba(255,255,255,0.1)"}`,
+                    color:liters===v?(m.color||"#a78bfa"):"var(--text3)",transition:"all .15s" }}>
                   {v}L
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Véhicule / Conso */}
           <div>
-            <label style={{ fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,fontWeight:800,display:"block",marginBottom:6 }}>Mon véhicule</label>
-            <div style={{ display:"flex",gap:6,marginBottom:6 }}>
-              <select value={selMake} onChange={e=>{ setSelMake(e.target.value); setSelModel(""); }}
-                style={{ flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:10,padding:"7px 9px",color:selMake?"var(--text)":"var(--text3)",fontFamily:"'Outfit',sans-serif",fontSize:11,cursor:"pointer" }}>
-                <option value="">Marque…</option>
-                {Object.keys(VEHICLES).map(mk=><option key={mk} value={mk}>{mk}</option>)}
+            <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:8 }}>Mon véhicule</div>
+            <select value={selMake} onChange={e=>{setSelMake(e.target.value);setSelModel("");}}
+              style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
+                borderRadius:11,padding:"8px 12px",color:selMake?"var(--text)":"var(--text3)",
+                fontFamily:"'Outfit',sans-serif",fontSize:13,marginBottom:8 }}>
+              <option value="">Marque…</option>
+              {Object.keys(VEHICLES).map(mk => <option key={mk} value={mk}>{mk}</option>)}
+            </select>
+            {selMake && (
+              <select value={selModel} onChange={e=>setSelModel(e.target.value)}
+                style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
+                  borderRadius:11,padding:"8px 12px",color:selModel?"var(--text)":"var(--text3)",
+                  fontFamily:"'Outfit',sans-serif",fontSize:13,marginBottom:8 }}>
+                <option value="">Modèle…</option>
+                {Object.keys(VEHICLES[selMake]).map(mo=><option key={mo} value={mo}>{mo}</option>)}
               </select>
-              {selMake && (
-                <select value={selModel} onChange={e=>setSelModel(e.target.value)}
-                  style={{ flex:2,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:10,padding:"7px 9px",color:selModel?"var(--text)":"var(--text3)",fontFamily:"'Outfit',sans-serif",fontSize:11,cursor:"pointer" }}>
-                  <option value="">Modèle…</option>
-                  {Object.keys(VEHICLES[selMake]).map(mo=><option key={mo} value={mo}>{mo}</option>)}
-                </select>
-              )}
-            </div>
+            )}
             {vehicleConso ? (
-              <div style={{ display:"flex",alignItems:"center",gap:7,padding:"6px 10px",background:"rgba(74,222,128,0.07)",border:"1px solid rgba(74,222,128,0.18)",borderRadius:9 }}>
-                <span>🚗</span>
-                <div style={{ flex:1 }}>
+              <div style={{ padding:"8px 12px",borderRadius:10,background:"rgba(74,222,128,0.08)",
+                border:"1px solid rgba(74,222,128,0.2)",display:"flex",alignItems:"center",gap:8,marginTop:4 }}>
+                <span style={{ fontSize:18 }}>🚗</span>
+                <div>
                   <div style={{ fontSize:11,fontWeight:800,color:"var(--green)" }}>{vehicleConso} L/100 km (WLTP)</div>
-                  <div style={{ fontSize:9,color:"var(--text3)" }}>{selMake} {selModel}</div>
+                  <div style={{ fontSize:10,color:"var(--text3)" }}>{selMake} {selModel}</div>
                 </div>
-                <button onClick={()=>{ setSelMake(""); setSelModel(""); }} style={{ background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:16,lineHeight:1 }}>×</button>
               </div>
             ) : (
               <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-                <span style={{ fontSize:10,color:"var(--text3)",whiteSpace:"nowrap" }}>Ou manuellement :</span>
-                <input type="number" value={manualConso} onChange={e=>setManualConso(Math.max(1,+e.target.value))} min={1} max={30} step={0.1}
-                  style={{ width:68,fontSize:13,fontWeight:700,padding:"5px 9px",borderRadius:9,textAlign:"center",background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)",color:"var(--text)" }}/>
+                <span style={{ fontSize:11,color:"var(--text3)",fontWeight:600 }}>Ou manuellement :</span>
+                <input type="number" value={manualConso} onChange={e=>setManualConso(Math.max(1,+e.target.value))}
+                  min={1} max={30} step={0.1}
+                  style={{ width:64,fontSize:13,fontWeight:700,padding:"5px 9px",borderRadius:9,textAlign:"center",
+                    background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)",color:"var(--text)" }}/>
                 <span style={{ fontSize:10,color:"var(--text3)" }}>L / 100 km</span>
               </div>
             )}
           </div>
         </div>
 
-        <div style={{ display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",gap:11,padding:"20px 14px",borderRadius:15,background:`linear-gradient(145deg,${m.color||"#a78bfa"}0b,rgba(0,0,0,0.1))`,border:`1px solid ${m.color||"#a78bfa"}1a` }}>
-          {price != null ? (<>
-            <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.5,fontWeight:800 }}>Coût du plein</div>
-            <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,lineHeight:1,color:m.color||"var(--purple)",textShadow:`0 0 36px ${m.color||"#a78bfa"}45`,textAlign:"center" }}>
-              <span style={{ fontSize:52 }}>{total?.toFixed(2)}</span><span style={{ fontSize:24 }}>€</span>
-            </div>
-            <div style={{ fontSize:10,color:"var(--text3)",textAlign:"center",lineHeight:1.7 }}>
-              {liters} L · {m.label} · <strong style={{ color:"var(--text)" }}>{price.toFixed(3)} €/L</strong>
-            </div>
-            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,width:"100%" }}>
-              {[
-                { label:"/ 100 km", val:`${per100?.toFixed(2)}€`, sub:`${effectiveConso}L/100` },
-                { label:"Prix / L",  val:`${price.toFixed(3)}€`,  sub:"à la pompe" },
-              ].map(s=>(
-                <div key={s.label} style={{ textAlign:"center",padding:"9px 6px",background:"rgba(255,255,255,0.04)",borderRadius:10,border:"1px solid rgba(255,255,255,0.06)" }}>
-                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.7,marginBottom:4 }}>{s.label}</div>
-                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,color:"var(--text)" }}>{s.val}</div>
-                  <div style={{ fontSize:9,color:"var(--text3)",marginTop:1 }}>{s.sub}</div>
+        {/* ── Panneau droit : résultats ── */}
+        <div style={{ padding:"18px 16px",display:"flex",flexDirection:"column",gap:12,
+          background:`linear-gradient(160deg,${m.color||"#a78bfa"}0a,rgba(0,0,0,0.08))` }}>
+
+          {price != null ? (
+            <>
+              {/* Prix principal */}
+              <div style={{ textAlign:"center",padding:"16px 12px 12px",borderRadius:16,
+                background:`linear-gradient(145deg,${m.color||"#a78bfa"}18,rgba(0,0,0,0.15))`,
+                border:`1.5px solid ${m.color||"#a78bfa"}30` }}>
+                <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:2,fontWeight:800,marginBottom:8 }}>
+                  💰 Coût du plein
                 </div>
-              ))}
-            </div>
-            {saving!=null && saving>0.01 && (
-              <div style={{ width:"100%",padding:"7px 11px",background:"rgba(74,222,128,0.07)",border:"1px solid rgba(74,222,128,0.16)",borderRadius:9,fontSize:10,color:"var(--green)",fontWeight:700,textAlign:"center" }}>
-                💸 Économisez {saving.toFixed(2)} € chez {bestS?.nom}
+                <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,lineHeight:1,
+                  color:m.color||"var(--purple)",
+                  textShadow:`0 0 40px ${m.color||"#a78bfa"}50`,textAlign:"center" }}>
+                  <span style={{ fontSize:56 }}>{totalCost?.toFixed(2)}</span>
+                  <span style={{ fontSize:26 }}>€</span>
+                </div>
+                <div style={{ fontSize:11,color:"var(--text3)",marginTop:8,lineHeight:1.7 }}>
+                  {liters} L · <strong style={{color:"var(--text)"}}>{price.toFixed(3)} €/L</strong>
+                </div>
               </div>
-            )}
-          </>) : (
-            <div style={{ textAlign:"center",padding:20 }}>
-              <div style={{ fontSize:38,marginBottom:8 }}>{m.icon||"⛽"}</div>
-              <div style={{ fontSize:12,color:"var(--text3)",fontWeight:600 }}>Prix non disponible<br/>dans cette zone</div>
+
+              {/* Stats */}
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
+                {[
+                  { icon:"🛣️", label:"/ 100 km",    val:`${per100?.toFixed(2)}€`, sub:`${effectiveConso}L/100`, color:m.color },
+                  { icon:"⛽", label:"Prix / L",     val:`${price.toFixed(3)}€`,  sub:"à la pompe",              color:m.color },
+                  ...(distancePossible ? [{ icon:"📍", label:"Distance",  val:`≈${distancePossible}km`, sub:`avec ${liters}L`, color:"#60a5fa" }] : []),
+                  ...(saving           ? [{ icon:"💸", label:"Économie",  val:`-${saving.toFixed(2)}€`, sub:"vs cette station", color:"#4ade80" }] : []),
+                ].map((s,i)=>(
+                  <div key={i} style={{ textAlign:"center",padding:"10px 8px",borderRadius:12,
+                    background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)" }}>
+                    <div style={{ fontSize:16,marginBottom:4 }}>{s.icon}</div>
+                    <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.7,marginBottom:4 }}>{s.label}</div>
+                    <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:18,color:s.color||"var(--text)" }}>{s.val}</div>
+                    <div style={{ fontSize:9,color:"var(--text3)",marginTop:2 }}>{s.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Barre progression plein */}
+              <div style={{ borderRadius:12,padding:"10px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)" }}>
+                <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+                  <span style={{ fontSize:10,color:"var(--text3)",fontWeight:700 }}>⛽ Réservoir</span>
+                  <span style={{ fontSize:10,color:m.color||"#a78bfa",fontWeight:800 }}>{liters}L / {Math.max(liters,120)}L max</span>
+                </div>
+                <div style={{ height:8,borderRadius:4,background:"rgba(255,255,255,0.08)",overflow:"hidden" }}>
+                  <div style={{ height:"100%",borderRadius:4,width:`${Math.min(100,(liters/120)*100)}%`,
+                    background:`linear-gradient(90deg,${m.color||"#a78bfa"},${m.color||"#a78bfa"}88)`,
+                    transition:"width .3s" }}/>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+              color:"var(--text3)",padding:20,textAlign:"center",gap:8 }}>
+              <div style={{ fontSize:32 }}>🔍</div>
+              <div style={{ fontWeight:700,fontSize:13 }}>Aucun prix disponible</div>
+              <div style={{ fontSize:11 }}>Lancez une recherche de station dans cette zone</div>
             </div>
           )}
         </div>
