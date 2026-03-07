@@ -491,15 +491,15 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 ::-webkit-scrollbar-thumb:hover{background:rgba(167,139,250,0.45);}
 
 /* ── ANIMATIONS ── */
-@keyframes fadeUp{from{opacity:0}to{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes scaleIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 @keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
-.fade-up{animation:fadeUp .25s ease both;}
+.fade-up{animation:fadeUp .3s ease both;}
 .fade-in{animation:fadeIn .2s ease both;}
 .scale-in{animation:scaleIn .28s cubic-bezier(.34,1.56,.64,1) both;}
 .slide-in{animation:slideIn .25s ease both;}
@@ -507,10 +507,12 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .float-icon{animation:float 3s ease-in-out infinite;}
 .pulse-dot{animation:pulse 2s infinite;}
 .spin{animation:spin .7s linear infinite;}
+/* iOS Safari : translateY dans les animations décale les touch targets → désactivé sur touch */
 @media(hover:none){
-  .float-icon{animation:none !important;}
+  .fade-up{animation:fadeIn .25s ease both !important;}
   .slide-in{animation:fadeIn .2s ease both !important;}
   .scale-in{animation:fadeIn .2s ease both !important;}
+  .float-icon{animation:none !important;}
 }
 
 /* ── RECHARTS ── */
