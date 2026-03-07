@@ -518,61 +518,209 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 /* ── RECHARTS ── */
 .rc-tooltip{background:#1a1635;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:10px 14px;font-family:'Outfit',sans-serif;font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);}
 
-/* ── RESPONSIVE ── */
+/* ── RESPONSIVE MOBILE (iPhone-first) ── */
 @media(max-width:880px){
+  /* Sidebar hidden off-screen, slides in on demand */
   .sidebar{transform:translateX(calc(-1 * var(--sw)));}
   .sidebar.open{transform:translateX(0);}
   .sidebar-overlay.open{display:block;}
   .main-area{margin-left:0 !important;}
   .content-grid{grid-template-columns:1fr !important;}
   .grid-4{grid-template-columns:1fr 1fr !important;}
+
+  /* Page content : bottom padding = tab bar (60px) + safe area + breathing room */
   .page-content{
-    padding:12px;
-    padding-bottom:calc(84px + env(safe-area-inset-bottom));
-    padding-left:calc(12px + env(safe-area-inset-left));
-    padding-right:calc(12px + env(safe-area-inset-right));
+    padding:14px;
+    padding-top:16px;
+    padding-bottom:calc(68px + env(safe-area-inset-bottom));
+    padding-left:calc(14px + env(safe-area-inset-left));
+    padding-right:calc(14px + env(safe-area-inset-right));
+    overflow-x:hidden;
   }
+
+  /* ── TAB BAR ── */
   .bottom-nav{
-    display:flex;position:fixed;bottom:0;left:0;right:0;
-    background:rgba(7,6,15,0.97);backdrop-filter:blur(24px);
-    border-top:1px solid var(--border);
+    display:flex;
+    position:fixed;
+    bottom:0; left:0; right:0;
+    /* Solid background, no blur (fixes iOS repaint glitch) */
+    background:#0a0818;
+    border-top:1px solid rgba(255,255,255,0.09);
     justify-content:space-around;
+    align-items:flex-start;
+    /* 60px content zone + safe area padding below */
     padding-top:10px;
-    padding-bottom:max(4px, calc(env(safe-area-inset-bottom) - 10px));
+    padding-bottom:env(safe-area-inset-bottom);
     padding-left:env(safe-area-inset-left);
     padding-right:env(safe-area-inset-right);
     z-index:250;
-    /* Ensure tappable area is above iOS home indicator */
-    min-height:calc(56px + env(safe-area-inset-bottom));
+    /* Fixed total height so content never overlaps */
+    height:calc(60px + env(safe-area-inset-bottom));
   }
-  /* Extra tap area for nav items */
+
+  /* ── TAB ITEM ── */
   .bnav-item{
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:3px;padding:6px 10px;border-radius:12px;cursor:pointer;
-    transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);
-    text-transform:uppercase;letter-spacing:.3px;min-width:48px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    gap:2px;
+    /* Minimum 44×44pt touch target (Apple HIG) */
+    min-width:52px;
+    min-height:44px;
+    padding:2px 6px 0;
+    border-radius:0;
+    cursor:pointer;
+    font-size:10px;
+    font-weight:700;
+    color:rgba(237,233,248,0.35);
+    letter-spacing:0.2px;
     position:relative;
-    /* Bigger tap target */
-    min-height:48px;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+    user-select:none;
+    /* Smooth color transition only (no transform = no tap-target offset bug) */
+    transition:color .15s;
   }
-  .bnav-item.active{color:var(--purple);}
-  .bnav-item.active .bnav-icon-wrap{background:rgba(167,139,250,0.18);border-radius:12px;}
-  .bnav-icon{font-size:22px;}
-  .bnav-icon-wrap{padding:4px 12px;border-radius:10px;transition:all .18s;}
+  .bnav-item.active{ color:var(--purple); }
+  .bnav-icon-wrap{
+    width:44px; height:32px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:12px;
+    transition:background .15s;
+  }
+  .bnav-item.active .bnav-icon-wrap{
+    background:rgba(167,139,250,0.15);
+  }
+  .bnav-icon{ font-size:24px; line-height:1; }
+  /* Active pill under icon */
+  .bnav-item.active::before{
+    content:'';
+    position:absolute;
+    top:0; left:50%;
+    transform:translateX(-50%);
+    width:32px; height:3px;
+    border-radius:0 0 3px 3px;
+    background:var(--purple);
+  }
+
+  /* ── TOPBAR ── */
   .topbar{
-    height:calc(56px + env(safe-area-inset-top)) !important;
+    height:calc(52px + env(safe-area-inset-top)) !important;
+    padding-top:calc(8px + env(safe-area-inset-top)) !important;
     padding-left:calc(14px + env(safe-area-inset-left));
     padding-right:calc(14px + env(safe-area-inset-right));
+    padding-bottom:8px;
   }
-  /* Compact clock on mobile */
-  .topbar-clock-date{display:none;}
-  .topbar-clock{border-radius:12px;}
-  .topbar-clock-time{padding:8px 14px;}
+  .topbar-clock{ display:none; }
+  /* Month selector chip in topbar (mobile only, injected via .topbar-month) */
+  .topbar-month{
+    display:flex !important;
+    align-items:center;
+    gap:5px;
+    background:rgba(167,139,250,0.10);
+    border:1px solid rgba(167,139,250,0.25);
+    border-radius:20px;
+    padding:5px 12px;
+    font-size:12px;
+    font-weight:800;
+    color:var(--purple);
+    cursor:pointer;
+    white-space:nowrap;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .topbar-month select{
+    background:transparent;
+    border:none;
+    color:var(--purple);
+    font-family:'Outfit',sans-serif;
+    font-size:12px;
+    font-weight:800;
+    padding:0;
+    outline:none;
+    cursor:pointer;
+    -webkit-appearance:none;
+    max-width:120px;
+  }
 
-  /* ── EXPENSE ROW — full mobile redesign ── */
-  /* Disable hover effects on touch */
+  /* ── MORE SHEET (slide up) ── */
+  .more-sheet-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.6);
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    z-index:400;
+  }
+  .more-sheet{
+    position:fixed;
+    left:0; right:0; bottom:0;
+    background:linear-gradient(180deg,#100e22,#0a0818);
+    border-top:1px solid rgba(255,255,255,0.12);
+    border-radius:24px 24px 0 0;
+    padding:0 0 env(safe-area-inset-bottom);
+    z-index:401;
+    /* Slide up animation */
+    animation:sheetUp .28s cubic-bezier(.32,1.25,.64,1) both;
+  }
+  @keyframes sheetUp{
+    from{transform:translateY(100%)}
+    to{transform:translateY(0)}
+  }
+  .more-sheet-handle{
+    width:36px; height:4px;
+    background:rgba(255,255,255,0.2);
+    border-radius:2px;
+    margin:12px auto 4px;
+  }
+  .more-sheet-title{
+    font-size:11px; font-weight:900;
+    letter-spacing:1.5px; text-transform:uppercase;
+    color:rgba(237,233,248,0.35);
+    padding:8px 20px 10px;
+  }
+  .more-sheet-row{
+    display:flex; align-items:center; gap:14px;
+    padding:14px 20px;
+    border-top:1px solid rgba(255,255,255,0.05);
+    font-size:15px; font-weight:700;
+    color:var(--text);
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+    transition:background .15s;
+  }
+  .more-sheet-row:active{ background:rgba(255,255,255,0.05); }
+  .more-sheet-icon{
+    width:42px; height:42px;
+    border-radius:13px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; flex-shrink:0;
+  }
+  .more-sheet-sep{
+    height:8px;
+    background:rgba(255,255,255,0.025);
+    margin:4px 0;
+  }
+  .more-month-row{
+    padding:12px 20px 4px;
+  }
+  .more-month-label{
+    font-size:11px;font-weight:800;color:rgba(237,233,248,0.4);
+    text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;
+  }
+  .more-month-select{
+    background:rgba(167,139,250,0.08);
+    border:1px solid rgba(167,139,250,0.2);
+    border-radius:12px;
+    color:var(--text);
+    padding:10px 14px;
+    font-size:14px;font-weight:700;
+    width:100%;
+    font-family:'Outfit',sans-serif;
+    outline:none;
+  }
+
+  /* ── EXPENSE ROW ── */
   .expense-row{
     padding:12px 14px !important;
     display:grid !important;
@@ -582,153 +730,61 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     align-items:center !important;
     column-gap:12px !important;
   }
-  /* Col 1: icon */
-  .expense-row .tx-icon-wrap{
-    grid-column:1;
-    grid-row:1 / 3;
-    align-self:center;
-    overflow:visible;
-  }
-  .expense-row .tx-icon-wrap .tx-icon{
-    width:46px !important;
-    height:46px !important;
-    font-size:22px !important;
-    border-radius:14px !important;
-    box-shadow:none !important;
-  }
-  .expense-row .tx-icon-wrap .tx-badge{
-    width:18px !important;
-    height:18px !important;
-    font-size:10px !important;
-    bottom:-3px !important;
-    right:-3px !important;
-    border-width:2px !important;
-  }
-  /* Col 2: text info */
-  .expense-row .tx-text-col{
-    grid-column:2;
-    grid-row:1;
-    min-width:0;
-  }
-  /* Col 3: amount */
-  .expense-row .tx-amount-col{
-    grid-column:3;
-    grid-row:1;
-    text-align:right;
-    flex-shrink:0;
-  }
-  .expense-row .tx-amount-col > div{
-    font-size:16px !important;
-  }
-  /* Row 2: action buttons full width */
-  .expense-row .row-actions{
-    grid-column:2 / 4;
-    grid-row:2;
-    opacity:1 !important;
-    transform:none !important;
-    flex-direction:row !important;
-    margin-top:8px;
-    gap:6px !important;
-    flex-wrap:nowrap;
-  }
-  .expense-row .row-actions .action-btn{
-    flex:1;
-    justify-content:center;
-    padding:7px 4px !important;
-    font-size:11px !important;
-    min-width:0;
-  }
-  /* Hide verbose badges on mobile, keep compact */
-  .expense-row .tx-badges-row{
-    display:flex;
-    gap:4px;
-    flex-wrap:nowrap;
-    overflow:hidden;
-  }
-  .expense-row .tx-badges-row .tx-badge-cat{
-    font-size:11px !important;
-    padding:3px 8px !important;
-  }
-  .expense-row .tx-badges-row .tx-badge-prof{
-    display:none !important;
-  }
-  .expense-row .tx-badges-row .tx-badge-date{
-    font-size:10px !important;
-    padding:3px 7px !important;
-  }
-  /* Hide proportion bar on mobile */
+  .expense-row .tx-icon-wrap{ grid-column:1; grid-row:1/3; align-self:center; overflow:visible; }
+  .expense-row .tx-icon-wrap .tx-icon{ width:44px !important;height:44px !important;font-size:21px !important;border-radius:13px !important;box-shadow:none !important; }
+  .expense-row .tx-icon-wrap .tx-badge{ width:18px !important;height:18px !important;font-size:10px !important;bottom:-3px !important;right:-3px !important;border-width:2px !important; }
+  .expense-row .tx-text-col{ grid-column:2; grid-row:1; min-width:0; }
+  .expense-row .tx-amount-col{ grid-column:3; grid-row:1; text-align:right; flex-shrink:0; }
+  .expense-row .tx-amount-col > div{ font-size:16px !important; }
+  .expense-row .row-actions{ grid-column:2/4; grid-row:2; opacity:1 !important;transform:none !important;flex-direction:row !important;margin-top:8px;gap:6px !important;flex-wrap:nowrap; }
+  .expense-row .row-actions .action-btn{ flex:1;justify-content:center;padding:8px 4px !important;font-size:11px !important;min-width:0;min-height:40px; }
+  .expense-row .tx-badges-row{ display:flex;gap:4px;flex-wrap:nowrap;overflow:hidden; }
+  .expense-row .tx-badges-row .tx-badge-cat{ font-size:11px !important;padding:3px 8px !important; }
+  .expense-row .tx-badges-row .tx-badge-prof{ display:none !important; }
+  .expense-row .tx-badges-row .tx-badge-date{ font-size:10px !important;padding:3px 7px !important; }
   .expense-row .tx-bar-row{ display:none !important; }
-  /* Disable hover border-left animation */
-  .expense-row:hover{
-    transform:none !important;
-    padding-left:14px !important;
-  }
-  /* Prevent tooltip popups from showing on touch */
+  .expense-row:hover{ transform:none !important;padding-left:14px !important; }
   .tip::after,.tip::before{ display:none !important; }
 
-  /* KPI bar — 2×2 grid */
-  .expenses-kpi-bar{grid-template-columns:1fr 1fr !important;}
-  .expenses-kpi-bar > div{padding:12px 14px !important;}
-  .expenses-kpi-bar .stat-num{font-size:15px !important;}
-
-  /* Expenses toolbar stacks */
-  .expenses-toolbar{
-    flex-direction:column !important;
-    gap:8px !important;
-    padding:10px 12px !important;
-  }
-  .expenses-toolbar .toolbar-selects{
-    display:flex;
-    gap:8px;
-    width:100%;
-  }
+  /* KPI / toolbar */
+  .expenses-kpi-bar{ grid-template-columns:1fr 1fr !important; }
+  .expenses-kpi-bar > div{ padding:12px 14px !important; }
+  .expenses-kpi-bar .stat-num{ font-size:15px !important; }
+  .expenses-toolbar{ flex-direction:column !important;gap:8px !important;padding:10px 12px !important; }
+  .expenses-toolbar .toolbar-selects{ display:flex;gap:8px;width:100%; }
   .expenses-toolbar .toolbar-selects > *{ flex:1; }
-  .expenses-toolbar .toolbar-btns{
-    display:flex;
-    gap:6px;
-    width:100%;
-  }
-  .expenses-toolbar .toolbar-btns > button{
-    flex:1;
-    justify-content:center;
-    font-size:11.5px !important;
-    padding:8px 6px !important;
-  }
+  .expenses-toolbar .toolbar-btns{ display:flex;gap:6px;width:100%; }
+  .expenses-toolbar .toolbar-btns > button{ flex:1;justify-content:center;font-size:11.5px !important;padding:9px 6px !important;min-height:44px; }
 
-  /* Income cards mobile */
-  .income-card .stat-num{font-size:22px !important;}
-  /* Bill actions always visible on mobile */
-  .bill-hover-actions{opacity:1 !important;transform:translateX(0) !important;}
-  /* Profile cards mobile — 1 col */
-  .profile-cards-grid{grid-template-columns:1fr !important;}
-  /* Stats KPI */
-  .stat-kpi-card{padding:16px !important;}
-  .stat-num{font-size:clamp(18px,4vw,28px);}
+  /* Other sections */
+  .income-card .stat-num{ font-size:22px !important; }
+  .bill-hover-actions{ opacity:1 !important;transform:translateX(0) !important; }
+  .profile-cards-grid{ grid-template-columns:1fr !important; }
+  .stat-kpi-card{ padding:16px !important; }
+  .stat-num{ font-size:clamp(18px,4vw,28px); }
 }
 
 @media(max-width:520px){
-  .grid-2{grid-template-columns:1fr !important;}
-  .grid-3{grid-template-columns:1fr 1fr !important;}
-  .grid-4{grid-template-columns:1fr 1fr !important;}
-  .modal-box{padding:20px;border-radius:20px;}
-  .profile-card{margin-bottom:2px;}
-  .btn{min-height:44px;}
-  .nav-item{min-height:46px;}
-  .filter-chip{padding:9px 14px !important;font-size:12.5px !important;}
-  .fuel-sim-grid{grid-template-columns:1fr !important;}
-  .fuel-best-grid{grid-template-columns:1fr 1fr !important;gap:10px !important;}
-  .station-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  /* Expense title truncation tighter on small screen */
-  .expense-row .tx-title{ max-width:140px !important; }
+  .grid-2{ grid-template-columns:1fr !important; }
+  .grid-3{ grid-template-columns:1fr 1fr !important; }
+  .grid-4{ grid-template-columns:1fr 1fr !important; }
+  .modal-box{ padding:20px;border-radius:20px; }
+  .profile-card{ margin-bottom:2px; }
+  .btn{ min-height:44px; }
+  .nav-item{ min-height:46px; }
+  .filter-chip{ padding:9px 14px !important;font-size:12.5px !important; }
+  .fuel-sim-grid{ grid-template-columns:1fr !important; }
+  .fuel-best-grid{ grid-template-columns:1fr 1fr !important;gap:10px !important; }
+  .station-table-wrap{ overflow-x:auto;-webkit-overflow-scrolling:touch; }
+  .expense-row .tx-title{ max-width:130px !important; }
 }
-/* Disable tooltips on touch-only devices */
+
 @media(hover:none){
   .gtip{ display:none !important; }
 }
-/* iPhone notch / safe area */
-@supports(padding-top: env(safe-area-inset-top)){
-  .app-shell{padding-top:0;}
-  .auth-shell{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+@supports(padding-top:env(safe-area-inset-top)){
+  .app-shell{ padding-top:0; }
+  .auth-shell{ padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom); }
 }
 `;
 
@@ -1070,6 +1126,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeUID, setActiveUID] = useState(null);
   const [isLinked, setIsLinked] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [, startTransition] = useTransition();
   const navigateTo = useCallback((p) => { startTransition(() => setPage(p)); setSidebarOpen(false); }, []);
 
@@ -1265,6 +1322,12 @@ export default function App() {
           <div className="topbar">
             <button className="menu-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">☰</button>
             <div style={{ fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:700,color:"var(--text)",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{pageTitles[page]}</div>
+            <div className="topbar-month">
+              <span>📅</span>
+              <select value={selMonth} onChange={e => setSelMonth(e.target.value)}>
+                {allMonths.map(k => <option key={k} value={k}>{monthLabelShort(k)}</option>)}
+              </select>
+            </div>
             <div style={{ display:"flex",alignItems:"center",gap:8,flexShrink:0 }}>
               {page==="expenses" && (
                 <>
@@ -1313,14 +1376,61 @@ export default function App() {
         </div>
 
         <nav className="bottom-nav">
-          {navItems.map(n => (
+          {[
+            { id:"dashboard", icon:"🏠", label:"Accueil" },
+            { id:"expenses",  icon:"💳", label:"Dépenses" },
+            { id:"bills",     icon:"📋", label:"Factures", badge:unpaidBills },
+            { id:"stats",     icon:"📊", label:"Stats" },
+          ].map(n => (
             <div key={n.id} className={`bnav-item ${page===n.id?"active":""}`} onClick={() => navigate(n.id)}>
               <div className="bnav-icon-wrap"><span className="bnav-icon">{n.icon}</span></div>
               <span>{n.label}</span>
-              {n.badge>0 && <span style={{ position:"absolute",top:2,right:4,background:overdueBills>0?"var(--red)":"rgba(251,191,36,0.85)",color:"white",borderRadius:10,padding:"0 5px",fontSize:9,fontWeight:800 }}>{n.badge}</span>}
+              {n.badge>0 && <span style={{ position:"absolute",top:0,right:2,background:overdueBills>0?"var(--red)":"var(--yellow)",color:"white",borderRadius:10,padding:"0 5px",fontSize:9,fontWeight:800,minWidth:16,textAlign:"center" }}>{n.badge}</span>}
             </div>
           ))}
+          <div className={`bnav-item ${["incomes","essence","settings"].includes(page)?"active":""}`} onClick={() => setMoreOpen(true)}>
+            <div className="bnav-icon-wrap"><span className="bnav-icon">⋯</span></div>
+            <span>Plus</span>
+          </div>
         </nav>
+
+        {moreOpen && (
+          <>
+            <div className="more-sheet-overlay" onClick={() => setMoreOpen(false)}/>
+            <div className="more-sheet">
+              <div className="more-sheet-handle"/>
+              <div className="more-month-row">
+                <div className="more-month-label">📅 Période</div>
+                <select className="more-month-select" value={selMonth} onChange={e => { setSelMonth(e.target.value); }}>
+                  {allMonths.map(k => <option key={k} value={k}>{monthLabel(k)}</option>)}
+                </select>
+              </div>
+              <div className="more-sheet-title" style={{marginTop:10}}>Navigation</div>
+              {[
+                { id:"incomes",  icon:"💵", label:"Revenus",   desc:"Revenus du mois",          bg:"rgba(74,222,128,0.12)",  color:"#4ade80" },
+                { id:"essence",  icon:"⛽", label:"Carburants",desc:"Prix en temps réel",        bg:"rgba(251,191,36,0.12)",  color:"#fbbf24", badge:"LIVE" },
+                { id:"settings", icon:"⚙️", label:"Réglages",  desc:"Profils & catégories",      bg:"rgba(167,139,250,0.12)", color:"#a78bfa" },
+              ].map(item => (
+                <div key={item.id} className="more-sheet-row" onClick={() => { navigate(item.id); setMoreOpen(false); }}>
+                  <div className="more-sheet-icon" style={{background:item.bg}}><span>{item.icon}</span></div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:800,fontSize:15}}>{item.label}</div>
+                    <div style={{fontSize:12,color:"rgba(237,233,248,0.45)",marginTop:1}}>{item.desc}</div>
+                  </div>
+                  {item.badge && <span style={{fontSize:9,background:"rgba(251,191,36,0.18)",color:"#fbbf24",borderRadius:20,padding:"3px 8px",fontWeight:900,border:"1px solid rgba(251,191,36,0.3)"}}>{item.badge}</span>}
+                  <span style={{color:"rgba(237,233,248,0.25)",fontSize:16}}>›</span>
+                </div>
+              ))}
+              <div className="more-sheet-sep"/>
+              <div className="more-sheet-row" style={{color:"var(--red)"}} onClick={() => { setMoreOpen(false); signOut(auth); }}>
+                <div className="more-sheet-icon" style={{background:"rgba(248,113,113,0.12)"}}><span>🚪</span></div>
+                <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:"var(--red)"}}>Déconnexion</div></div>
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"rgba(237,233,248,0.3)",fontWeight:600}}><div className={`sync-dot ${syncStatus}`} style={{flexShrink:0}}/>{syncLabel[syncStatus]}</div>
+              </div>
+              <div style={{height:8}}/>
+            </div>
+          </>
+        )}
 
         {modal && <ModalRouter modal={modal} setModal={setModal} data={data} update={update} selMonth={selMonth}/>}
       </div>
