@@ -507,6 +507,13 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .float-icon{animation:float 3s ease-in-out infinite;}
 .pulse-dot{animation:pulse 2s infinite;}
 .spin{animation:spin .7s linear infinite;}
+/* iOS Safari : translateY dans les animations décale les touch targets → désactivé sur touch */
+@media(hover:none){
+  .fade-up{animation:fadeIn .25s ease both !important;}
+  .slide-in{animation:fadeIn .2s ease both !important;}
+  .scale-in{animation:fadeIn .2s ease both !important;}
+  .float-icon{animation:none !important;}
+}
 
 /* ── RECHARTS ── */
 .rc-tooltip{background:#1a1635;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:10px 14px;font-family:'Outfit',sans-serif;font-size:12px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,0.4);}
