@@ -2269,19 +2269,55 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
           { label:"Plus grosse dép.", val:transactions.length?fmt(Math.max(...transactions.map(t=>t.amount))):"—",color:"var(--purple)",icon:"🔺",bg:"rgba(167,139,250,0.08)",border:"rgba(167,139,250,0.2)",tip:"Transaction la plus élevée du mois" },
         ].map(s => (
           <div key={s.label} className="tip" data-tip={s.tip}
-            style={{ background:s.bg,border:`1px solid ${s.border}`,borderRadius:14,padding:"16px 18px",display:"flex",alignItems:"center",gap:13,cursor:"default",transition:"all .2s" }}
-            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(0,0,0,0.3)";}}
-            onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
-            <div style={{ width:42,height:42,borderRadius:12,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0 }}>{s.icon}</div>
+            style={{ background:s.bg,border:`1px solid ${s.border}`,borderRadius:14,padding:isMobile?"10px 10px":"16px 18px",display:"flex",alignItems:"center",gap:isMobile?8:13,cursor:"default",transition:"all .2s",minHeight:isMobile?72:undefined }}
+            onMouseEnter={isMobile?undefined:e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(0,0,0,0.3)";}}
+            onMouseLeave={isMobile?undefined:e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+            <div style={{ width:isMobile?32:42,height:isMobile?32:42,borderRadius:12,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isMobile?16:20,flexShrink:0 }}>{s.icon}</div>
             <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:10.5,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.9,fontWeight:800,marginBottom:4 }}>{s.label}</div>
-              <div className="stat-num" style={{ fontSize:17,fontWeight:900,color:s.color }}>{s.val}</div>
+              <div style={{ fontSize:isMobile?9:10.5,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.9,fontWeight:800,marginBottom:4,lineHeight:1.2 }}>{s.label}</div>
+              <div className="stat-num" style={{ fontSize:isMobile?13:17,fontWeight:900,color:s.color }}>{s.val}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* TOOLBAR */}
+      {isMobile ? (
+        <div style={{ marginBottom:12 }}>
+          {/* Ligne 1 : recherche */}
+          <div style={{ position:"relative",marginBottom:8 }}>
+            <span style={{ position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:13,pointerEvents:"none",opacity:.4 }}>🔍</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…" style={{ paddingLeft:34,background:"rgba(255,255,255,0.05)",border:"1px solid var(--border)",borderRadius:10,fontSize:13 }}/>
+            {search && <button onClick={() => setSearch("")} style={{ position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:18,lineHeight:1 }}>×</button>}
+          </div>
+          {/* Ligne 2 : tri + groupe + actions */}
+          <div style={{ display:"flex",gap:6 }}>
+            <select value={sort} onChange={e => setSort(e.target.value)} style={{ flex:1,padding:"8px 8px",fontSize:11,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)",borderRadius:10 }}>
+              <option value="date_desc">Date ↓</option><option value="date_asc">Date ↑</option>
+              <option value="amount_desc">Montant ↓</option><option value="amount_asc">Montant ↑</option>
+            </select>
+            <select value={groupBy} onChange={e => setGroupBy(e.target.value)} style={{ flex:1,padding:"8px 8px",fontSize:11,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)",borderRadius:10 }}>
+              <option value="none">Sans groupe</option><option value="day">Par jour</option><option value="category">Par catégorie</option>
+            </select>
+            <button type="button" onClick={() => setModal({ type:"importCIC", selMonth })}
+              style={{ flexShrink:0,padding:"8px 10px",borderRadius:10,border:"1px solid rgba(27,46,143,0.4)",background:"rgba(27,46,143,0.12)",color:"#8AACFF",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent" }}>
+              🏦 CIC
+            </button>
+            {transactions.length>0 && !confirmClear && (
+              <button type="button" onClick={() => setConfirmClear(true)}
+                style={{ flexShrink:0,padding:"8px 10px",borderRadius:10,border:"1px solid rgba(248,113,113,0.22)",background:"rgba(248,113,113,0.07)",color:"var(--red)",cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent" }}>
+                🗑
+              </button>
+            )}
+            {confirmClear && (
+              <>
+                <button type="button" onClick={clearAll} style={{ flexShrink:0,padding:"8px 12px",borderRadius:9,border:"1px solid rgba(248,113,113,0.5)",background:"rgba(248,113,113,0.2)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:800,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent" }}>Oui</button>
+                <button type="button" onClick={() => setConfirmClear(false)} style={{ flexShrink:0,padding:"8px 12px",borderRadius:9,border:"1px solid var(--border)",background:"var(--glass)",color:"var(--text2)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent" }}>Non</button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="expenses-toolbar" style={{ display:"flex",gap:8,marginBottom:14,alignItems:"center",background:"var(--glass)",border:"1px solid var(--border)",borderRadius:15,padding:"10px 14px",flexWrap:"wrap" }}>
         <div style={{ position:"relative",flex:1,minWidth:180 }}>
           <span style={{ position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:13,pointerEvents:"none",opacity:.4 }}>🔍</span>
@@ -2323,20 +2359,34 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
           </div>
         )}
       </div>
+      )}
 
       {/* FILTER CHIPS */}
-      <div style={{ marginBottom:20,paddingTop:8,overflow:"visible" }}>
-        <div className="filter-bar" style={{ paddingTop:6,paddingBottom:8,overflow:"visible" }}>
+      <div style={{ marginBottom:16,paddingTop:4 }}>
+        <div className="filter-bar" style={{
+          display:"flex",
+          gap:7,
+          flexWrap: isMobile ? "nowrap" : "wrap",
+          overflowX: isMobile ? "auto" : "visible",
+          overflowY: "visible",
+          paddingBottom:8,
+          paddingTop:4,
+          WebkitOverflowScrolling:"touch",
+          scrollbarWidth:"none",
+          msOverflowStyle:"none",
+        }}>
           {[
             { id:"all",label:"Tout",icon:"",tip:"Afficher toutes les dépenses" },
             ...data.profiles.map(p => ({ id:p.id,label:p.name,icon:p.avatar,tip:`Dépenses de ${p.name}`,color:p.color })),
             ...data.categories.map(c => ({ id:c.id,label:c.name,icon:c.icon,tip:`Catégorie : ${c.name}`,color:c.color })),
           ].map(f => (
             <div key={f.id}
-              className={`filter-chip tip ${filter===f.id?"active":""}`}
-              data-tip={f.tip}
+              className={`filter-chip ${filter===f.id?"active":""}`}
               onClick={() => setFilter(filter===f.id&&f.id!=="all"?"all":f.id)}
-              style={filter===f.id&&f.color?{ borderColor:f.color+"66",background:f.color+"18",color:f.color,boxShadow:`0 2px 12px ${f.color}22` }:{}}>
+              style={{
+                flexShrink: isMobile ? 0 : undefined,
+                ...(filter===f.id&&f.color ? { borderColor:f.color+"66",background:f.color+"18",color:f.color,boxShadow:`0 2px 12px ${f.color}22` } : {}),
+              }}>
               {f.icon && <span className="chip-emoji">{f.icon}</span>}
               <span>{f.label}</span>
             </div>
