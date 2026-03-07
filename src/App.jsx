@@ -5991,8 +5991,6 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
   const saving = bestS && selectedStation && bestS.id !== selectedStation.id
     ? (selectedStation[fuel] - bestS[fuel]) * liters : null;
   const m = FUEL_META[fuel] || {};
-
-  const m = FUEL_META[fuel] || {};
   const totalCost = total;
   const distancePossible = effectiveConso > 0 ? Math.round((liters / effectiveConso) * 100) : null;
 
