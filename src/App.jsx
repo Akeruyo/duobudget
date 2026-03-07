@@ -399,10 +399,12 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .tx-row.selected{background:rgba(167,139,250,0.08);border-color:rgba(167,139,250,0.25);}
 
 /* ── EXPENSE ROW PREMIUM HOVER ── */
-.expense-row{transition:all .22s cubic-bezier(.4,0,.2,1);cursor:default;}
-.expense-row:hover{background:linear-gradient(135deg,rgba(167,139,250,0.07),rgba(244,114,182,0.04)) !important;border-color:rgba(167,139,250,0.28) !important;box-shadow:0 4px 24px rgba(167,139,250,0.1),inset 0 1px 0 rgba(255,255,255,0.05) !important;transform:translateX(2px);}
-.expense-row .row-actions{opacity:0;transform:translateX(8px);transition:all .2s;}
+.expense-row{transition:background .22s, border-color .22s, box-shadow .22s;cursor:default;}
+.expense-row:hover{background:linear-gradient(135deg,rgba(167,139,250,0.07),rgba(244,114,182,0.04)) !important;border-color:rgba(167,139,250,0.28) !important;box-shadow:0 4px 24px rgba(167,139,250,0.1),inset 0 1px 0 rgba(255,255,255,0.05) !important;}
+.expense-row .row-actions{opacity:0;transform:translateX(8px);transition:opacity .2s, transform .2s;}
 .expense-row:hover .row-actions{opacity:1;transform:translateX(0);}
+/* Badge profil : décoratif seulement, ne doit pas intercepter les clics */
+.tx-badge{pointer-events:none;}
 
 /* ── MISC ── */
 .glow-text{background:var(--grad-main);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
@@ -2450,15 +2452,15 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
 
                         {isMobile ? (
                           /* ── MOBILE LAYOUT ── */
-                          <div style={{ padding:"12px 14px", position:"relative", isolation:"isolate" }}>
+                          <div style={{ padding:"12px 14px" }}>
                             {/* Row 1: icon + title + amount */}
                             <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:8 }}>
-                              {/* Icon */}
-                              <div style={{ position:"relative",flexShrink:0,width:44,height:44 }}>
-                                <div style={{ width:44,height:44,borderRadius:13,background:`linear-gradient(135deg,${cat.color}22,${cat.color}08)`,border:`2px solid ${cat.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22 }}>
+                              {/* Icon — overflow:hidden pour que le badge ne déborde pas */}
+                              <div style={{ position:"relative",flexShrink:0,width:50,height:50 }}>
+                                <div style={{ width:50,height:50,borderRadius:14,background:`linear-gradient(135deg,${cat.color}22,${cat.color}08)`,border:`2px solid ${cat.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24 }}>
                                   {cat.icon}
                                 </div>
-                                <div style={{ position:"absolute",bottom:-3,right:-3,width:18,height:18,borderRadius:"50%",background:prof.color||"var(--bg3)",border:"2px solid var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10 }}>
+                                <div style={{ position:"absolute",bottom:0,right:0,width:18,height:18,borderRadius:"50%",background:prof.color||"var(--bg3)",border:"2px solid var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,pointerEvents:"none",zIndex:1 }}>
                                   {prof.avatar}
                                 </div>
                               </div>
@@ -2479,27 +2481,27 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                                 -{fmt(tx.amount)}
                               </div>
                             </div>
-                            {/* Row 2: action buttons */}
-                            <div style={{ display:"flex",gap:6,marginTop:8 }}>
+                            {/* Row 2: action buttons — height fixe pour éviter le décalage iOS */}
+                            <div style={{ display:"flex",gap:6 }}>
                               <button
                                 type="button"
                                 onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
                                 onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"11px 4px",minHeight:44,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 ✏️ Modifier
                               </button>
                               <button
                                 type="button"
                                 onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); duplicate(tx); }}
                                 onClick={e => { e.stopPropagation(); duplicate(tx); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"11px 4px",minHeight:44,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 📋 Dupliquer
                               </button>
                               <button
                                 type="button"
                                 onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); del(tx.id); }}
                                 onClick={e => { e.stopPropagation(); del(tx.id); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"11px 4px",minHeight:44,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 🗑 Suppr.
                               </button>
                             </div>
