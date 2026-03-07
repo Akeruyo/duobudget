@@ -3290,7 +3290,7 @@ function ImportCICModal({ close, data, update, selMonth }) {
   );
 }
 
-
+function AddBillModal({ close, data, update }) {
   const [name, setName]         = useState("");
   const [amount, setAmount]     = useState("");
   const [icon, setIcon]         = useState("⚡");
