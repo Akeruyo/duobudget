@@ -555,12 +555,13 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .bnav-row{
     display:flex;
     justify-content:space-around;
-    align-items:flex-start;
-    height:60px;
-    padding-top:10px;
+    align-items:center;
+    height:56px;
+    padding-top:0;
     padding-left:env(safe-area-inset-left);
     padding-right:env(safe-area-inset-right);
     width:100%;
+    box-sizing:border-box;
   }
   /* Spacer safe-area : 0px en browser, ~34px en standalone iOS */
   .bnav-inset{
@@ -576,12 +577,11 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     display:flex;
     flex-direction:column;
     align-items:center;
-    justify-content:flex-start;
+    justify-content:center;
     gap:2px;
-    /* Minimum 44×44pt touch target (Apple HIG) */
     min-width:52px;
     min-height:44px;
-    padding:2px 6px 0;
+    padding:0 6px;
     border-radius:0;
     cursor:pointer;
     font-size:10px;
@@ -592,20 +592,19 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     -webkit-tap-highlight-color:transparent;
     touch-action:manipulation;
     user-select:none;
-    /* Smooth color transition only (no transform = no tap-target offset bug) */
     transition:color .15s;
   }
   .bnav-item.active{ color:var(--purple); }
   .bnav-icon-wrap{
-    width:44px; height:32px;
+    width:40px; height:28px;
     display:flex; align-items:center; justify-content:center;
-    border-radius:12px;
+    border-radius:10px;
     transition:background .15s;
   }
   .bnav-item.active .bnav-icon-wrap{
     background:rgba(167,139,250,0.15);
   }
-  .bnav-icon{ font-size:24px; line-height:1; }
+  .bnav-icon{ font-size:22px; line-height:1; }
   /* Active pill under icon */
   .bnav-item.active::before{
     content:'';
@@ -799,15 +798,18 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .app-shell{ padding-top:0; }
   .auth-shell{ padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom); }
 }
-/* safe-area handled via .bnav-inset spacer */
-/* Topbar standalone : priorité à env() sinon --sat-override */
-:root{ --sat: env(safe-area-inset-top,0px); }
+/* ── STANDALONE PWA — variables --sat/--sab injectées par JS ── */
+:root{ --sat:0px; --sab:0px; }
 body.pwa-standalone .topbar{
-  height:calc(52px + max(env(safe-area-inset-top,0px),var(--sat-override,0px))) !important;
-  padding-top:calc(8px + max(env(safe-area-inset-top,0px),var(--sat-override,0px))) !important;
+  height:calc(52px + var(--sat)) !important;
+  padding-top:calc(8px + var(--sat)) !important;
+}
+body.pwa-standalone .bnav-inset{
+  height:var(--sab) !important;
+  min-height:var(--sab) !important;
 }
 body.pwa-standalone .page-content{
-  padding-bottom:calc(60px + max(env(safe-area-inset-bottom,0px),20px)) !important;
+  padding-bottom:calc(68px + var(--sab)) !important;
 }
 `;
 
@@ -912,29 +914,41 @@ function useFavicon() {
     });
 
     // ── Détection standalone iOS (navigator.standalone) + fallback media query ──
-    const checkStandalone = () => {
-      const isStandalone =
-        window.navigator.standalone === true ||
-        window.matchMedia('(display-mode: standalone)').matches;
+    const applyStandaloneLayout = () => {
+      const isStandalone = window.navigator.standalone === true;
       document.documentElement.classList.toggle('pwa-standalone', isStandalone);
       document.body.classList.toggle('pwa-standalone', isStandalone);
-      // Forcer --sat CSS variable pour topbar quand env() n'est pas disponible
+
       if(isStandalone){
-        // Lire la vraie safe-area via CSS (disponible après le 1er paint)
-        const sat = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sat')||'0')||0;
-        if(!sat){
-          // Fallback heuristique : iPhone standard = 44px, iPhone mini = 50px, plus vieilles = 20px
-          const h = window.screen.height;
-          const guess = h >= 812 ? 47 : 20;
-          document.documentElement.style.setProperty('--sat-override', guess+'px');
-        }
+        // Méthode 1 : lire env() via getComputedStyle d'un élément paddé
+        const ruler = document.createElement('div');
+        ruler.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;' +
+          'padding-top:env(safe-area-inset-top,0px);' +
+          'padding-bottom:env(safe-area-inset-bottom,0px);' +
+          'visibility:hidden;pointer-events:none;';
+        document.body.appendChild(ruler);
+        const cs = window.getComputedStyle(ruler);
+        const satRaw = parseFloat(cs.paddingTop) || 0;
+        const sabRaw = parseFloat(cs.paddingBottom) || 0;
+        document.body.removeChild(ruler);
+
+        // Méthode 2 : fallback heuristique si env() renvoie 0
+        const sh = window.screen.height;
+        const dpr = window.devicePixelRatio || 1;
+        // iPhones avec notch/Dynamic Island : hauteur logique >= 812
+        const hasNotch = sh >= 812 || (sh * dpr >= 1624);
+        const sat = satRaw > 0 ? satRaw : (hasNotch ? 47 : 20);
+        const sab = sabRaw > 0 ? sabRaw : (hasNotch ? 34 : 0);
+
+        document.documentElement.style.setProperty('--sat', sat + 'px');
+        document.documentElement.style.setProperty('--sab', sab + 'px');
       } else {
-        document.documentElement.style.removeProperty('--sat-override');
+        document.documentElement.style.removeProperty('--sat');
+        document.documentElement.style.removeProperty('--sab');
       }
     };
-    checkStandalone();
-    setTimeout(checkStandalone, 200);
-    try { window.matchMedia('(display-mode: standalone)').addEventListener('change', checkStandalone); } catch(e){}
+    applyStandaloneLayout();
+    setTimeout(applyStandaloneLayout, 100);
   }, []);
 }
 
@@ -2662,22 +2676,22 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                             <div style={{ display:"flex",gap:6 }}>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
-                                onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); if(window.confirm('Modifier cette dépense ?')) setModal({ type:"editTransaction",tx,selMonth }); }}
+                                onClick={e => { e.stopPropagation(); if(window.confirm('Modifier cette dépense ?')) setModal({ type:"editTransaction",tx,selMonth }); }}
                                 style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 ✏️ Modifier
                               </button>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); duplicate(tx); }}
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); if(window.confirm("Dupliquer cette dépense ?")) duplicate(tx); }}
                                 onClick={e => { e.stopPropagation(); duplicate(tx); }}
                                 style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 📋 Dupliquer
                               </button>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); del(tx.id); }}
-                                onClick={e => { e.stopPropagation(); del(tx.id); }}
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); if(window.confirm('Supprimer cette dépense ?')) del(tx.id); }}
+                                onClick={e => { e.stopPropagation(); if(window.confirm('Supprimer cette dépense ?')) del(tx.id); }}
                                 style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 🗑 Suppr.
                               </button>
@@ -2730,8 +2744,8 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
 
                             <div className="row-actions" style={{ display:"flex",flexDirection:"column",gap:5,flexShrink:0 }}>
                               <button onClick={() => setModal({ type:"editTransaction",tx,selMonth })} className="action-btn action-btn-edit tip" data-tip="Modifier">✏️ Modifier</button>
-                              <button onClick={() => duplicate(tx)} className="action-btn action-btn-dup tip" data-tip="Dupliquer">📋 Dupliquer</button>
-                              <button onClick={() => del(tx.id)} className="action-btn action-btn-del tip" data-tip="Supprimer">🗑 Supprimer</button>
+                              <button onClick={() => { if(window.confirm('Dupliquer cette dépense ?')) duplicate(tx); }} className="action-btn action-btn-dup tip" data-tip="Dupliquer">📋 Dupliquer</button>
+                              <button onClick={() => { if(window.confirm('Supprimer cette dépense ?')) del(tx.id); }} className="action-btn action-btn-del tip" data-tip="Supprimer">🗑 Supprimer</button>
                             </div>
                           </div>
                         )}
@@ -4308,6 +4322,101 @@ const BRAND_DATA = {
     patterns:[/\btotal\b/i],
     logo: null
   },
+  "bp": {
+    label:"BP", abbr:"BP", bg:"#006600", fg:"#FFD700",
+    patterns:[/\bbp\b/i,/british.?petroleum/i],
+    logo:(s)=>(<svg width={s} height={s} viewBox="0 0 100 100"><rect width="100" height="100" fill="#006600"/><text x="50" y="62" textAnchor="middle" fill="#FFD700" style={{fontFamily:"Arial Black,sans-serif",fontSize:38,fontWeight:900}}>BP</text></svg>)
+  },
+  "aldi": {
+    label:"Aldi", abbr:"AL", bg:"#0000CC", fg:"#FFB600",
+    patterns:[/\baldi\b/i],
+    logo:(s)=>(<svg width={s} height={s} viewBox="0 0 100 100"><rect width="100" height="100" fill="#003082"/><text x="50" y="65" textAnchor="middle" fill="#FFB600" style={{fontFamily:"Arial Black,sans-serif",fontSize:38,fontWeight:900}}>ALDI</text></svg>)
+  },
+  "netto": {
+    label:"Netto", abbr:"NE", bg:"#D90000", fg:"#fff",
+    patterns:[/\bnetto\b/i],
+    logo:null
+  },
+  "carrefour": {
+    label:"Carrefour", abbr:"CF", bg:"#007DC5", fg:"#fff",
+    patterns:[/carrefour/i],
+    logo:(s)=>(<svg width={s} height={s} viewBox="0 0 100 100"><rect width="100" height="100" fill="#007DC5"/><text x="50" y="56" textAnchor="middle" fill="#fff" style={{fontFamily:"Arial,sans-serif",fontSize:13,fontWeight:900,letterSpacing:-.5}}>CARREFOUR</text><polygon points="38,20 50,42 62,20" fill="#E3000F"/><polygon points="38,80 50,58 62,80" fill="#E3000F"/></svg>)
+  },
+  "casino": {
+    label:"Casino", abbr:"CA", bg:"#009B3A", fg:"#fff",
+    patterns:[/\bcasino\b/i],
+    logo:null
+  },
+  "super_u": {
+    label:"Super U", abbr:"U", bg:"#ED1C24", fg:"#fff",
+    patterns:[/super.?u\b/i,/\bhyper.?u\b/i,/\bu\s+express/i,/\bsysteme.?u/i,/\bsystème.?u/i,/\bu\b.*marché/i],
+    logo:(s)=>(<svg width={s} height={s} viewBox="0 0 100 100"><rect width="100" height="100" fill="#ED1C24"/><text x="50" y="68" textAnchor="middle" fill="#fff" style={{fontFamily:"Arial Black,sans-serif",fontSize:56,fontWeight:900}}>U</text></svg>)
+  },
+  "geant": {
+    label:"Géant Casino", abbr:"GC", bg:"#009B3A", fg:"#fff",
+    patterns:[/géant/i,/geant/i],
+    logo:null
+  },
+  "lidl": {
+    label:"Lidl", abbr:"LI", bg:"#0050AA", fg:"#FFD700",
+    patterns:[/\blidl\b/i],
+    logo:(s)=>(<svg width={s} height={s} viewBox="0 0 100 100"><rect width="100" height="100" fill="#0050AA"/><ellipse cx="50" cy="45" rx="24" ry="24" fill="#FFD700"/><ellipse cx="50" cy="45" rx="16" ry="16" fill="#E3000F"/><text x="50" y="82" textAnchor="middle" fill="#fff" style={{fontFamily:"Arial Black,sans-serif",fontSize:16,fontWeight:900}}>LIDL</text></svg>)
+  },
+  "leclerc_express": {
+    label:"Leclerc Express", abbr:"E.", bg:"#003F9B", fg:"#FFD700",
+    patterns:[/leclerc.?express/i,/express.?leclerc/i],
+    logo:null
+  },
+  "auchan": {
+    label:"Auchan", abbr:"AU", bg:"#E4002B", fg:"#fff",
+    patterns:[/\bauchan\b/i],
+    logo:(s)=>(<svg width={s} height={s} viewBox="0 0 100 100"><rect width="100" height="100" fill="#E4002B"/><text x="50" y="62" textAnchor="middle" fill="#fff" style={{fontFamily:"Arial Black,sans-serif",fontSize:28,fontWeight:900}}>AUCHAN</text></svg>)
+  },
+  "simply": {
+    label:"Simply Market", abbr:"SM", bg:"#E4002B", fg:"#fff",
+    patterns:[/simply/i],
+    logo:null
+  },
+  "cora": {
+    label:"Cora", abbr:"CO", bg:"#C8102E", fg:"#fff",
+    patterns:[/\bcora\b/i],
+    logo:null
+  },
+  "champion": {
+    label:"Champion", abbr:"CH", bg:"#0059A3", fg:"#fff",
+    patterns:[/champion/i],
+    logo:null
+  },
+  "relay": {
+    label:"Relay", abbr:"RY", bg:"#FF6600", fg:"#fff",
+    patterns:[/\brelay\b/i],
+    logo:null
+  },
+  "dyneff": {
+    label:"Dyneff", abbr:"DY", bg:"#FF6600", fg:"#fff",
+    patterns:[/dyneff/i],
+    logo:null
+  },
+  "esso": {
+    label:"Esso", abbr:"ES", bg:"#003087", fg:"#FF0000",
+    patterns:[/\besso\b/i],
+    logo:(s)=>(<svg width={s} height={s} viewBox="0 0 100 100"><rect width="100" height="100" fill="#003087"/><text x="50" y="63" textAnchor="middle" fill="#FF0000" style={{fontFamily:"Arial Black,sans-serif",fontSize:36,fontWeight:900}}>ESSO</text></svg>)
+  },
+  "api": {
+    label:"Api", abbr:"AP", bg:"#004A97", fg:"#fff",
+    patterns:[/\bapi\b/i,/\bstation\s+api/i],
+    logo:null
+  },
+  "vito": {
+    label:"Vito", abbr:"VI", bg:"#FF6200", fg:"#fff",
+    patterns:[/\bvito\b/i],
+    logo:null
+  },
+  "access": {
+    label:"Access", abbr:"AC", bg:"#1A1A1A", fg:"#E5B800",
+    patterns:[/\baccess\b/i],
+    logo:null
+  },
   "leclerc": {
     label:"E. Leclerc", abbr:"E.", bg:"#00309A", fg:"#fff",
     patterns:[/e\.?\s*leclerc/i, /petro\s*est/i, /sodibrag/i, /galec/i, /sodia/i, /\bleclerc\b/i],
@@ -4581,8 +4690,7 @@ function FuelMapLeaflet({ stations, userLat, userLng }) {
       stations.forEach(s=>{
         if(!s.lat||!s.lng) return;
         const brand=detectBrand(s.nom,s.enseignes,s.adresse)||{abbr:"⛽",bg:"#374151",fg:"#fff"};
-        const resolved=resolveNom(s);
-        const nomDisplay=resolved.nom;
+        const {nom:nomDisplay}=resolveNom(s);
         const dist=(userLat&&userLng)?fmtKm(haversineKm(userLat,userLng,s.lat,s.lng)):null;
         const fuels=['gazole','sp95','e10','sp98'].filter(k=>s[k]!=null);
         const fuelsHtml=fuels.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;margin:2px 0;background:#1a1035;border-radius:8px;border-left:3px solid ${FUEL_COLORS[k]||'#a78bfa'}"><span style="font-size:10px;font-weight:700;color:${FUEL_COLORS[k]||'#fff'}">${k.toUpperCase()}</span><span style="font-size:13px;font-weight:900;color:#fff;font-family:'Fraunces',serif">${s[k].toFixed(3)} €</span></div>`).join("");
@@ -4908,7 +5016,7 @@ function EssencePage() {
               const dist=best._dist!=null?fmtKm(best._dist):null;
               return (
                 <div key={k}
-                  onClick={()=>{if(best.lat){window.location.href=`maps://?daddr=${best.lat},${best.lng}&dirflg=d`;}}}
+                  onClick={()=>{}}
                   style={{
                     background:`linear-gradient(160deg,${meta.color}18,${meta.color}06)`,
                     border:`1.5px solid ${meta.color}35`,borderRadius:20,
@@ -4925,17 +5033,18 @@ function EssencePage() {
                       <span style={{fontWeight:900,fontSize:13,color:meta.color,letterSpacing:.5,textTransform:"uppercase"}}>{meta.label}</span>
                     </div>
                     {/* Bouton navigation haut droite */}
-                    <button
-                      onClick={e=>{e.stopPropagation();if(best.lat){window.location.href=`maps://?daddr=${best.lat},${best.lng}&dirflg=d`;}}}
+                    <a
+                      href={best.lat?`maps://?daddr=${best.lat},${best.lng}&dirflg=d`:"#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={e=>{e.stopPropagation(); if(!best.lat) e.preventDefault();}}
                       style={{width:30,height:30,borderRadius:8,border:`1px solid ${meta.color}35`,
-                        background:`${meta.color}15`,color:meta.color,cursor:"pointer",fontSize:14,
+                        background:`${meta.color}15`,color:meta.color,fontSize:16,
                         display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-                        transition:"all .15s"}}
-                      title="Démarrer l'itinéraire"
-                      onMouseEnter={e=>{e.currentTarget.style.background=`${meta.color}30`;}}
-                      onMouseLeave={e=>{e.currentTarget.style.background=`${meta.color}15`;}}>
+                        textDecoration:"none"}}
+                      title="Démarrer l'itinéraire">
                       🗺️
-                    </button>
+                    </a>
                   </div>
 
                   {/* Corps */}
@@ -4994,6 +5103,7 @@ function EssencePage() {
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {stationsWithDist.map((s,i)=>{
                 const brand=detectBrand(s.nom,s.enseignes,s.adresse);
+                const {nom:nomDisplay}=resolveNom(s);
                 const fuelsAvail=Object.entries(FUEL_META).filter(([k])=>s[k]!=null);
                 // isBest[k] = vrai si cette station est la moins chère pour ce carburant
                 const isBestFor=(k)=>{
@@ -5012,7 +5122,7 @@ function EssencePage() {
                       cursor:mapsUrl?"pointer":"default",
                       transition:"transform .15s,box-shadow .15s,border-color .15s",
                     }}
-                    onTouchStart={e=>e.currentTarget.style.transform="scale(0.985)"}
+                    onTouchStart={e=>{e.currentTarget.style.transform="scale(0.985)";}}
                     onTouchEnd={e=>{e.currentTarget.style.transform="";}}
                     onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(167,139,250,0.3)";e.currentTarget.style.boxShadow="0 4px 20px rgba(167,139,250,0.12)";}}
                     onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";e.currentTarget.style.boxShadow="";}}>
@@ -5020,26 +5130,14 @@ function EssencePage() {
                     {/* Ligne principale */}
                     <div style={{display:"flex",alignItems:"center",padding:"12px 14px",gap:12}}>
 
-                      {/* Logo marque */}
-                      <div style={{
-                        width:46,height:46,borderRadius:13,flexShrink:0,
-                        background:brand?brand.bg:"rgba(255,255,255,0.08)",
-                        border:"2px solid rgba(255,255,255,0.15)",
-                        display:"flex",alignItems:"center",justifyContent:"center",
-                        fontSize:brand?.abbr?.length>2?11:15,fontWeight:900,
-                        color:brand?brand.fg:"#fff",
-                        fontFamily:"'Outfit',sans-serif",letterSpacing:.5,
-                        boxShadow:"0 2px 8px rgba(0,0,0,0.3)",
-                        textAlign:"center",lineHeight:1.1,
-                      }}>
-                        {brand?.abbr||"⛽"}
-                      </div>
+                      {/* Logo marque — BrandIcon SVG */}
+                      <BrandIcon nom={s.nom} enseignes={s.enseignes} adresse={s.adresse} size={46}/>
 
                       {/* Infos station */}
                       <div style={{flex:1,minWidth:0}}>
                         {/* Nom établissement en blanc, en gras */}
                         <div style={{fontWeight:900,fontSize:13.5,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:.2}}>
-                          {(()=>{const r=resolveNom(s);return r.nom;})()}
+                          {nomDisplay}
                         </div>
                         {/* Adresse en gris clair */}
                         <div style={{fontSize:11,color:"rgba(255,255,255,0.38)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>
@@ -5051,22 +5149,23 @@ function EssencePage() {
                         </div>
                       </div>
 
-                      {/* Bouton Maps */}
+                      {/* Bouton Maps — <a> natif pour iOS Plans */}
                       {mapsUrl&&(
-                        <button
-                          onClick={e=>{e.stopPropagation();window.location.href=mapsUrl;}}
+                        <a
+                          href={mapsUrl||"#"}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={e=>{e.stopPropagation(); if(!mapsUrl) e.preventDefault();}}
                           style={{
                             width:42,height:42,borderRadius:12,flexShrink:0,
                             background:"rgba(167,139,250,0.12)",
                             border:"1px solid rgba(167,139,250,0.3)",
                             display:"flex",alignItems:"center",justifyContent:"center",
-                            cursor:"pointer",fontSize:18,transition:"all .15s",
+                            fontSize:20,textDecoration:"none",
                           }}
-                          title="Ouvrir dans Plans"
-                          onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.25)";e.currentTarget.style.borderColor="rgba(167,139,250,0.5)";}}
-                          onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.borderColor="rgba(167,139,250,0.3)";}}>
+                          title="Ouvrir dans Plans">
                           🗺️
-                        </button>
+                        </a>
                       )}
                     </div>
 
