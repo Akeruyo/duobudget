@@ -548,9 +548,18 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .topbar-clock{border-radius:12px;}
   .topbar-clock-time{padding:8px 14px;}
   /* Transaction rows on mobile */
-  .expense-row{padding:16px 14px !important;}
-  .expense-row:hover{padding-left:18px !important;}
+  .expense-row{padding:14px 12px !important;}
+  .expense-row:hover{padding-left:16px !important;}
   .row-actions{opacity:1 !important;transform:translateX(0) !important;flex-direction:row !important;}
+  /* Icon + badge overlap fix on mobile */
+  .tx-icon-wrap{width:46px !important;height:46px !important;}
+  .tx-icon-wrap .tx-icon{width:46px !important;height:46px !important;font-size:22px !important;border-radius:14px !important;}
+  .tx-icon-wrap .tx-badge{width:20px !important;height:20px !important;font-size:10px !important;bottom:-4px !important;right:-4px !important;border-width:2px !important;}
+  /* Expenses toolbar: stack on mobile */
+  .expenses-toolbar{flex-direction:column !important;gap:8px !important;}
+  .expenses-toolbar > *{width:100% !important;min-width:0 !important;}
+  .expenses-toolbar .toolbar-row1{display:flex;gap:8px;width:100%;}
+  .expenses-toolbar .toolbar-row1 > *{flex:1;}
   /* Income cards mobile */
   .income-card .stat-num{font-size:22px !important;}
   /* Bill actions always visible on mobile */
@@ -2119,7 +2128,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
       </div>
 
       {/* TOOLBAR */}
-      <div style={{ display:"flex",gap:8,marginBottom:14,alignItems:"center",background:"var(--glass)",border:"1px solid var(--border)",borderRadius:15,padding:"10px 14px",flexWrap:"wrap" }}>
+      <div className="expenses-toolbar" style={{ display:"flex",gap:8,marginBottom:14,alignItems:"center",background:"var(--glass)",border:"1px solid var(--border)",borderRadius:15,padding:"10px 14px",flexWrap:"wrap" }}>
         <div style={{ position:"relative",flex:1,minWidth:180 }}>
           <span style={{ position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:13,pointerEvents:"none",opacity:.4 }}>🔍</span>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher une dépense…" style={{ paddingLeft:34,background:"rgba(255,255,255,0.05)",border:"1px solid var(--border)",borderRadius:10,fontSize:13 }}/>
@@ -2138,6 +2147,12 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
             <option value="none">Aucun</option><option value="day">Par jour</option><option value="category">Par catégorie</option>
           </select>
         </div>
+        <button onClick={() => setModal({ type:"importCIC", selMonth })} className="tip" data-tip="Importer les opérations CIC depuis le presse-papiers"
+          style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,border:"1px solid rgba(27,46,143,0.4)",background:"rgba(27,46,143,0.12)",color:"#8AACFF",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",transition:"all .2s",flexShrink:0 }}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(27,46,143,0.25)";e.currentTarget.style.borderColor="rgba(27,46,143,0.6)";e.currentTarget.style.color="#fff";}}
+          onMouseLeave={e=>{e.currentTarget.style.background="rgba(27,46,143,0.12)";e.currentTarget.style.borderColor="rgba(27,46,143,0.4)";e.currentTarget.style.color="#8AACFF";}}>
+          🏦 Importer CIC
+        </button>
         {transactions.length>0 && !confirmClear && (
           <button onClick={() => setConfirmClear(true)} className="tip" data-tip="Supprimer toutes les dépenses du mois"
             style={{ display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:10,border:"1px solid rgba(248,113,113,0.22)",background:"rgba(248,113,113,0.07)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",transition:"all .2s",flexShrink:0 }}
@@ -2225,11 +2240,11 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                         onMouseLeave={e => { e.currentTarget.style.background="transparent"; e.currentTarget.style.borderLeftColor="transparent"; e.currentTarget.style.paddingLeft="22px"; }}>
 
                         <div style={{ display:"flex",alignItems:"center",gap:14,flex:1,minWidth:0 }}>
-                          <div style={{ position:"relative",flexShrink:0 }}>
-                            <div style={{ width:62,height:62,borderRadius:20,background:`linear-gradient(135deg,${cat.color}22,${cat.color}08)`,border:`2px solid ${cat.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:`0 8px 22px ${cat.color}20,inset 0 1px 0 rgba(255,255,255,0.07)` }}>
+                          <div style={{ position:"relative",flexShrink:0 }} className="tx-icon-wrap">
+                            <div className="tx-icon" style={{ width:62,height:62,borderRadius:20,background:`linear-gradient(135deg,${cat.color}22,${cat.color}08)`,border:`2px solid ${cat.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:`0 8px 22px ${cat.color}20,inset 0 1px 0 rgba(255,255,255,0.07)` }}>
                               {cat.icon}
                             </div>
-                            <div className="tip tip-right" data-tip={`Profil : ${prof.name}`}
+                            <div className="tip tip-right tx-badge" data-tip={`Profil : ${prof.name}`}
                               style={{ position:"absolute",bottom:-6,right:-6,width:24,height:24,borderRadius:"50%",background:prof.color||"var(--bg3)",border:"2.5px solid var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,boxShadow:`0 2px 8px rgba(0,0,0,0.5)` }}>
                               {prof.avatar}
                             </div>
@@ -2925,6 +2940,7 @@ function ModalRouter({ modal, setModal, data, update, selMonth }) {
 
   if (modal.type === "editIncome")          return <IncomeModal              close={close} data={data} update={update} profileId={modal.profileId} selMonth={modal.selMonth||selMonth}/>;
   if (modal.type === "addTransaction")      return <AddTxModal               close={close} data={data} update={update} selMonth={modal.selMonth||selMonth}/>;
+  if (modal.type === "importCIC")           return <ImportCICModal           close={close} data={data} update={update} selMonth={modal.selMonth||selMonth}/>;
   if (modal.type === "editTransaction")     return <EditTxModal              close={close} data={data} update={update} tx={modal.tx} selMonth={modal.selMonth||selMonth}/>;
   if (modal.type === "addBill")             return <AddBillModal             close={close} data={data} update={update}/>;
   if (modal.type === "editBill")            return <EditBillModal            close={close} data={data} update={update} bill={modal.bill}/>;
@@ -3090,7 +3106,191 @@ function EditTxModal({ close, data, update, tx, selMonth }) {
   );
 }
 
-function AddBillModal({ close, data, update }) {
+function ImportCICModal({ close, data, update, selMonth }) {
+  const [step, setStep]         = useState("paste"); // paste | preview | done
+  const [raw, setRaw]           = useState("");
+  const [parsed, setParsed]     = useState([]);
+  const [duplicates, setDups]   = useState([]);
+  const [selected, setSelected] = useState(new Set());
+  const [profId, setProfId]     = useState(data.profiles[0]?.id || "");
+  const [error, setError]       = useState("");
+  const textRef = useRef();
+  useEffect(() => { textRef.current?.focus(); }, []);
+
+  // Auto-categorisation rules
+  const CIC_RULES = [
+    { patterns:[/carrefour|lidl|aldi|leclerc|intermarché|super u|monoprix|franprix|casino|picard/i], catName:"Courses" },
+    { patterns:[/sncf|ratp|navigo|uber|blablacar|oui\.sncf|transdev/i], catName:"Transport" },
+    { patterns:[/netflix|spotify|amazon prime|deezer|disney|canal\+/i], catName:"Abonnements" },
+    { patterns:[/edf|engie|total energie|veolia|orange|sfr|free|bouygue/i], catName:"Factures" },
+    { patterns:[/restaurant|brasserie|mcdonald|quick|burger|pizza|sushi|kebab|café|bar /i], catName:"Restaurant" },
+    { patterns:[/pharmacie|médecin|docteur|clinique|hopital|mutuelle/i], catName:"Santé" },
+    { patterns:[/amazon|fnac|darty|cdiscount|zalando|shein|h&m|zara/i], catName:"Shopping" },
+    { patterns:[/total|bp|shell|esso|carburant|station/i], catName:"Carburant" },
+    { patterns:[/loyer|syndic|assurance|maif|axa/i], catName:"Logement" },
+    { patterns:[/salaire|virement|prime|remboursement/i], catName:"Revenus" },
+  ];
+  const catByName = name => data.categories.find(c => c.name.toLowerCase().includes(name.toLowerCase()))?.id || data.categories[0]?.id || "";
+  const autoCategory = label => {
+    for (const rule of CIC_RULES) {
+      if (rule.patterns.some(p => p.test(label))) return catByName(rule.catName);
+    }
+    return data.categories[0]?.id || "";
+  };
+
+  const parseClipboard = async () => {
+    let text = raw;
+    if (!text.trim()) {
+      try { text = await navigator.clipboard.readText(); setRaw(text); }
+      catch { setError("Impossible de lire le presse-papiers. Colle le texte manuellement."); return; }
+    }
+    setError("");
+    try {
+      const payload = JSON.parse(text);
+      if (!payload._duobudget || !Array.isArray(payload.transactions)) {
+        setError("Format invalide. Assure-toi d'avoir cliqué 'Sync DuoBudget' sur CIC Filbanque.");
+        return;
+      }
+      const existing = data.monthsData?.[selMonth]?.transactions || [];
+      const existLabels = new Set(existing.map(t => `${t.label}__${t.amount}__${t.timestamp?.slice(0,10)}`));
+      const txs = payload.transactions.map(t => ({
+        id: mkid(),
+        label: t.label,
+        amount: Math.abs(t.amount),
+        categoryId: autoCategory(t.label),
+        profileId: profId,
+        timestamp: t.date ? new Date(t.date).toISOString() : nowISO(),
+        source: "CIC",
+      }));
+      const dups = new Set();
+      txs.forEach(t => { if (existLabels.has(`${t.label}__${t.amount}__${t.timestamp.slice(0,10)}`)) dups.add(t.id); });
+      setDups(dups);
+      setSelected(new Set(txs.filter(t => !dups.has(t.id)).map(t => t.id)));
+      setParsed(txs);
+      setStep("preview");
+    } catch { setError("Format invalide. Colle le JSON copié par l'extension CIC."); }
+  };
+
+  const doImport = () => {
+    const toImport = parsed.filter(t => selected.has(t.id)).map(t => ({ ...t, profileId: profId }));
+    if (!toImport.length) { close(); return; }
+    update(d => {
+      ensureMonth(d, selMonth);
+      d.monthsData[selMonth].transactions.push(...toImport);
+    });
+    setStep("done");
+  };
+
+  const toggleAll = () => {
+    const nonDup = parsed.filter(t => !duplicates.has(t.id)).map(t => t.id);
+    if (selected.size === nonDup.length) setSelected(new Set());
+    else setSelected(new Set(nonDup));
+  };
+
+  const fmt = n => n.toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
+  const totalSel = parsed.filter(t => selected.has(t.id)).reduce((s,t)=>s+t.amount,0);
+
+  if (step === "done") return (
+    <ModalWrap close={close} title="✅ Import terminé">
+      <div style={{ textAlign:"center",padding:"20px 0" }}>
+        <div style={{ fontSize:64,marginBottom:12 }}>🎉</div>
+        <div style={{ fontSize:22,fontWeight:900,marginBottom:8 }}>{parsed.filter(t=>selected.has(t.id)).length} opérations importées</div>
+        <div style={{ fontSize:14,color:"var(--text2)",marginBottom:28 }}>Elles apparaissent maintenant dans vos dépenses du mois.</div>
+        <button className="btn btn-primary" onClick={close} style={{ minWidth:160 }}>Fermer</button>
+      </div>
+    </ModalWrap>
+  );
+
+  if (step === "preview") return (
+    <ModalWrap close={close} title={`🏦 Importer CIC — ${parsed.length} opérations`}>
+      {/* Profil assigné */}
+      <div style={{ marginBottom:14 }}>
+        <label>Assigner au profil</label>
+        <select value={profId} onChange={e=>{setProfId(e.target.value);}} style={{ marginBottom:0 }}>
+          {data.profiles.map(p=><option key={p.id} value={p.id}>{p.avatar} {p.name}</option>)}
+        </select>
+      </div>
+      {/* Toggle all */}
+      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10 }}>
+        <div style={{ fontSize:12,color:"var(--text2)",fontWeight:700 }}>
+          <span style={{ color:"var(--purple)" }}>{selected.size}</span>/{parsed.length} sélectionnées
+          {duplicates.size>0 && <span style={{ marginLeft:8,fontSize:11,color:"var(--orange)" }}>· {duplicates.size} doublons exclus</span>}
+        </div>
+        <button onClick={toggleAll} style={{ fontSize:11,background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.25)",color:"var(--purple)",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontWeight:700,fontFamily:"'Outfit',sans-serif" }}>
+          {selected.size===parsed.filter(t=>!duplicates.has(t.id)).length?"Déselectionner":"Tout sélectionner"}
+        </button>
+      </div>
+      {/* Liste */}
+      <div style={{ maxHeight:320,overflowY:"auto",borderRadius:12,border:"1px solid var(--border)",marginBottom:14 }}>
+        {parsed.map((tx, i) => {
+          const cat = data.categories.find(c=>c.id===tx.categoryId)||{icon:"❓",color:"#888"};
+          const isDup = duplicates.has(tx.id);
+          const isSel = selected.has(tx.id);
+          return (
+            <div key={tx.id} onClick={()=>{ if(isDup) return; const ns=new Set(selected); ns.has(tx.id)?ns.delete(tx.id):ns.add(tx.id); setSelected(ns); }}
+              style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<parsed.length-1?"1px solid rgba(255,255,255,0.05)":"none",cursor:isDup?"default":"pointer",opacity:isDup?0.45:1,background:isSel&&!isDup?"rgba(167,139,250,0.06)":"transparent",transition:"background .15s" }}>
+              <div style={{ width:20,height:20,borderRadius:6,border:`2px solid ${isSel&&!isDup?"var(--purple)":"var(--border)"}`,background:isSel&&!isDup?"var(--purple)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:11,color:"#fff",transition:"all .15s" }}>
+                {isSel&&!isDup && "✓"}
+              </div>
+              <div style={{ fontSize:16,flexShrink:0 }}>{cat.icon}</div>
+              <div style={{ flex:1,minWidth:0 }}>
+                <div style={{ fontSize:13,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{tx.label}</div>
+                <div style={{ fontSize:11,color:"var(--text3)",marginTop:1 }}>{new Date(tx.timestamp).toLocaleDateString("fr-FR")}</div>
+              </div>
+              <div style={{ display:"flex",alignItems:"center",gap:8,flexShrink:0 }}>
+                {isDup && <span style={{ fontSize:9,background:"rgba(251,146,60,0.15)",border:"1px solid rgba(251,146,60,0.3)",color:"var(--orange)",borderRadius:8,padding:"2px 6px",fontWeight:700 }}>DOUBLON</span>}
+                <span style={{ fontWeight:900,fontSize:14,color:"var(--red)" }}>-{fmt(tx.amount)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Total + actions */}
+      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,padding:"8px 12px",background:"rgba(248,113,113,0.07)",border:"1px solid rgba(248,113,113,0.18)",borderRadius:10 }}>
+        <span style={{ fontSize:12,color:"var(--text2)",fontWeight:700 }}>Total à importer</span>
+        <span style={{ fontFamily:"'Fraunces',serif",fontSize:20,fontWeight:900,color:"var(--red)" }}>-{fmt(totalSel)}</span>
+      </div>
+      <div style={{ display:"flex",gap:10 }}>
+        <button className="btn btn-ghost" onClick={close} style={{ flex:1 }}>Annuler</button>
+        <button className="btn btn-primary" onClick={doImport} style={{ flex:1 }} disabled={selected.size===0}>
+          Importer {selected.size} opération{selected.size!==1?"s":""}
+        </button>
+      </div>
+    </ModalWrap>
+  );
+
+  // Step: paste
+  return (
+    <ModalWrap close={close} title="🏦 Importer depuis CIC">
+      <div style={{ marginBottom:16,padding:"12px 14px",background:"rgba(27,46,143,0.1)",border:"1px solid rgba(27,46,143,0.3)",borderRadius:12,fontSize:13,lineHeight:1.6,color:"var(--text2)" }}>
+        <strong style={{ color:"var(--text)" }}>Comment ça marche :</strong><br/>
+        1. Ouvre CIC Filbanque dans ton navigateur<br/>
+        2. Clique sur <strong>Sync DuoBudget</strong> (bouton en bas à droite)<br/>
+        3. Reviens ici et clique <strong>Coller &amp; Analyser</strong>
+      </div>
+      {error && <div style={{ marginBottom:12,padding:"10px 14px",background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,fontSize:13,color:"var(--red)",fontWeight:600 }}>{error}</div>}
+      <div style={{ marginBottom:14 }}>
+        <label>Profil à associer</label>
+        <select value={profId} onChange={e=>setProfId(e.target.value)}>
+          {data.profiles.map(p=><option key={p.id} value={p.id}>{p.avatar} {p.name}</option>)}
+        </select>
+      </div>
+      <div style={{ marginBottom:16 }}>
+        <label>Données copiées (optionnel — laisser vide pour coller automatiquement)</label>
+        <textarea ref={textRef} value={raw} onChange={e=>setRaw(e.target.value)} placeholder='Colle ici le JSON copié par l'"'"'extension CIC, ou laisse vide pour lecture auto du presse-papiers…' rows={4}
+          style={{ resize:"vertical",fontFamily:"monospace",fontSize:11.5,color:"var(--text3)" }}/>
+      </div>
+      <div style={{ display:"flex",gap:10 }}>
+        <button className="btn btn-ghost" onClick={close} style={{ flex:1 }}>Annuler</button>
+        <button className="btn btn-primary" onClick={parseClipboard} style={{ flex:1 }}>
+          📋 Coller &amp; Analyser
+        </button>
+      </div>
+    </ModalWrap>
+  );
+}
+
+
   const [name, setName]         = useState("");
   const [amount, setAmount]     = useState("");
   const [icon, setIcon]         = useState("⚡");
@@ -3715,7 +3915,7 @@ const BRAND_DATA = {
     )
   },
   "bp": {
-    label:"BP", abbr:"BP", bg="#00772A", fg:"#FBCE07",
+    label:"BP", abbr:"BP", bg:"#00772A", fg:"#FBCE07",
     patterns:[/\bbp\b/i],
     logo: (s) => (
       <svg width={s} height={s} viewBox="0 0 100 100">
