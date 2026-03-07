@@ -2379,7 +2379,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                   </div>
                 )}
 
-                <div style={{ background:"var(--glass)",border:"1px solid var(--border)",borderRadius:18,overflow:"visible",boxShadow:"0 2px 20px rgba(0,0,0,0.2)" }}>
+                <div style={{ background:"var(--glass)",border:"1px solid var(--border)",borderRadius:18,overflow:"visible",boxShadow:"0 2px 20px rgba(0,0,0,0.2)",position:"relative" }}>
                   {group.items.map((tx, idx) => {
                     const cat  = catMap[tx.categoryId]||{ icon:"❓",color:"#888",name:"Autre" };
                     const prof = profMap[tx.profileId]||{ avatar:"❓",name:"?",color:"#888" };
@@ -2392,7 +2392,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                         style={{
                           borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.05)",
                           background: "transparent",
-                          transition: "background .2s",
+                          transition: isMobile ? "none" : "background .2s",
                           borderRadius: isLast ? "0 0 18px 18px" : 0,
                         }}
                         onMouseEnter={isMobile ? undefined : e => { e.currentTarget.style.background=`linear-gradient(135deg,${cat.color}08,rgba(167,139,250,0.05))`; }}
@@ -2400,7 +2400,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
 
                         {isMobile ? (
                           /* ── MOBILE LAYOUT ── */
-                          <div style={{ padding:"12px 14px" }}>
+                          <div style={{ padding:"12px 14px", position:"relative", isolation:"isolate" }}>
                             {/* Row 1: icon + title + amount */}
                             <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:8 }}>
                               {/* Icon */}
@@ -2430,23 +2430,26 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                               </div>
                             </div>
                             {/* Row 2: action buttons */}
-                            <div style={{ display:"flex",gap:6 }}>
+                            <div style={{ display:"flex",gap:6,marginTop:8 }}>
                               <button
                                 type="button"
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
                                 onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 4px",borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"11px 4px",minHeight:44,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 ✏️ Modifier
                               </button>
                               <button
                                 type="button"
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); duplicate(tx); }}
                                 onClick={e => { e.stopPropagation(); duplicate(tx); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 4px",borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"11px 4px",minHeight:44,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 📋 Dupliquer
                               </button>
                               <button
                                 type="button"
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); del(tx.id); }}
                                 onClick={e => { e.stopPropagation(); del(tx.id); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 4px",borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:4,padding:"11px 4px",minHeight:44,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 🗑 Suppr.
                               </button>
                             </div>
