@@ -225,6 +225,14 @@ button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:mani
   --sw:244px;--r:16px;--r-sm:11px;--r-lg:22px;
 }
 html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);width:100%;height:100%;margin:0;padding:0;overflow:hidden;}
+/* iOS Safari : utiliser dvh (dynamic viewport) pour suivre la barre URL */
+@supports(height:100dvh){
+  html,body,#root{height:100dvh;}
+}
+/* Fallback webkit */
+@supports not (height:100dvh){
+  html,body,#root{height:-webkit-fill-available;}
+}
 
 /* ── AUTH ── */
 .auth-shell{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -263,7 +271,8 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .check-anim{animation:checkDraw .5s ease .1s both;stroke-dasharray:100;stroke-dashoffset:0;}
 
 /* ── SHELL ── */
-.app-shell{position:fixed;inset:0;display:flex;overflow:hidden;
+.app-shell{position:fixed;inset:0;display:flex;overflow:hidden;height:100dvh;}
+@supports not (height:100dvh){.app-shell{height:-webkit-fill-available;}}
   background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(167,139,250,0.08) 0%,transparent 60%),
              radial-gradient(ellipse 50% 30% at 90% 100%,rgba(244,114,182,0.05) 0%,transparent 60%),
              var(--bg);}
