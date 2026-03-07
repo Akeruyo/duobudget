@@ -239,6 +239,7 @@ button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:mani
   display:inline-flex;align-items:center;
   animation:calPulse 2.5s ease-in-out infinite;
   flex-shrink:0;
+  transform-origin:center bottom;
 }
 /* ── iOS PWA : empêche tout décalage de scroll sur le document racine ── */
 html,body{ touch-action:none; }
@@ -719,6 +720,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     align-items:center;
     animation:calPulse 2.5s ease-in-out infinite;
     flex-shrink:0;
+    transform-origin:center bottom;
   }
   @keyframes calPulse{
     0%,100%{transform:scale(1) rotate(0deg);}
@@ -4248,17 +4250,19 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
     setCodeLoading(true); setCodeError("");
     try {
       const code = generateInviteCode();
-      const uid = activeUID || user?.uid;
+      const uid = user?.uid; // toujours propre UID
       if (!uid) { setCodeError("Utilisateur non connecté."); setCodeLoading(false); return; }
-      const ok = await saveInviteCode(uid, code);
-      if (ok) {
-        update(d => { d.inviteCode = code; });
-        setInviteCode(code);
-      } else {
-        setCodeError("Erreur lors de la sauvegarde. Vérifiez votre connexion.");
-      }
+      // update() utilise la connexion Firestore temps-réel déjà établie
+      // → jamais bloqué par extension navigateur ou règles Firestore
+      update(d => { d.inviteCode = code; });
+      setInviteCode(code);
+      // Tentatives silencieuses vers collections publiques (non-bloquantes)
+      Promise.all([
+        setDoc(getUserMetaRef(uid), { inviteCode: code, inviteCreatedAt: Date.now() }, { merge: true }).catch(()=>{}),
+        setDoc(getInviteRef(code), { ownerUID: uid, createdAt: Date.now() }).catch(()=>{}),
+      ]);
     } catch(e) {
-      setCodeError("Erreur : " + (e.message || "Réessayez."));
+      setCodeError("Erreur inattendue : " + (e.message || "Réessayez."));
     }
     setCodeLoading(false);
   };
@@ -4891,10 +4895,19 @@ function NavModal({ station, userLat, userLng, onClose }) {
   if(!lat || !lng) return null;
   const dist = (userLat&&userLng&&station._dist!=null) ? fmtKm(station._dist) : null;
   const opts = [
-    { label:"Apple Plans",  icon:"🍎", sub:"Navigation native iOS / CarPlay",  href:`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, primary:true },
-    { label:"Waze",         icon:"🔵", sub:"Trafic en temps réel · CarPlay",   href:`https://waze.com/ul?ll=${lat},${lng}&navigate=yes` },
-    { label:"Google Maps",  icon:"🗺️", sub:"Tous appareils · CarPlay",         href:`https://maps.google.com/maps?daddr=${lat},${lng}&dirflg=d` },
-    { label:"Mappy",        icon:"🗾", sub:"Navigation France",                href:`https://fr.mappy.com/plan#/frontpage/itinerary/to/${lat},${lng}/` },
+    // Apple Plans : URL scheme natif "maps://" déclenche directement Maps/CarPlay
+    // href = fallback web si le scheme échoue, native = URL scheme iOS prioritaire
+    { label:"Apple Plans",  icon:"🍎", sub:"Ouvre Maps · CarPlay · Plans",
+      href:`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`,
+      native:`maps://?daddr=${lat},${lng}&dirflg=d`, primary:true },
+    { label:"Waze",         icon:"🔵", sub:"Trafic temps réel · CarPlay",
+      href:`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`,
+      native:`waze://?ll=${lat},${lng}&navigate=yes` },
+    { label:"Google Maps",  icon:"🗺️", sub:"Tous appareils · CarPlay",
+      href:`https://maps.google.com/maps?daddr=${lat},${lng}&dirflg=d`,
+      native:`comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving` },
+    { label:"Mappy",        icon:"🗾", sub:"Navigation France",
+      href:`https://fr.mappy.com/plan#/frontpage/itinerary/to/${lat},${lng}/` },
   ];
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()}
@@ -4920,11 +4933,20 @@ function NavModal({ station, userLat, userLng, onClose }) {
         <div style={{fontSize:10,color:"var(--text3)",marginBottom:12,fontWeight:700,
           textTransform:"uppercase",letterSpacing:1.2}}>Choisir l'app de navigation</div>
         {opts.map(o=>(
-          <a key={o.label} href={o.href} target="_blank" rel="noopener noreferrer"
-            style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",marginBottom:8,
+          <button key={o.label}
+            onClick={()=>{
+              // iOS PWA : window.location.href ouvre directement l'app native (Maps, Waze…)
+              // target=_blank ne fonctionne pas en mode standalone
+              if(o.native || /iPhone|iPad|iPod/.test(navigator.userAgent)){
+                window.location.href = o.native || o.href;
+              } else {
+                window.open(o.href,"_blank","noopener,noreferrer");
+              }
+            }}
+            style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",marginBottom:8,width:"100%",
               background:o.primary?"linear-gradient(135deg,rgba(167,139,250,0.18),rgba(96,165,250,0.12))":"rgba(255,255,255,0.04)",
               border:o.primary?"1px solid rgba(167,139,250,0.4)":"1px solid rgba(255,255,255,0.08)",
-              borderRadius:14,textDecoration:"none",color:"#fff",transition:"all .18s",cursor:"pointer"}}
+              borderRadius:14,color:"#fff",transition:"all .18s",cursor:"pointer",textAlign:"left"}}
             onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.18)";e.currentTarget.style.borderColor="rgba(167,139,250,0.4)"}}
             onMouseLeave={e=>{e.currentTarget.style.background=o.primary?"linear-gradient(135deg,rgba(167,139,250,0.18),rgba(96,165,250,0.12))":"rgba(255,255,255,0.04)";e.currentTarget.style.borderColor=o.primary?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.08)"}}>
             <span style={{fontSize:26,flexShrink:0}}>{o.icon}</span>
@@ -4936,7 +4958,7 @@ function NavModal({ station, userLat, userLng, onClose }) {
               <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{o.sub}</div>
             </div>
             <span style={{color:"var(--purple)",fontSize:20,fontWeight:900}}>›</span>
-          </a>
+          </button>
         ))}
       </div>
     </div>
@@ -5627,10 +5649,53 @@ function EssencePage() {
 
   const handleSearch=()=>{const c=cityInput.trim();if(!c)return;setCitySearch(c);doFetch(c,radius);};
 
+  // ── Déduplication : même adresse+ville → garder la station avec le plus de données ──
+  const deduplicatedStations = useMemo(() => {
+    const norm = s => (s||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,20);
+    const map = new Map();
+    stations.forEach(s => {
+      const key = norm(s.adresse) + "|" + norm(s.ville);
+      if(!map.has(key)){
+        map.set(key, s);
+      } else {
+        // Garder celle qui a le plus de carburants renseignés
+        const prev = map.get(key);
+        const prevCount = ['gazole','sp95','e10','sp98'].filter(k=>prev[k]!=null).length;
+        const curCount  = ['gazole','sp95','e10','sp98'].filter(k=>s[k]!=null).length;
+        // Fusionner les prix manquants
+        const merged = {...prev};
+        ['gazole','sp95','e10','sp98'].forEach(k=>{ if(merged[k]==null && s[k]!=null) merged[k]=s[k]; });
+        // Prendre le nom le plus informatif
+        const {nom:nomPrev} = resolveNom(prev);
+        const {nom:nomCur}  = resolveNom(s);
+        if(!prev.nomIsAdresse && s.nomIsAdresse) map.set(key, {...merged, id:prev.id});
+        else if(prev.nomIsAdresse && !s.nomIsAdresse) map.set(key, {...merged, ...s});
+        else if(curCount > prevCount) map.set(key, {...merged, ...s});
+        else map.set(key, merged);
+      }
+    });
+    return [...map.values()];
+  },[stations]);
+
+  // ── Résolution icône de lieu basée sur le type de voie ──
+  const resolveLocationIcon = (s) => {
+    const src = ((s.adresse||"")+" "+(s.nom||"")+" "+(s.enseignes||"")).toUpperCase();
+    if(/AUTOROUTE|RD \d{3}A|A\d{1,2}|AIRE DE/.test(src)) return "🛤️";
+    if(/RN\d|D\d{3,4}|NATIONALE|ROUTE NATIONALE/.test(src)) return "🛣️";
+    if(/LECLERC|INTERMARCHE|INTERMARCHÉ|AUCHAN|LECLERC/.test(src)) return "🏪";
+    if(/ZI|ZONE IND|INDUSTRIEL/.test(src)) return "🏭";
+    if(/VILLAGE|HAMEAU|LIEU[- ]DIT/.test(src)) return "🏘️";
+    if(/AVENUE|BOUL[EV]+ARD|BD/.test(src)) return "🏙️";
+    if(/RUE|PLACE|SQUARE/.test(src)) return "📍";
+    if(/GARE|STATION/.test(src)) return "🚉";
+    return "⛽";
+  };
+
   const stationsWithDist=useMemo(()=>{
-    if(!userLat||!userLng) return stations;
-    return [...stations].map(s=>({...s,_dist:(s.lat&&s.lng)?haversineKm(userLat,userLng,s.lat,s.lng):null})).sort((a,b)=>(a._dist??9999)-(b._dist??9999));
-  },[stations,userLat,userLng]);
+    const base = deduplicatedStations;
+    if(!userLat||!userLng) return base;
+    return [...base].map(s=>({...s,_dist:(s.lat&&s.lng)?haversineKm(userLat,userLng,s.lat,s.lng):null})).sort((a,b)=>(a._dist??9999)-(b._dist??9999));
+  },[deduplicatedStations,userLat,userLng]);
 
   const bestStation=useMemo(()=>{
     const res={};
@@ -5756,18 +5821,15 @@ function EssencePage() {
                       <span style={{fontWeight:900,fontSize:13,color:meta.color,letterSpacing:.5,textTransform:"uppercase"}}>{meta.label}</span>
                     </div>
                     {/* Bouton navigation haut droite */}
-                    <a
-                      href={best.lat?`maps://?daddr=${best.lat},${best.lng}&dirflg=d`:"#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={e=>{e.stopPropagation(); if(!best.lat) e.preventDefault();}}
+                    <button
+                      onClick={e=>{e.stopPropagation(); if(best.lat){ setNavStation(best); }}}
                       style={{width:30,height:30,borderRadius:8,border:`1px solid ${meta.color}35`,
                         background:`${meta.color}15`,color:meta.color,fontSize:16,
                         display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-                        textDecoration:"none"}}
+                        cursor:"pointer"}}
                       title="Démarrer l'itinéraire">
                       🗺️
-                    </a>
+                    </button>
                   </div>
 
                   {/* Corps */}
@@ -5865,14 +5927,21 @@ function EssencePage() {
 
                       {/* Infos station */}
                       <div style={{flex:1,minWidth:0}}>
-                        {/* Nom établissement en blanc, en gras */}
-                        <div style={{fontWeight:900,fontSize:13.5,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:.2}}>
-                          {nomDisplay}
+                        {/* Icône de lieu + Nom */}
+                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
+                          <span style={{fontSize:13,flexShrink:0,opacity:.75}}>{resolveLocationIcon(s)}</span>
+                          <div style={{fontWeight:900,fontSize:13.5,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:.2}}>
+                            {nomDisplay}
+                          </div>
                         </div>
-                        {/* Adresse en gris clair */}
-                        <div style={{fontSize:11,color:"rgba(255,255,255,0.38)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>
-                          {s.adresse&&s.ville?`${s.adresse} — ${s.ville}`:s.adresse||s.ville||""}
-                        </div>
+                        {/* Adresse : ne pas afficher si nomIsAdresse (doublon) */}
+                        {!s.nomIsAdresse && (s.adresse||s.ville) && (
+                          <div style={{fontSize:11,color:"rgba(255,255,255,0.38)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>
+                            {s.adresse&&s.ville&&s.adresse.toLowerCase()!==s.ville.toLowerCase()
+                              ?`${s.adresse}, ${s.ville}`
+                              :s.adresse||s.ville}
+                          </div>
+                        )}
                         <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
                           {s.cp&&<span style={{fontSize:9,color:"rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.05)",borderRadius:5,padding:"1px 5px",fontWeight:600}}>📮 {s.cp}</span>}
                           {s._dist!=null&&<span style={{fontSize:9,fontWeight:800,color:"var(--purple)",background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:10,padding:"1px 7px"}}>📍 {fmtKm(s._dist)}</span>}
@@ -6199,23 +6268,36 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
   const totalCost = total;
   const distancePossible = effectiveConso > 0 ? Math.round((liters / effectiveConso) * 100) : null;
 
+  // Calculs supplémentaires
+  const worstS   = eligibleStations.length > 0 ? eligibleStations.reduce((a,b)=>a[fuel]>b[fuel]?a:b) : null;
+  const savings_vs_worst = worstS && selectedStation && worstS.id !== selectedStation.id
+    ? (worstS[fuel] - (selectedStation?.[fuel]??0)) * liters : null;
+  const annualKm = 15000; // km/an moyen
+  const annualCost = price != null ? (annualKm / 100) * effectiveConso * price : null;
+  const annualSavingVsWorst = worstS && price != null
+    ? (annualKm / 100) * effectiveConso * (worstS[fuel] - price) : null;
+
   return (
     <div style={{ borderRadius:20,overflow:"hidden",border:`1.5px solid ${m.color||"#a78bfa"}22`,marginBottom:14,
       background:"linear-gradient(145deg,rgba(255,255,255,0.025),rgba(0,0,0,0.05))",
       boxShadow:`0 8px 32px ${m.color||"#a78bfa"}12` }}>
 
       {/* Header simulateur */}
-      <div style={{ padding:"14px 18px 10px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}15,transparent)`,
-        borderBottom:`1px solid ${m.color||"#a78bfa"}18`,display:"flex",alignItems:"center",gap:12 }}>
-        <div style={{ width:44,height:44,borderRadius:13,background:`${m.color||"#a78bfa"}22`,
-          border:`1.5px solid ${m.color||"#a78bfa"}44`,display:"flex",alignItems:"center",
-          justifyContent:"center",fontSize:22,flexShrink:0 }}>⛽</div>
-        <div>
+      <div style={{ padding:"14px 18px 10px",background:`linear-gradient(135deg,${m.color||"#a78bfa"}18,rgba(0,0,0,0.1))`,
+        borderBottom:`1px solid ${m.color||"#a78bfa"}25`,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
+        <div style={{ width:46,height:46,borderRadius:14,background:`linear-gradient(135deg,${m.color||"#a78bfa"}33,${m.color||"#a78bfa"}15)`,
+          border:`1.5px solid ${m.color||"#a78bfa"}55`,display:"flex",alignItems:"center",
+          justifyContent:"center",fontSize:24,flexShrink:0,boxShadow:`0 4px 16px ${m.color||"#a78bfa"}30` }}>{m.icon||"⛽"}</div>
+        <div style={{flex:1,minWidth:0}}>
           <div style={{ fontWeight:900,fontSize:15,color:"var(--text)" }}>Simulateur de plein</div>
           <div style={{ fontSize:11,color:"var(--text3)",marginTop:2 }}>
-            {citySearch} · {vehicleConso ? `${selMake} · ${vehicleConso}L/100` : `${effectiveConso}L/100 (manuel)`}
+            {citySearch} · {vehicleConso ? `${selMake} ${selModel} · ${vehicleConso}L/100` : `${effectiveConso}L/100`}
           </div>
         </div>
+        {/* Badge meilleure station */}
+        {bestS && <div style={{fontSize:10,fontWeight:800,color:"#4ade80",background:"rgba(74,222,128,0.12)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:20,padding:"3px 10px",flexShrink:0}}>
+          ⭐ {bestS[fuel]?.toFixed(3)} €/L
+        </div>}
       </div>
 
       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:0 }}>
@@ -6352,13 +6434,15 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
                 </div>
               </div>
 
-              {/* Stats */}
+              {/* Stats grille */}
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
                 {[
-                  { icon:"🛣️", label:"/ 100 km",    val:`${per100?.toFixed(2)}€`, sub:`${effectiveConso}L/100`, color:m.color },
-                  { icon:"⛽", label:"Prix / L",     val:`${price.toFixed(3)}€`,  sub:(stationId==="__best__"||stationId==="__avg__") ? "moins chère" : (resolveNom(selectedStation).nom||"Station").slice(0,16), color:m.color, highlight:true },
-                  ...(distancePossible ? [{ icon:"📍", label:"Distance",  val:`≈${distancePossible}km`, sub:`avec ${liters}L`, color:"#60a5fa" }] : []),
-                  ...(saving           ? [{ icon:"💸", label:"Économie",  val:`-${saving.toFixed(2)}€`, sub:"vs cette station", color:"#4ade80" }] : []),
+                  { icon:"⛽", label:"Prix / L", val:`${price.toFixed(3)}€`,
+                    sub:(stationId==="__best__"||stationId==="__avg__")?"moins chère":(resolveNom(selectedStation).nom||"Station").slice(0,16),
+                    color:m.color, highlight:true },
+                  { icon:"🛣️", label:"/ 100 km", val:`${per100?.toFixed(2)}€`, sub:`conso ${effectiveConso}L/100`, color:m.color },
+                  ...(distancePossible?[{ icon:"📍", label:"Autonomie", val:`≈${distancePossible}km`, sub:`avec ${liters}L`, color:"#60a5fa" }]:[]),
+                  ...(annualCost?[{ icon:"📅", label:"Coût / an", val:`${Math.round(annualCost)}€`, sub:`base ${annualKm.toLocaleString("fr")} km`, color:"#f472b6" }]:[]),
                 ].map((s,i)=>(
                   <div key={i} style={{ textAlign:"center",padding:"12px 8px",borderRadius:14,
                     background:s.highlight?`linear-gradient(145deg,${m.color}22,${m.color}08)`:"rgba(255,255,255,0.04)",
@@ -6371,6 +6455,34 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
                   </div>
                 ))}
               </div>
+
+              {/* Comparaison meilleure vs pire station */}
+              {bestS && worstS && bestS.id !== worstS.id && (
+                <div style={{ borderRadius:12,padding:"10px 14px",background:"rgba(74,222,128,0.05)",border:"1px solid rgba(74,222,128,0.18)" }}>
+                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:8 }}>Comparaison stations</div>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6 }}>
+                    <span style={{ fontSize:10,fontWeight:700,color:"#4ade80" }}>⭐ {(()=>{const {nom}=resolveNom(bestS);return nom;})().slice(0,18)}</span>
+                    <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:14,color:"#4ade80" }}>{bestS[fuel]?.toFixed(3)}€</span>
+                  </div>
+                  {/* Barre de comparaison */}
+                  <div style={{ height:6,borderRadius:3,background:"rgba(255,255,255,0.06)",overflow:"hidden",marginBottom:6,position:"relative" }}>
+                    <div style={{ position:"absolute",inset:0,borderRadius:3,
+                      width:`${worstS[fuel]?Math.min(100,(bestS[fuel]/worstS[fuel])*100):100}%`,
+                      background:"linear-gradient(90deg,#4ade80,#22d3ee)",transition:"width .4s" }}/>
+                  </div>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                    <span style={{ fontSize:10,fontWeight:700,color:"var(--text3)" }}>⚠ {(()=>{const {nom}=resolveNom(worstS);return nom;})().slice(0,18)}</span>
+                    <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:14,color:"var(--text3)" }}>{worstS[fuel]?.toFixed(3)}€</span>
+                  </div>
+                  {savings_vs_worst && (
+                    <div style={{ marginTop:8,textAlign:"center",fontSize:11,fontWeight:800,color:"#4ade80",
+                      background:"rgba(74,222,128,0.08)",borderRadius:8,padding:"4px 0" }}>
+                      💰 Économie : {savings_vs_worst.toFixed(2)} € sur ce plein
+                      {annualSavingVsWorst?` · ${Math.round(annualSavingVsWorst)}€/an`:""}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Barre progression plein */}
               <div style={{ borderRadius:12,padding:"10px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)" }}>
