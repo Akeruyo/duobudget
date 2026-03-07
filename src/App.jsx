@@ -234,18 +234,39 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .auth-shell{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;
   padding-top:calc(20px + env(safe-area-inset-top));
   padding-bottom:calc(20px + env(safe-area-inset-bottom));
-  background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(167,139,250,0.2),transparent 70%),
-             radial-gradient(ellipse 60% 40% at 80% 100%,rgba(244,114,182,0.1),transparent 60%),
-             var(--bg);}
-.auth-card{background:linear-gradient(145deg,#110f24,#1a1635);border:1px solid var(--border2);border-radius:28px;padding:40px;width:100%;max-width:420px;box-shadow:0 32px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(167,139,250,0.08);}
+  background:radial-gradient(ellipse 90% 70% at 30% 20%,rgba(167,139,250,0.25),transparent 60%),
+             radial-gradient(ellipse 70% 50% at 80% 80%,rgba(244,114,182,0.2),transparent 55%),
+             radial-gradient(ellipse 50% 40% at 60% 50%,rgba(96,165,250,0.12),transparent 60%),
+             var(--bg);
+  overflow:hidden;}
+/* Orbes animées derrière la card */
+.auth-shell::before,.auth-shell::after{
+  content:''; position:absolute; border-radius:50%; filter:blur(80px); pointer-events:none; opacity:.55;
+}
+.auth-shell::before{
+  width:500px;height:500px; background:rgba(167,139,250,0.25); top:-150px; left:-100px;
+  animation:orbFloat1 8s ease-in-out infinite;
+}
+.auth-shell::after{
+  width:400px;height:400px; background:rgba(244,114,182,0.2); bottom:-120px; right:-80px;
+  animation:orbFloat2 10s ease-in-out infinite;
+}
+@keyframes orbFloat1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
+@keyframes orbFloat2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,-30px)}}
+.auth-card{
+  background:linear-gradient(145deg,rgba(15,12,32,0.92),rgba(22,18,50,0.92));
+  border:1px solid rgba(167,139,250,0.2);border-radius:32px;padding:40px;width:100%;max-width:440px;
+  box-shadow:0 40px 100px rgba(0,0,0,0.7),0 0 0 1px rgba(167,139,250,0.12),inset 0 1px 0 rgba(255,255,255,0.07);
+  backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);
+  position:relative;z-index:1;}
 
 /* ── AUTH INPUT FIELD ── */
 .auth-field{position:relative;margin-bottom:14px;}
-.auth-field label{font-size:11px;color:var(--text3);font-weight:700;letter-spacing:.6px;text-transform:uppercase;display:block;margin-bottom:6px;}
-.auth-field input{background:rgba(255,255,255,0.055);border:1px solid rgba(255,255,255,0.1);border-radius:13px;color:var(--text);padding:13px 16px 13px 44px;font-size:14px;width:100%;outline:none;transition:all .2s;font-family:'Outfit',sans-serif;}
-.auth-field input:focus{border-color:rgba(167,139,250,0.6);box-shadow:0 0 0 3px rgba(167,139,250,0.1),inset 0 1px 0 rgba(255,255,255,0.05);}
-.auth-field .field-icon{position:absolute;left:14px;bottom:13px;font-size:16px;pointer-events:none;}
-.auth-field .eye-btn{position:absolute;right:12px;bottom:10px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:17px;padding:3px;transition:color .2s;line-height:1;}
+.auth-field label{font-size:11px;color:var(--text3);font-weight:700;letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:7px;}
+.auth-field input{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:14px;color:var(--text);padding:14px 16px 14px 46px;font-size:14px;width:100%;outline:none;transition:all .25s;font-family:'Outfit',sans-serif;box-shadow:inset 0 2px 4px rgba(0,0,0,0.2);}
+.auth-field input:focus{border-color:rgba(167,139,250,0.7);box-shadow:0 0 0 4px rgba(167,139,250,0.14),inset 0 1px 0 rgba(255,255,255,0.07);}
+.auth-field .field-icon{position:absolute;left:15px;bottom:14px;font-size:17px;pointer-events:none;}
+.auth-field .eye-btn{position:absolute;right:12px;bottom:10px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:18px;padding:3px;transition:color .2s;line-height:1;}
 .auth-field .eye-btn:hover{color:var(--text2);}
 
 /* ── AUTH STRENGTH BAR ── */
@@ -258,7 +279,8 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 
 /* ── FEATURE PILLS ── */
 .auth-features{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:20px;}
-.auth-feature-pill{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:20px;padding:5px 10px;font-size:11px;color:var(--text3);font-weight:500;}
+.auth-feature-pill{display:flex;align-items:center;gap:6px;background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.18);border-radius:20px;padding:6px 12px;font-size:11px;color:rgba(237,233,248,0.7);font-weight:600;transition:all .2s;}
+.auth-feature-pill:hover{background:rgba(167,139,250,0.14);}
 
 /* ── RESET VIEW ── */
 .reset-back-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;transition:color .2s;margin-bottom:24px;}
@@ -285,12 +307,12 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;width:0;
   transition:margin-left .3s cubic-bezier(.4,0,.2,1);}
 .topbar{
-  height:calc(64px + env(safe-area-inset-top));
-  padding-top:calc(10px + env(safe-area-inset-top));
+  height:calc(56px + env(safe-area-inset-top));
+  padding-top:calc(8px + env(safe-area-inset-top));
   padding-left:calc(22px + env(safe-area-inset-left));
   padding-right:calc(16px + env(safe-area-inset-right));
-  padding-bottom:10px;
-  background:rgba(7,6,15,0.94);backdrop-filter:blur(32px);
+  padding-bottom:8px;
+  background:rgba(7,6,15,0.97);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
 .page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;}
@@ -620,41 +642,53 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 
   /* ── TOPBAR ── */
   .topbar{
-    height:calc(52px + env(safe-area-inset-top)) !important;
-    padding-top:calc(8px + env(safe-area-inset-top)) !important;
-    padding-left:calc(14px + env(safe-area-inset-left));
-    padding-right:calc(14px + env(safe-area-inset-right));
-    padding-bottom:8px;
+    height:calc(48px + env(safe-area-inset-top)) !important;
+    padding-top:calc(6px + env(safe-area-inset-top)) !important;
+    padding-left:calc(12px + env(safe-area-inset-left));
+    padding-right:calc(12px + env(safe-area-inset-right));
+    padding-bottom:6px;
   }
   .topbar-clock{ display:none; }
   /* Month selector chip in topbar (mobile only, injected via .topbar-month) */
   .topbar-month{
     display:flex !important;
     align-items:center;
-    gap:5px;
-    background:rgba(167,139,250,0.10);
-    border:1px solid rgba(167,139,250,0.25);
-    border-radius:20px;
-    padding:5px 12px;
-    font-size:12px;
+    gap:6px;
+    background:rgba(167,139,250,0.12);
+    border:1px solid rgba(167,139,250,0.30);
+    border-radius:22px;
+    padding:6px 14px 6px 10px;
+    font-size:13px;
     font-weight:800;
     color:var(--purple);
     cursor:pointer;
     white-space:nowrap;
     -webkit-tap-highlight-color:transparent;
+    box-shadow:0 2px 10px rgba(167,139,250,0.2);
+  }
+  .topbar-month-icon{
+    font-size:18px;
+    display:inline-flex;
+    align-items:center;
+    animation:calPulse 2.5s ease-in-out infinite;
+    flex-shrink:0;
+  }
+  @keyframes calPulse{
+    0%,100%{transform:scale(1) rotate(0deg);}
+    50%{transform:scale(1.15) rotate(-5deg);}
   }
   .topbar-month select{
     background:transparent;
     border:none;
     color:var(--purple);
     font-family:'Outfit',sans-serif;
-    font-size:12px;
+    font-size:13px;
     font-weight:800;
     padding:0;
     outline:none;
     cursor:pointer;
     -webkit-appearance:none;
-    max-width:120px;
+    max-width:130px;
   }
 
   /* ── MORE SHEET (slide up) ── */
@@ -1439,14 +1473,14 @@ export default function App() {
             <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
               <button className="menu-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">☰</button>
               <div className="topbar-month">
-                <span style={{fontSize:13}}>📅</span>
+                <span className="topbar-month-icon">📅</span>
                 <select value={selMonth} onChange={e => setSelMonth(e.target.value)}
                   style={{fontVariantNumeric:"tabular-nums",letterSpacing:"0.02em"}}>
                   {allMonths.map(k => <option key={k} value={k}>{monthLabelShort(k)}</option>)}
                 </select>
               </div>
             </div>
-            <div style={{ display:"flex",alignItems:"center",gap:6,flexShrink:0 }}>hrink:0 }}>
+            <div style={{ display:"flex",alignItems:"center",gap:6,flexShrink:0 }}>
               {page==="expenses" && (
                 <>
                   <button className="topbar-action-btn tip" data-tip="Exporter en CSV"
@@ -2725,21 +2759,27 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                             <div style={{ display:"flex",gap:6 }}>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); if(window.confirm('Modifier cette dépense ?')) setModal({ type:"editTransaction",tx,selMonth }); }}
-                                onClick={e => { e.stopPropagation(); if(window.confirm('Modifier cette dépense ?')) setModal({ type:"editTransaction",tx,selMonth }); }}
+                                onTouchStart={e => { e.currentTarget._touchMoved = false; e.currentTarget._touchStartY = e.touches[0].clientY; }}
+                                onTouchMove={e => { if(Math.abs(e.touches[0].clientY - e.currentTarget._touchStartY) > 6) e.currentTarget._touchMoved = true; }}
+                                onTouchEnd={e => { e.stopPropagation(); if(e.currentTarget._touchMoved) return; e.preventDefault(); setModal({ type:"editTransaction",tx,selMonth }); }}
+                                onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
                                 style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 ✏️ Modifier
                               </button>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); if(window.confirm("Dupliquer cette dépense ?")) duplicate(tx); }}
+                                onTouchStart={e => { e.currentTarget._touchMoved = false; e.currentTarget._touchStartY = e.touches[0].clientY; }}
+                                onTouchMove={e => { if(Math.abs(e.touches[0].clientY - e.currentTarget._touchStartY) > 6) e.currentTarget._touchMoved = true; }}
+                                onTouchEnd={e => { e.stopPropagation(); if(e.currentTarget._touchMoved) return; e.preventDefault(); duplicate(tx); }}
                                 onClick={e => { e.stopPropagation(); duplicate(tx); }}
                                 style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 📋 Dupliquer
                               </button>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); if(window.confirm('Supprimer cette dépense ?')) del(tx.id); }}
+                                onTouchStart={e => { e.currentTarget._touchMoved = false; e.currentTarget._touchStartY = e.touches[0].clientY; }}
+                                onTouchMove={e => { if(Math.abs(e.touches[0].clientY - e.currentTarget._touchStartY) > 6) e.currentTarget._touchMoved = true; }}
+                                onTouchEnd={e => { e.stopPropagation(); if(e.currentTarget._touchMoved) return; e.preventDefault(); if(window.confirm('Supprimer cette dépense ?')) del(tx.id); }}
                                 onClick={e => { e.stopPropagation(); if(window.confirm('Supprimer cette dépense ?')) del(tx.id); }}
                                 style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 🗑 Suppr.
@@ -2841,11 +2881,12 @@ function Bills({ data, update, selMonth, mdata, setModal }) {
       if (d.monthsData[selMonth]) {
         d.monthsData[selMonth].transactions = (d.monthsData[selMonth].transactions||[]).filter(t => !t.fromBill);
       }
-      // 2. Réinitialiser TOUTES les factures du mois (paid + paidAt + tout statut custom)
+      // 2. Réinitialiser TOUTES les factures du mois — explicit false pour fiabilité
       d.bills.forEach(b => {
-        if (b.paid) delete b.paid[selMonth];
-        if (b.paidAt) delete b.paidAt[selMonth];
-        if (b.customStatus) delete b.customStatus[selMonth];
+        if (!b.paid) b.paid = {};
+        b.paid[selMonth] = false;
+        if (b.paidAt) b.paidAt[selMonth] = null;
+        if (b.customStatus) b.customStatus[selMonth] = null;
       });
     });
     setConfirmClear(false);
@@ -2856,7 +2897,7 @@ function Bills({ data, update, selMonth, mdata, setModal }) {
     if (search.trim()) { const q=search.toLowerCase(); bills = bills.filter(b => b.name.toLowerCase().includes(q)); }
     const now = new Date();
     bills = bills.filter(b => {
-      const isPaid = b.paid?.[selMonth];
+      const isPaid = b.paid?.[selMonth] === true;
       const isOverdue = b.dueDate&&new Date(b.dueDate)<now&&!isPaid;
       if (filterStatus==="paid")    return isPaid;
       if (filterStatus==="unpaid")  return !isPaid&&!isOverdue;
@@ -2866,13 +2907,13 @@ function Bills({ data, update, selMonth, mdata, setModal }) {
     return bills;
   }, [data.bills,search,filterStatus,selMonth]);
 
-  const overdueList  = useMemo(() => allBillsFiltered.filter(b=>!b.paid?.[selMonth]&&b.dueDate&&new Date(b.dueDate)<new Date()).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate)), [allBillsFiltered,selMonth]);
-  const pendingList  = useMemo(() => allBillsFiltered.filter(b=>!b.paid?.[selMonth]&&!(b.dueDate&&new Date(b.dueDate)<new Date())).sort((a,b)=>{ if(!a.dueDate)return 1; if(!b.dueDate)return -1; return new Date(a.dueDate)-new Date(b.dueDate); }), [allBillsFiltered,selMonth]);
-  const unpaid = useMemo(() => allBillsFiltered.filter(b=>!b.paid?.[selMonth]).sort((a,b)=>{ if(!a.dueDate)return 1; if(!b.dueDate)return -1; return new Date(a.dueDate)-new Date(b.dueDate); }), [allBillsFiltered,selMonth]);
-  const paid        = useMemo(() => allBillsFiltered.filter(b=>b.paid?.[selMonth]), [allBillsFiltered,selMonth]);
-  const totalUnpaid = useMemo(() => data.bills.filter(b=>!b.paid?.[selMonth]).reduce((s,b)=>s+(b.amount||0),0), [data.bills,selMonth]);
-  const totalPaid   = useMemo(() => data.bills.filter(b=>b.paid?.[selMonth]).reduce((s,b)=>s+(b.amount||0),0), [data.bills,selMonth]);
-  const overdueCount = useMemo(() => data.bills.filter(b=>b.dueDate&&new Date(b.dueDate)<new Date()&&!b.paid?.[selMonth]).length, [data.bills,selMonth]);
+  const overdueList  = useMemo(() => allBillsFiltered.filter(b=>b.paid?.[selMonth]!==true&&b.dueDate&&new Date(b.dueDate)<new Date()).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate)), [allBillsFiltered,selMonth]);
+  const pendingList  = useMemo(() => allBillsFiltered.filter(b=>b.paid?.[selMonth]!==true&&!(b.dueDate&&new Date(b.dueDate)<new Date())).sort((a,b)=>{ if(!a.dueDate)return 1; if(!b.dueDate)return -1; return new Date(a.dueDate)-new Date(b.dueDate); }), [allBillsFiltered,selMonth]);
+  const unpaid = useMemo(() => allBillsFiltered.filter(b=>b.paid?.[selMonth]!==true).sort((a,b)=>{ if(!a.dueDate)return 1; if(!b.dueDate)return -1; return new Date(a.dueDate)-new Date(b.dueDate); }), [allBillsFiltered,selMonth]);
+  const paid        = useMemo(() => allBillsFiltered.filter(b=>b.paid?.[selMonth]===true), [allBillsFiltered,selMonth]);
+  const totalUnpaid = useMemo(() => data.bills.filter(b=>b.paid?.[selMonth]!==true).reduce((s,b)=>s+(b.amount||0),0), [data.bills,selMonth]);
+  const totalPaid   = useMemo(() => data.bills.filter(b=>b.paid?.[selMonth]===true).reduce((s,b)=>s+(b.amount||0),0), [data.bills,selMonth]);
+  const overdueCount = useMemo(() => data.bills.filter(b=>b.dueDate&&new Date(b.dueDate)<new Date()&&b.paid?.[selMonth]!==true).length, [data.bills,selMonth]);
 
   return (
     <div className="fade-up content-grid">
@@ -4109,6 +4150,7 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
   const [inviteCode, setInviteCode] = useState(data.inviteCode || "");
   const [codeLoading, setCodeLoading] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [codeError, setCodeError] = useState("");
   const [pwdOld, setPwdOld] = useState(""); const [pwdNew, setPwdNew] = useState(""); const [pwdErr, setPwdErr] = useState(""); const [pwdOk, setPwdOk] = useState(false); const [pwdLoading, setPwdLoading] = useState(false);
   // Suppression de compte — 3 étapes : 0=bouton, 1=saisie mdp, 2=confirmation finale
   const [delStep, setDelStep] = useState(0);
@@ -4117,12 +4159,20 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
   const [delLoading, setDelLoading] = useState(false);
 
   const genCode = async () => {
-    setCodeLoading(true);
-    const code = generateInviteCode();
-    const ok = await saveInviteCode(activeUID || user.uid, code);
-    if (ok) {
-      update(d => { d.inviteCode = code; });
-      setInviteCode(code);
+    setCodeLoading(true); setCodeError("");
+    try {
+      const code = generateInviteCode();
+      const uid = activeUID || user?.uid;
+      if (!uid) { setCodeError("Utilisateur non connecté."); setCodeLoading(false); return; }
+      const ok = await saveInviteCode(uid, code);
+      if (ok) {
+        update(d => { d.inviteCode = code; });
+        setInviteCode(code);
+      } else {
+        setCodeError("Erreur lors de la sauvegarde. Vérifiez votre connexion.");
+      }
+    } catch(e) {
+      setCodeError("Erreur : " + (e.message || "Réessayez."));
     }
     setCodeLoading(false);
   };
@@ -4274,16 +4324,19 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
                   </div>
                   <div style={{ display:"flex",gap:8 }}>
                     <button className="btn btn-primary" style={{ flex:1 }} onClick={copyCode}>{codeCopied?"✅ Copié !":"📋 Copier le code"}</button>
-                    <button className="btn btn-ghost btn-sm" onClick={genCode} disabled={codeLoading}>🔄</button>
+                    <button className="btn btn-ghost btn-sm" onClick={genCode} disabled={codeLoading} title="Générer un nouveau code">🔄</button>
                   </div>
                   <div style={{ fontSize:11,color:"var(--text3)",marginTop:10,lineHeight:1.6 }}>
                     ℹ️ Votre partenaire doit créer un compte via "Rejoindre" et entrer ce code.
                   </div>
                 </div>
               ) : (
-                <button className="btn btn-primary" style={{ width:"100%" }} onClick={genCode} disabled={codeLoading}>
-                  {codeLoading ? "Génération…" : "✨ Générer un code d'invitation"}
-                </button>
+                <>
+                  <button className="btn btn-primary" style={{ width:"100%" }} onClick={genCode} disabled={codeLoading}>
+                    {codeLoading ? <><span style={{display:"inline-block",animation:"spin .8s linear infinite"}}>⟳</span> Génération…</> : "✨ Générer un code d'invitation"}
+                  </button>
+                  {codeError && <div className="alert-banner alert-danger" style={{ marginTop:10 }}>⚠️ {codeError}</div>}
+                </>
               )}
             </div>
 
@@ -4752,10 +4805,10 @@ function NavModal({ station, userLat, userLng, onClose }) {
   if(!lat || !lng) return null;
   const dist = (userLat&&userLng&&station._dist!=null) ? fmtKm(station._dist) : null;
   const opts = [
-    { label:"Apple Plans",  icon:"🍎", sub:"Navigation native iOS / macOS",  href:`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d` },
-    { label:"Google Maps",  icon:"🗺️", sub:"Tous appareils",                  href:`https://maps.google.com/maps?daddr=${lat},${lng}` },
-    { label:"Waze",         icon:"🔵", sub:"Trafic en temps réel",            href:`https://waze.com/ul?ll=${lat},${lng}&navigate=yes` },
-    { label:"Here WeGo",    icon:"📡", sub:"Navigation offline",              href:`https://share.here.com/r/${lat},${lng}` },
+    { label:"Apple Plans",  icon:"🍎", sub:"Navigation native iOS / CarPlay",  href:`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`, primary:true },
+    { label:"Waze",         icon:"🔵", sub:"Trafic en temps réel · CarPlay",   href:`https://waze.com/ul?ll=${lat},${lng}&navigate=yes` },
+    { label:"Google Maps",  icon:"🗺️", sub:"Tous appareils · CarPlay",         href:`https://maps.google.com/maps?daddr=${lat},${lng}&dirflg=d` },
+    { label:"Mappy",        icon:"🗾", sub:"Navigation France",                href:`https://fr.mappy.com/plan#/frontpage/itinerary/to/${lat},${lng}/` },
   ];
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()}
@@ -4779,20 +4832,24 @@ function NavModal({ station, userLat, userLng, onClose }) {
             display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
         <div style={{fontSize:10,color:"var(--text3)",marginBottom:12,fontWeight:700,
-          textTransform:"uppercase",letterSpacing:1.2}}>Navigation vers cette station</div>
+          textTransform:"uppercase",letterSpacing:1.2}}>Choisir l'app de navigation</div>
         {opts.map(o=>(
           <a key={o.label} href={o.href} target="_blank" rel="noopener noreferrer"
-            style={{display:"flex",alignItems:"center",gap:14,padding:"13px 16px",marginBottom:8,
-              background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
+            style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",marginBottom:8,
+              background:o.primary?"linear-gradient(135deg,rgba(167,139,250,0.18),rgba(96,165,250,0.12))":"rgba(255,255,255,0.04)",
+              border:o.primary?"1px solid rgba(167,139,250,0.4)":"1px solid rgba(255,255,255,0.08)",
               borderRadius:14,textDecoration:"none",color:"#fff",transition:"all .18s",cursor:"pointer"}}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.borderColor="rgba(167,139,250,0.3)"}}
-            onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.borderColor="rgba(255,255,255,0.08)"}}>
-            <span style={{fontSize:24,flexShrink:0}}>{o.icon}</span>
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.18)";e.currentTarget.style.borderColor="rgba(167,139,250,0.4)"}}
+            onMouseLeave={e=>{e.currentTarget.style.background=o.primary?"linear-gradient(135deg,rgba(167,139,250,0.18),rgba(96,165,250,0.12))":"rgba(255,255,255,0.04)";e.currentTarget.style.borderColor=o.primary?"rgba(167,139,250,0.4)":"rgba(255,255,255,0.08)"}}>
+            <span style={{fontSize:26,flexShrink:0}}>{o.icon}</span>
             <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:13}}>{o.label}</div>
-              <div style={{fontSize:11,color:"var(--text3)"}}>{o.sub}</div>
+              <div style={{fontWeight:800,fontSize:14,display:"flex",alignItems:"center",gap:7}}>
+                {o.label}
+                {o.primary&&<span style={{fontSize:9,background:"var(--purple)",color:"#fff",borderRadius:6,padding:"1px 6px",fontWeight:900,letterSpacing:.5}}>CARPLAY</span>}
+              </div>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>{o.sub}</div>
             </div>
-            <span style={{color:"var(--text3)",fontSize:18}}>›</span>
+            <span style={{color:"var(--purple)",fontSize:20,fontWeight:900}}>›</span>
           </a>
         ))}
       </div>
@@ -5064,7 +5121,7 @@ function MeteoPage() {
               </div>
 
               {/* Indicateurs droite */}
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,minWidth:200 }}>
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,minWidth:200 }}>
                 {[
                   { icon:"💧", label:"Humidité",    val:`${cur.relative_humidity_2m}%`,
                     color:humidColor(cur.relative_humidity_2m) },
@@ -5080,15 +5137,18 @@ function MeteoPage() {
                     color:"#a3e635" },
                 ].map((item,i) => (
                   <div key={i} style={{
-                    background:"rgba(0,0,0,0.2)",backdropFilter:"blur(8px)",
-                    borderRadius:14,padding:"10px 12px",
-                    border:"1px solid rgba(255,255,255,0.12)",
+                    background:"rgba(0,0,0,0.22)",backdropFilter:"blur(8px)",
+                    borderRadius:16,padding:"14px 14px",
+                    border:"1px solid rgba(255,255,255,0.14)",
+                    display:"flex",flexDirection:"column",justifyContent:"space-between",
                   }}>
-                    <div style={{ fontSize:18,marginBottom:3 }}>{item.icon}</div>
-                    <div style={{ fontSize:9,color:"rgba(255,255,255,0.5)",fontWeight:700,
-                      textTransform:"uppercase",letterSpacing:.8,marginBottom:2 }}>{item.label}</div>
-                    <div style={{ fontWeight:900,fontSize:14,color:item.color||"#fff" }}>{item.val}</div>
-                    {item.sub&&<div style={{ fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1 }}>{item.sub}</div>}
+                    <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:6 }}>
+                      <span style={{fontSize:22}}>{item.icon}</span>
+                      <span style={{ fontSize:10,color:"rgba(255,255,255,0.55)",fontWeight:700,
+                        textTransform:"uppercase",letterSpacing:.8 }}>{item.label}</span>
+                    </div>
+                    <div style={{ fontWeight:900,fontSize:20,color:item.color||"#fff",lineHeight:1 }}>{item.val}</div>
+                    {item.sub&&<div style={{ fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:4,fontWeight:600 }}>{item.sub}</div>}
                   </div>
                 ))}
               </div>
@@ -5689,15 +5749,13 @@ function EssencePage() {
                   const minPrice=Math.min(...stationsWithDist.filter(x=>x[k]!=null).map(x=>x[k]));
                   return Math.abs(s[k]-minPrice)<0.0005; // tolérance flottant
                 };
-                const mapsUrl=s.lat?`maps://?daddr=${s.lat},${s.lng}&dirflg=d`:null;
                 return (
                   <div key={s.id||i}
-                    onClick={()=>mapsUrl&&window.open(mapsUrl,'_blank')}
                     style={{
                       background:"rgba(255,255,255,0.03)",
                       border:"1px solid rgba(255,255,255,0.08)",
                       borderRadius:16,overflow:"hidden",
-                      cursor:mapsUrl?"pointer":"default",
+                      cursor:"default",
                       transition:"transform .15s,box-shadow .15s,border-color .15s",
                     }}
                     onTouchStart={e=>{e.currentTarget.style.transform="scale(0.985)";}}
@@ -5735,23 +5793,24 @@ function EssencePage() {
                         </div>
                       </div>
 
-                      {/* Bouton Maps — <a> natif pour iOS Plans */}
-                      {mapsUrl&&(
-                        <a
-                          href={mapsUrl||"#"}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={e=>{e.stopPropagation(); if(!mapsUrl) e.preventDefault();}}
+                      {/* Bouton navigation — ouvre le sélecteur d'appli (CarPlay compatible) */}
+                      {s.lat&&s.lng&&(
+                        <button
+                          onClick={e=>{e.stopPropagation(); setNavStation(s);}}
                           style={{
-                            width:42,height:42,borderRadius:12,flexShrink:0,
-                            background:"rgba(167,139,250,0.12)",
-                            border:"1px solid rgba(167,139,250,0.3)",
+                            width:44,height:44,borderRadius:13,flexShrink:0,
+                            background:"linear-gradient(135deg,rgba(167,139,250,0.2),rgba(96,165,250,0.2))",
+                            border:"1px solid rgba(167,139,250,0.4)",
                             display:"flex",alignItems:"center",justifyContent:"center",
-                            fontSize:20,textDecoration:"none",
+                            fontSize:22,cursor:"pointer",
+                            boxShadow:"0 2px 12px rgba(167,139,250,0.3)",
+                            transition:"all .18s",
                           }}
-                          title="Ouvrir dans Plans">
+                          onTouchStart={e=>{e.currentTarget.style.transform="scale(0.9)";e.currentTarget.style.background="linear-gradient(135deg,rgba(167,139,250,0.35),rgba(96,165,250,0.35))";}}
+                          onTouchEnd={e=>{e.currentTarget.style.transform="";e.currentTarget.style.background="linear-gradient(135deg,rgba(167,139,250,0.2),rgba(96,165,250,0.2))";}}
+                          title="Naviguer vers cette station">
                           🗺️
-                        </a>
+                        </button>
                       )}
                     </div>
 
@@ -5863,26 +5922,69 @@ function EssencePage() {
           <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
             {Object.entries(FUEL_META).map(([k,m])=>(
               <button key={k} onClick={()=>setChartFuel(k)}
-                style={{padding:"6px 12px",borderRadius:9,border:chartFuel===k?`1px solid ${m.color}`:"1px solid var(--border)",background:chartFuel===k?`${m.color}18`:"var(--glass)",color:chartFuel===k?m.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12}}>
+                style={{padding:"8px 16px",borderRadius:20,border:chartFuel===k?`1.5px solid ${m.color}`:"1px solid var(--border)",background:chartFuel===k?`${m.color}22`:"var(--glass)",color:chartFuel===k?m.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,transition:"all .2s",boxShadow:chartFuel===k?`0 4px 14px ${m.color}30`:"none"}}>
                 {m.icon} {m.label}
               </button>
             ))}
           </div>
-          <div className="card" style={{marginBottom:14}}>
-            <div style={{fontWeight:800,fontSize:14,marginBottom:4}}>📈 {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label} · {citySearch}</div>
-            <div style={{fontSize:11,color:"var(--text3)",marginBottom:16}}>Actualisation toutes les 10 min · {chartData.length} points</div>
-            {chartData.length>=2?(
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData} margin={{top:5,right:20,left:0,bottom:5}}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
-                  <XAxis dataKey="tsFmt" tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={{stroke:"var(--border)"}}/>
-                  <YAxis domain={["auto","auto"]} tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={false} tickFormatter={v=>v?.toFixed(3)+"€"}/>
-                  <Tooltip content={<FuelTooltip/>}/>
-                  <Legend wrapperStyle={{fontSize:11,paddingTop:10}}/>
-                  {chartLines.map(l=>(<Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color} strokeWidth={2.5} dot={{r:3,fill:l.color,strokeWidth:0}} activeDot={{r:5,strokeWidth:0}} name={l.key}/>))}
-                </LineChart>
-              </ResponsiveContainer>
-            ):(
+          <div className="card" style={{marginBottom:14,background:"linear-gradient(145deg,rgba(255,255,255,0.03),rgba(0,0,0,0.1))"}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,gap:10,flexWrap:"wrap"}}>
+              <div>
+                <div style={{fontWeight:900,fontSize:16,marginBottom:3}}>
+                  <span style={{color:FUEL_META[chartFuel]?.color}}>{FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label}</span>
+                  {" · "}{citySearch}
+                </div>
+                <div style={{fontSize:11,color:"var(--text3)"}}>Actualisation toutes les 10 min · {chartData.length} points</div>
+              </div>
+              {/* Légende - station la moins chère */}
+              {chartLines.length>0&&(
+                <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(74,222,128,0.08)",border:"1px solid rgba(74,222,128,0.3)",borderRadius:10,padding:"5px 10px"}}>
+                  <div style={{width:18,height:3,borderRadius:2,background:"#4ade80",boxShadow:"0 0 8px #4ade8080"}}/>
+                  <span style={{fontSize:11,color:"#4ade80",fontWeight:800}}>🏆 Moins chère</span>
+                </div>
+              )}
+            </div>
+            {chartData.length>=2?(()=>{
+              // Déterminer la station actuellement la moins chère pour ce carburant
+              const lastPoint = chartData[chartData.length-1];
+              let cheapestStation = null, cheapestPrice = Infinity;
+              chartLines.forEach(l=>{
+                const price = lastPoint[l.key];
+                if(price!=null && price<cheapestPrice){ cheapestPrice=price; cheapestStation=l.key; }
+              });
+              return (
+                <ResponsiveContainer width="100%" height={320}>
+                  <LineChart data={chartData} margin={{top:10,right:20,left:0,bottom:5}}>
+                    <defs>
+                      <filter id="glowGreen">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      </filter>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
+                    <XAxis dataKey="tsFmt" tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={{stroke:"var(--border)"}}/>
+                    <YAxis domain={["auto","auto"]} tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={false} tickFormatter={v=>v?.toFixed(3)+"€"}/>
+                    <Tooltip content={<FuelTooltip cheapest={cheapestStation}/>}/>
+                    <Legend wrapperStyle={{fontSize:11,paddingTop:10}}/>
+                    {chartLines.map(l=>{
+                      const isCheapest = l.key===cheapestStation;
+                      return (
+                        <Line key={l.key} type="monotone" dataKey={l.key}
+                          stroke={isCheapest?"#4ade80":l.color}
+                          strokeWidth={isCheapest?3.5:1.5}
+                          strokeDasharray={isCheapest?"none":"none"}
+                          dot={isCheapest?{r:4,fill:"#4ade80",strokeWidth:2,stroke:"#fff"}:{r:2,fill:l.color,strokeWidth:0}}
+                          activeDot={{r:6,strokeWidth:2,stroke:isCheapest?"#4ade80":l.color}}
+                          opacity={isCheapest?1:0.55}
+                          name={isCheapest?`🏆 ${l.key}`:l.key}
+                          style={isCheapest?{filter:"drop-shadow(0 0 6px #4ade8080)"}:{}}
+                        />
+                      );
+                    })}
+                  </LineChart>
+                </ResponsiveContainer>
+              );
+            })():(
               <div style={{textAlign:"center",padding:"40px 20px",color:"var(--text3)"}}>
                 <div style={{fontSize:44,marginBottom:10}}>📊</div>
                 <div style={{fontWeight:700,marginBottom:16}}>Historique en cours de constitution</div>
@@ -5892,16 +5994,31 @@ function EssencePage() {
           </div>
           {stationsWithDist.length>0&&avgPrices[chartFuel]!=null&&(
             <div className="card">
-              <div style={{fontWeight:800,fontSize:14,marginBottom:14}}>📊 Comparatif — {FUEL_META[chartFuel]?.label}</div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={stationsWithDist.filter(s=>s[chartFuel]!=null).map(s=>({nom:(s.nom||"Station").slice(0,14),prix:s[chartFuel]}))} margin={{top:0,right:16,left:0,bottom:0}}>
+              <div style={{fontWeight:900,fontSize:15,marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{color:FUEL_META[chartFuel]?.color}}>📊</span> Comparatif stations — <span style={{color:FUEL_META[chartFuel]?.color}}>{FUEL_META[chartFuel]?.label}</span>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={stationsWithDist.filter(s=>s[chartFuel]!=null).map((s,i)=>{
+                  const minP=Math.min(...stationsWithDist.filter(x=>x[chartFuel]!=null).map(x=>x[chartFuel]));
+                  return {nom:(s.nom||"Station").slice(0,14),prix:s[chartFuel],isBest:Math.abs(s[chartFuel]-minP)<0.0005};
+                })} margin={{top:8,right:16,left:0,bottom:0}}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false}/>
                   <XAxis dataKey="nom" tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={{stroke:"var(--border)"}}/>
                   <YAxis domain={["auto","auto"]} tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={false} tickFormatter={v=>v.toFixed(3)}/>
-                  <Tooltip formatter={v=>[v?.toFixed(3)+" €/L","Prix"]} contentStyle={{background:"var(--card,#1a1635)",border:"1px solid var(--border)",borderRadius:10,fontSize:12}}/>
-                  <Bar dataKey="prix" radius={[8,8,0,0]} fill={FUEL_META[chartFuel]?.color||"#a78bfa"} maxBarSize={80}/>
+                  <Tooltip formatter={(v,n,p)=>{ const isBest=p?.payload?.isBest; return [`${v?.toFixed(3)} €/L${isBest?" 🏆 Moins cher":""}`, "Prix"]; }} contentStyle={{background:"var(--card,#1a1635)",border:"1px solid var(--border)",borderRadius:10,fontSize:12}}/>
+                  <Bar dataKey="prix" radius={[8,8,0,0]} maxBarSize={80}>
+                    {stationsWithDist.filter(s=>s[chartFuel]!=null).map((s,i)=>{
+                      const minP=Math.min(...stationsWithDist.filter(x=>x[chartFuel]!=null).map(x=>x[chartFuel]));
+                      const isBest=Math.abs(s[chartFuel]-minP)<0.0005;
+                      return <Cell key={i} fill={isBest?"#4ade80":(FUEL_META[chartFuel]?.color||"#a78bfa")} opacity={isBest?1:0.6}/>;
+                    })}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              <div style={{marginTop:10,display:"flex",alignItems:"center",gap:8,fontSize:11,color:"var(--text3)"}}>
+                <div style={{width:14,height:14,borderRadius:4,background:"#4ade80",flexShrink:0}}/>
+                Station la moins chère actuellement
+              </div>
             </div>
           )}
         </div>
@@ -6151,16 +6268,18 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
                 {[
                   { icon:"🛣️", label:"/ 100 km",    val:`${per100?.toFixed(2)}€`, sub:`${effectiveConso}L/100`, color:m.color },
-                  { icon:"⛽", label:"Prix / L",     val:`${price.toFixed(3)}€`,  sub:"à la pompe",              color:m.color },
+                  { icon:"⛽", label:"Prix / L",     val:`${price.toFixed(3)}€`,  sub:selectedStation ? (resolveNom(selectedStation).nom||"Station").slice(0,16) : `Moy. ${eligibleStations.length} stations`, color:m.color, highlight:true },
                   ...(distancePossible ? [{ icon:"📍", label:"Distance",  val:`≈${distancePossible}km`, sub:`avec ${liters}L`, color:"#60a5fa" }] : []),
                   ...(saving           ? [{ icon:"💸", label:"Économie",  val:`-${saving.toFixed(2)}€`, sub:"vs cette station", color:"#4ade80" }] : []),
                 ].map((s,i)=>(
-                  <div key={i} style={{ textAlign:"center",padding:"10px 8px",borderRadius:12,
-                    background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)" }}>
-                    <div style={{ fontSize:16,marginBottom:4 }}>{s.icon}</div>
-                    <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.7,marginBottom:4 }}>{s.label}</div>
-                    <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:18,color:s.color||"var(--text)" }}>{s.val}</div>
-                    <div style={{ fontSize:9,color:"var(--text3)",marginTop:2 }}>{s.sub}</div>
+                  <div key={i} style={{ textAlign:"center",padding:"12px 8px",borderRadius:14,
+                    background:s.highlight?`linear-gradient(145deg,${m.color}22,${m.color}08)`:"rgba(255,255,255,0.04)",
+                    border:s.highlight?`1.5px solid ${m.color}44`:"1px solid rgba(255,255,255,0.07)",
+                    boxShadow:s.highlight?`0 4px 20px ${m.color}20`:"none" }}>
+                    <div style={{ fontSize:18,marginBottom:4 }}>{s.icon}</div>
+                    <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:.7,marginBottom:5 }}>{s.label}</div>
+                    <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:s.highlight?24:20,color:s.color||"var(--text)",textShadow:s.highlight?`0 0 20px ${s.color}60`:"none" }}>{s.val}</div>
+                    <div style={{ fontSize:10,color:"var(--text3)",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",padding:"0 4px" }}>{s.sub}</div>
                   </div>
                 ))}
               </div>
