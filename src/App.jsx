@@ -209,6 +209,7 @@ function processDueBills(data) {
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
+button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 :root{
   --bg:#07060f;--bg2:#0e0c1e;--bg3:#15122a;--bg4:#1a1635;
   --glass:rgba(255,255,255,0.055);--glass2:rgba(255,255,255,0.09);--glass3:rgba(255,255,255,0.12);
@@ -527,13 +528,26 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     background:rgba(7,6,15,0.97);backdrop-filter:blur(24px);
     border-top:1px solid var(--border);
     justify-content:space-around;
-    padding-top:8px;
-    padding-bottom:calc(12px + env(safe-area-inset-bottom));
+    padding-top:10px;
+    padding-bottom:max(20px, calc(env(safe-area-inset-bottom) + 8px));
     padding-left:env(safe-area-inset-left);
     padding-right:env(safe-area-inset-right);
     z-index:250;
+    /* Ensure tappable area is above iOS home indicator */
+    min-height:calc(64px + env(safe-area-inset-bottom));
   }
-  .bnav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 8px;border-radius:12px;cursor:pointer;transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;min-width:48px;position:relative;}
+  /* Extra tap area for nav items */
+  .bnav-item{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;padding:6px 10px;border-radius:12px;cursor:pointer;
+    transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);
+    text-transform:uppercase;letter-spacing:.3px;min-width:48px;
+    position:relative;
+    /* Bigger tap target */
+    min-height:48px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
   .bnav-item.active{color:var(--purple);}
   .bnav-item.active .bnav-icon-wrap{background:rgba(167,139,250,0.18);border-radius:12px;}
   .bnav-icon{font-size:22px;}
@@ -709,11 +723,15 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 `;
 
 // ═══════════════════════════════════════════════════════════
-//  GLOBAL TOOLTIP — fixed-position, never clipped
+//  GLOBAL TOOLTIP — desktop only, never on touch devices
 // ═══════════════════════════════════════════════════════════
+const isTouchDevice = () => window.matchMedia('(hover:none)').matches || ('ontouchstart' in window);
+
 function GlobalTooltip() {
   const [tip, setTip] = useState(null);
   useEffect(() => {
+    // Completely skip on touch/mobile — prevents freeze + misclick
+    if (isTouchDevice()) return;
     let timer;
     const show = (e) => {
       const el = e.target.closest('[data-tip]');
@@ -722,45 +740,32 @@ function GlobalTooltip() {
       timer = setTimeout(() => {
         const rect = el.getBoundingClientRect();
         const TIP_H = 38, TIP_W = 240, GAP = 10;
-        // Would showing above go off-screen?
         const canAbove = rect.top - TIP_H - GAP > 0;
         const canBelow = rect.bottom + TIP_H + GAP < window.innerHeight;
         const below = !canAbove || (!canAbove && canBelow);
-        // X: centre on element, clamp to viewport
         let x = rect.left + rect.width / 2;
         x = Math.max(TIP_W / 2 + 6, Math.min(window.innerWidth - TIP_W / 2 - 6, x));
-        setTip({
-          text: el.dataset.tip,
-          x,
-          y: below ? rect.bottom + GAP : rect.top - GAP,
-          below,
-        });
-      }, 100);
+        setTip({ text: el.dataset.tip, x, y: below ? rect.bottom + GAP : rect.top - GAP, below });
+      }, 120);
     };
     const hide = () => { clearTimeout(timer); setTip(null); };
-    document.addEventListener('mouseover', show, true);
-    document.addEventListener('mouseout',  hide,  true);
-    document.addEventListener('scroll',    hide,  true);
-    document.addEventListener('click',     hide,  true);
+    document.addEventListener('mouseover', show, { passive: true, capture: true });
+    document.addEventListener('mouseout',  hide,  { passive: true, capture: true });
+    document.addEventListener('scroll',    hide,  { passive: true });
+    document.addEventListener('click',     hide,  { passive: true });
     return () => {
       clearTimeout(timer);
       document.removeEventListener('mouseover', show, true);
       document.removeEventListener('mouseout',  hide, true);
-      document.removeEventListener('scroll',    hide, true);
-      document.removeEventListener('click',     hide, true);
+      document.removeEventListener('scroll',    hide);
+      document.removeEventListener('click',     hide);
     };
   }, []);
   if (!tip) return null;
   return (
     <div className={`gtip ${tip.below ? 'tip-below' : 'tip-above'}`}
-      style={{
-        position: 'fixed',
-        left: tip.x,
-        transform: 'translateX(-50%)',
-        zIndex: 999999,
-        pointerEvents: 'none',
-        ...(tip.below ? { top: tip.y } : { bottom: `calc(100vh - ${tip.y}px)` }),
-      }}>
+      style={{ position:'fixed', left:tip.x, transform:'translateX(-50%)', zIndex:999999, pointerEvents:'none',
+        ...(tip.below ? { top:tip.y } : { bottom:`calc(100vh - ${tip.y}px)` }) }}>
       {tip.text}
     </div>
   );
@@ -769,6 +774,18 @@ function GlobalTooltip() {
 // ═══════════════════════════════════════════════════════════
 //  FAVICON — SVG emoji injected dynamically
 // ═══════════════════════════════════════════════════════════
+// Hook mobile — re-évalue si la fenêtre est redimensionnée
+function useIsMobile() {
+  const [mob, setMob] = useState(() => window.innerWidth <= 880);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width:880px)');
+    const handler = (e) => setMob(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return mob;
+}
+
 function useFavicon() {
   useEffect(() => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%23a78bfa"/><stop offset="100%" stop-color="%23f472b6"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(%23g)"/><text y=".9em" font-size="72" x="12">💑</text></svg>`;
@@ -2169,6 +2186,7 @@ function Incomes({ data, update, selMonth, mdata, setModal }) {
 
 
 function Expenses({ data, update, selMonth, mdata, setModal }) {
+  const isMobile = useIsMobile();
   const md = mdata(selMonth);
   const { transactions } = md;
   const [filter, setFilter]   = useState("all");
@@ -2350,7 +2368,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                   </div>
                 )}
 
-                <div style={{ background:"var(--glass)",border:"1px solid var(--border)",borderRadius:18,overflow:"hidden",boxShadow:"0 2px 20px rgba(0,0,0,0.2)" }}>
+                <div style={{ background:"var(--glass)",border:"1px solid var(--border)",borderRadius:18,overflow:"visible",boxShadow:"0 2px 20px rgba(0,0,0,0.2)" }}>
                   {group.items.map((tx, idx) => {
                     const cat  = catMap[tx.categoryId]||{ icon:"❓",color:"#888",name:"Autre" };
                     const prof = profMap[tx.profileId]||{ avatar:"❓",name:"?",color:"#888" };
@@ -2359,76 +2377,115 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                     const amountBar = totalAll>0 ? (tx.amount/totalAll)*100 : 0;
 
                     return (
-                      <div key={tx.id} className="expense-row"
-                        style={{ display:"flex",alignItems:"center",gap:16,padding:"20px 22px",borderBottom:isLast?"none":"1px solid rgba(255,255,255,0.05)",background:"transparent",borderLeft:"3px solid transparent",transition:"all .22s" }}
-                        onMouseEnter={e => { e.currentTarget.style.background=`linear-gradient(135deg,${cat.color}08,rgba(167,139,250,0.05))`; e.currentTarget.style.borderLeftColor=cat.color; e.currentTarget.style.paddingLeft="28px"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background="transparent"; e.currentTarget.style.borderLeftColor="transparent"; e.currentTarget.style.paddingLeft="22px"; }}>
+                      <div key={tx.id}
+                        style={{
+                          borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.05)",
+                          background: "transparent",
+                          transition: "background .2s",
+                          borderRadius: isLast ? "0 0 18px 18px" : 0,
+                        }}
+                        onMouseEnter={isMobile ? undefined : e => { e.currentTarget.style.background=`linear-gradient(135deg,${cat.color}08,rgba(167,139,250,0.05))`; }}
+                        onMouseLeave={isMobile ? undefined : e => { e.currentTarget.style.background="transparent"; }}>
 
-                        {/* Icône catégorie + badge profil */}
-                        <div style={{ position:"relative",flexShrink:0 }} className="tx-icon-wrap">
-                          <div className="tx-icon" style={{ width:62,height:62,borderRadius:20,background:`linear-gradient(135deg,${cat.color}22,${cat.color}08)`,border:`2px solid ${cat.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:`0 8px 22px ${cat.color}20,inset 0 1px 0 rgba(255,255,255,0.07)` }}>
-                            {cat.icon}
-                          </div>
-                          <div className="tx-badge" data-tip={`Profil : ${prof.name}`}
-                            style={{ position:"absolute",bottom:-6,right:-6,width:24,height:24,borderRadius:"50%",background:prof.color||"var(--bg3)",border:"2.5px solid var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,boxShadow:`0 2px 8px rgba(0,0,0,0.5)` }}>
-                            {prof.avatar}
-                          </div>
-                        </div>
-
-                        {/* Texte + badges */}
-                        <div className="tx-text-col" style={{ display:"flex",flexDirection:"column",gap:8,flex:1,minWidth:0 }}>
-                          {/* Titre + badge AUTO */}
-                          <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-                            <span className="tx-title" style={{ fontWeight:900,fontSize:16,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:260 }}>{tx.label}</span>
-                            {tx.auto && (
-                              <span style={{ flexShrink:0,fontSize:9.5,background:"rgba(167,139,250,0.15)",border:"1px solid rgba(167,139,250,0.3)",color:"var(--purple)",borderRadius:20,padding:"2px 8px",fontWeight:800,letterSpacing:.3 }}>
-                                🤖 AUTO
-                              </span>
-                            )}
-                          </div>
-                          {/* Badges profil + catégorie + date */}
-                          <div className="tx-badges-row" style={{ display:"flex",alignItems:"center",gap:6,flexWrap:"wrap" }}>
-                            <span className="tx-badge-prof tip" data-tip={`Profil payeur : ${prof.name}`}
-                              style={{ display:"inline-flex",alignItems:"center",gap:5,background:`${prof.color||"#888"}12`,borderRadius:20,padding:"4px 11px",border:`1px solid ${prof.color||"#888"}25`,fontSize:12,fontWeight:700,color:prof.color||"var(--text2)" }}>
-                              <span style={{ fontSize:14 }}>{prof.avatar}</span>
-                              <span>{prof.name}</span>
-                            </span>
-                            <span className="tx-badge-cat tip" data-tip={`Catégorie : ${cat.name}`}
-                              style={{ display:"inline-flex",alignItems:"center",gap:5,background:`${cat.color}12`,borderRadius:20,padding:"4px 11px",border:`1px solid ${cat.color}28`,fontSize:12,fontWeight:700,color:cat.color }}>
-                              <span>{cat.icon}</span>
-                              <span>{cat.name}</span>
-                            </span>
-                            <span className="tx-badge-date tip" data-tip="Date et heure de la transaction"
-                              style={{ display:"inline-flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.04)",borderRadius:20,padding:"4px 11px",border:"1px solid rgba(255,255,255,0.07)",fontSize:11.5,color:"var(--text3)",fontWeight:600 }}>
-                              🕐 {smartDate(tx.timestamp)}
-                            </span>
-                          </div>
-                          {/* Barre de proportion */}
-                          <div className="tx-bar-row" style={{ display:"flex",alignItems:"center",gap:8 }}>
-                            <div style={{ flex:1,maxWidth:160,height:3,background:"rgba(255,255,255,0.07)",borderRadius:3,overflow:"hidden" }}>
-                              <div style={{ width:`${amountBar}%`,height:"100%",background:`linear-gradient(90deg,${cat.color},${cat.color}80)`,borderRadius:3,transition:"width .6s" }}/>
+                        {isMobile ? (
+                          /* ── MOBILE LAYOUT ── */
+                          <div style={{ padding:"12px 14px" }}>
+                            {/* Row 1: icon + title + amount */}
+                            <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:8 }}>
+                              {/* Icon */}
+                              <div style={{ position:"relative",flexShrink:0,width:44,height:44 }}>
+                                <div style={{ width:44,height:44,borderRadius:13,background:`linear-gradient(135deg,${cat.color}22,${cat.color}08)`,border:`2px solid ${cat.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22 }}>
+                                  {cat.icon}
+                                </div>
+                                <div style={{ position:"absolute",bottom:-3,right:-3,width:18,height:18,borderRadius:"50%",background:prof.color||"var(--bg3)",border:"2px solid var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10 }}>
+                                  {prof.avatar}
+                                </div>
+                              </div>
+                              {/* Title + category */}
+                              <div style={{ flex:1,minWidth:0 }}>
+                                <div style={{ fontWeight:800,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3 }}>{tx.label}</div>
+                                <div style={{ display:"flex",alignItems:"center",gap:5,flexWrap:"nowrap",overflow:"hidden" }}>
+                                  <span style={{ display:"inline-flex",alignItems:"center",gap:3,background:`${cat.color}15`,borderRadius:20,padding:"2px 8px",border:`1px solid ${cat.color}25`,fontSize:11,fontWeight:700,color:cat.color,flexShrink:0 }}>
+                                    {cat.icon} {cat.name}
+                                  </span>
+                                  <span style={{ fontSize:10.5,color:"var(--text3)",flexShrink:0 }}>
+                                    🕐 {smartDate(tx.timestamp)}
+                                  </span>
+                                </div>
+                              </div>
+                              {/* Amount */}
+                              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:17,color:"var(--red)",flexShrink:0 }}>
+                                -{fmt(tx.amount)}
+                              </div>
                             </div>
-                            <span style={{ fontSize:10,color:"var(--text3)",fontWeight:700 }}>{pct}% du total</span>
+                            {/* Row 2: action buttons */}
+                            <div style={{ display:"flex",gap:6 }}>
+                              <button onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"8px 6px",borderRadius:10,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.08)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif" }}>
+                                ✏️ Modifier
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); duplicate(tx); }}
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"8px 6px",borderRadius:10,border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"var(--blue)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif" }}>
+                                📋 Dupliquer
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); del(tx.id); }}
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"8px 6px",borderRadius:10,border:"1px solid rgba(248,113,113,0.3)",background:"rgba(248,113,113,0.08)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif" }}>
+                                🗑 Suppr.
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          /* ── DESKTOP LAYOUT ── */
+                          <div className="expense-row" style={{ display:"flex",alignItems:"center",gap:16,padding:"20px 22px",borderLeft:"3px solid transparent",transition:"all .22s" }}
+                            onMouseEnter={e => { e.currentTarget.style.borderLeftColor=cat.color; e.currentTarget.style.paddingLeft="28px"; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderLeftColor="transparent"; e.currentTarget.style.paddingLeft="22px"; }}>
 
-                        {/* Montant */}
-                        <div className="tx-amount-col tip" data-tip={`${pct}% du total mensuel (${fmt(totalAll)})`}
-                          style={{ marginLeft:"auto",textAlign:"right",flexShrink:0,minWidth:100 }}>
-                          <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:22,color:"var(--red)",textShadow:"0 0 18px rgba(248,113,113,0.3)",letterSpacing:-.5 }}>
-                            -{fmt(tx.amount)}
+                            <div style={{ position:"relative",flexShrink:0 }} className="tx-icon-wrap">
+                              <div className="tx-icon" style={{ width:62,height:62,borderRadius:20,background:`linear-gradient(135deg,${cat.color}22,${cat.color}08)`,border:`2px solid ${cat.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:`0 8px 22px ${cat.color}20,inset 0 1px 0 rgba(255,255,255,0.07)` }}>
+                                {cat.icon}
+                              </div>
+                              <div className="tx-badge" style={{ position:"absolute",bottom:-6,right:-6,width:24,height:24,borderRadius:"50%",background:prof.color||"var(--bg3)",border:"2.5px solid var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,boxShadow:`0 2px 8px rgba(0,0,0,0.5)` }}>
+                                {prof.avatar}
+                              </div>
+                            </div>
+
+                            <div className="tx-text-col" style={{ display:"flex",flexDirection:"column",gap:8,flex:1,minWidth:0 }}>
+                              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                                <span className="tx-title" style={{ fontWeight:900,fontSize:16,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:260 }}>{tx.label}</span>
+                                {tx.auto && <span style={{ flexShrink:0,fontSize:9.5,background:"rgba(167,139,250,0.15)",border:"1px solid rgba(167,139,250,0.3)",color:"var(--purple)",borderRadius:20,padding:"2px 8px",fontWeight:800 }}>🤖 AUTO</span>}
+                              </div>
+                              <div style={{ display:"flex",alignItems:"center",gap:6,flexWrap:"wrap" }}>
+                                <span className="tip" data-tip={`Profil : ${prof.name}`} style={{ display:"inline-flex",alignItems:"center",gap:5,background:`${prof.color||"#888"}12`,borderRadius:20,padding:"4px 11px",border:`1px solid ${prof.color||"#888"}25`,fontSize:12,fontWeight:700,color:prof.color||"var(--text2)" }}>
+                                  <span style={{ fontSize:14 }}>{prof.avatar}</span><span>{prof.name}</span>
+                                </span>
+                                <span className="tip" data-tip={`Catégorie : ${cat.name}`} style={{ display:"inline-flex",alignItems:"center",gap:5,background:`${cat.color}12`,borderRadius:20,padding:"4px 11px",border:`1px solid ${cat.color}28`,fontSize:12,fontWeight:700,color:cat.color }}>
+                                  <span>{cat.icon}</span><span>{cat.name}</span>
+                                </span>
+                                <span className="tip" data-tip="Date" style={{ display:"inline-flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.04)",borderRadius:20,padding:"4px 11px",border:"1px solid rgba(255,255,255,0.07)",fontSize:11.5,color:"var(--text3)",fontWeight:600 }}>
+                                  🕐 {smartDate(tx.timestamp)}
+                                </span>
+                              </div>
+                              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                                <div style={{ flex:1,maxWidth:160,height:3,background:"rgba(255,255,255,0.07)",borderRadius:3,overflow:"hidden" }}>
+                                  <div style={{ width:`${amountBar}%`,height:"100%",background:`linear-gradient(90deg,${cat.color},${cat.color}80)`,borderRadius:3,transition:"width .6s" }}/>
+                                </div>
+                                <span style={{ fontSize:10,color:"var(--text3)",fontWeight:700 }}>{pct}% du total</span>
+                              </div>
+                            </div>
+
+                            <div className="tx-amount-col tip" data-tip={`${pct}% du total mensuel`} style={{ marginLeft:"auto",textAlign:"right",flexShrink:0,minWidth:100 }}>
+                              <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:22,color:"var(--red)",textShadow:"0 0 18px rgba(248,113,113,0.3)",letterSpacing:-.5 }}>
+                                -{fmt(tx.amount)}
+                              </div>
+                            </div>
+
+                            <div className="row-actions" style={{ display:"flex",flexDirection:"column",gap:5,flexShrink:0 }}>
+                              <button onClick={() => setModal({ type:"editTransaction",tx,selMonth })} className="action-btn action-btn-edit tip" data-tip="Modifier">✏️ Modifier</button>
+                              <button onClick={() => duplicate(tx)} className="action-btn action-btn-dup tip" data-tip="Dupliquer">📋 Dupliquer</button>
+                              <button onClick={() => del(tx.id)} className="action-btn action-btn-del tip" data-tip="Supprimer">🗑 Supprimer</button>
+                            </div>
                           </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="row-actions" style={{ display:"flex",flexDirection:"column",gap:5,flexShrink:0 }}>
-                          <button onClick={() => setModal({ type:"editTransaction",tx,selMonth })}
-                            className="action-btn action-btn-edit tip tip-right" data-tip="Modifier cette dépense">✏️ Modifier</button>
-                          <button onClick={() => duplicate(tx)}
-                            className="action-btn action-btn-dup tip tip-right" data-tip="Dupliquer à l'instant présent">📋 Dupliquer</button>
-                          <button onClick={() => del(tx.id)}
-                            className="action-btn action-btn-del tip tip-right" data-tip="Supprimer définitivement">🗑 Supprimer</button>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
