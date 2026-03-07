@@ -3954,19 +3954,24 @@ function EssencePage() {
     return ()=>clearInterval(t);
   },[]);
 
-  // ── Géolocalisation ──
+  // ── Géolocalisation toggle ON / OFF ──
   const locateUser = () => {
-    if(!navigator.geolocation){ setError("Géolocalisation non supportée."); return; }
+    if(userLat && userLng) {
+      // GPS déjà actif → on le désactive et on revient à la recherche manuelle
+      setUserLat(null); setUserLng(null);
+      doFetch(citySearch, radius);
+      return;
+    }
+    if(!navigator.geolocation){ setError("Géolocalisation non supportée par ce navigateur."); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       ({coords})=>{
         setUserLat(coords.latitude); setUserLng(coords.longitude);
         setLocating(false);
-        // Recherche autour de la position
         doFetchGeo(coords.latitude, coords.longitude, radius);
       },
       ()=>{ setLocating(false); setError("Localisation refusée. Vérifiez les permissions du navigateur."); },
-      {enableHighAccuracy:true,timeout:9000}
+      {enableHighAccuracy:true, timeout:9000}
     );
   };
 
@@ -4017,13 +4022,67 @@ function EssencePage() {
     }).filter(s=>Object.keys(FUEL_META).some(k=>s[k]!=null));
   };
 
-  const finalize = (parsed, city) => {
-    setStations(parsed);
+  const finalize = async (parsed, city) => {
+    // ── Enrichissement OSM : récupère le vrai nom/enseigne de chaque station ──
+    let enriched = parsed;
+    const withGeo = parsed.filter(s=>s.lat&&s.lng);
+    if(withGeo.length > 0){
+      try{
+        const lats=withGeo.map(s=>s.lat), lngs=withGeo.map(s=>s.lng);
+        const pad=0.025;
+        const bbox=[
+          (Math.min(...lats)-pad).toFixed(5),(Math.min(...lngs)-pad).toFixed(5),
+          (Math.max(...lats)+pad).toFixed(5),(Math.max(...lngs)+pad).toFixed(5),
+        ].join(",");
+        const ovQ=`[out:json][timeout:8];(node[amenity=fuel](${bbox});way[amenity=fuel](${bbox}););out center tags;`;
+        const ENDPOINTS=[
+          "https://overpass-api.de/api/interpreter",
+          "https://overpass.kuro.mu/api/interpreter",
+          "https://overpass.openstreetmap.ru/api/interpreter",
+        ];
+        let ovData=null;
+        for(const ep of ENDPOINTS){
+          try{
+            const r=await fetch(ep,{method:"POST",body:"data="+encodeURIComponent(ovQ),signal:AbortSignal.timeout(6000)});
+            if(r.ok){ ovData=await r.json(); break; }
+          }catch{ /* essaie suivant */ }
+        }
+        if(ovData?.elements?.length){
+          const haverM=(la1,lo1,la2,lo2)=>{
+            const R=6371000,d2r=Math.PI/180;
+            const dLa=(la2-la1)*d2r,dLo=(lo2-lo1)*d2r;
+            const a=Math.sin(dLa/2)**2+Math.cos(la1*d2r)*Math.cos(la2*d2r)*Math.sin(dLo/2)**2;
+            return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+          };
+          const osmNodes=ovData.elements.map(el=>({
+            lat:el.lat??el.center?.lat, lng:el.lon??el.center?.lon,
+            name:el.tags?.brand||el.tags?.name||el.tags?.operator||"",
+          })).filter(n=>n.lat&&n.lng&&n.name&&n.name.length>2);
+
+          enriched=parsed.map(s=>{
+            if(!s.lat||!s.lng) return s;
+            let best=null, bestDist=100; // max 100m
+            osmNodes.forEach(n=>{
+              const d=haverM(s.lat,s.lng,n.lat,n.lng);
+              if(d<bestDist){bestDist=d;best=n;}
+            });
+            if(!best) return s;
+            const osmName=best.name;
+            if(osmName && !/^\d/.test(osmName) && osmName.length>2){
+              return {...s, nom:osmName, enseignes:osmName};
+            }
+            return s;
+          });
+        }
+      }catch{ /* OSM optionnel */ }
+    }
+
+    setStations(enriched);
     setLastUpdate(new Date());
     const ts=new Date().toISOString();
     const tsFmt=new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"short"})+" "+
                 new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
-    const newEntries=parsed.map(s=>({
+    const newEntries=enriched.map(s=>({
       ts,tsFmt,stationId:s.id,stationNom:(s.nom||"Station").slice(0,20),
       ...Object.fromEntries(Object.keys(FUEL_META).map(k=>[k,s[k]])),
     }));
@@ -4032,7 +4091,7 @@ function EssencePage() {
       const last10=new Date(Date.now()-600000).toISOString();
       const cleaned=prev.filter(e=>e.ts>=cutoff&&e.ts<last10);
       const next=[...cleaned,...newEntries].slice(-800);
-      try{ localStorage.setItem(LS_KEY,JSON.stringify({stations:parsed,history:next,city,ts:Date.now()})); }catch{}
+      try{ localStorage.setItem(LS_KEY,JSON.stringify({stations:enriched,history:next,city,ts:Date.now()})); }catch{}
       return next;
     });
   };
@@ -4218,15 +4277,16 @@ function EssencePage() {
           </button>
           {/* Bouton géolocalisation */}
           <button onClick={locateUser} disabled={locating}
-            style={{padding:"11px 16px",borderRadius:11,border:"1px solid rgba(167,139,250,0.35)",
-              background:userLat?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.05)",
-              color:userLat?"var(--purple)":"var(--text2)",cursor:"pointer",
+            style={{padding:"11px 16px",borderRadius:11,
+              border:userLat?"1px solid rgba(248,113,113,0.4)":"1px solid rgba(167,139,250,0.35)",
+              background:userLat?"rgba(248,113,113,0.12)":"rgba(255,255,255,0.05)",
+              color:userLat?"var(--red)":"var(--text2)",cursor:"pointer",
               fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap",
               display:"flex",alignItems:"center",gap:7,flexShrink:0,transition:"all .2s"}}>
             {locating
               ? <><span style={{animation:"spin .7s linear infinite",display:"inline-block"}}>⟳</span> Localisation…</>
               : userLat
-                ? <>📍 GPS actif</>
+                ? <>📍 Désactiver GPS</>
                 : <>📍 Me localiser</>}
           </button>
         </div>
@@ -4242,47 +4302,82 @@ function EssencePage() {
       {/* ══ TAB PRIX ══ */}
       {activeTab==="prices" && stationsWithDist.length>0 && (
         <div>
-          {/* Cartes meilleurs prix */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:10,marginBottom:20}}>
+          {/* ── Cartes meilleurs prix (redesign) ── */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12,marginBottom:22}}>
             {Object.entries(FUEL_META).map(([k,meta])=>{
               const list=stationsWithDist.filter(s=>s[k]!=null);
               if(!list.length) return null;
               const best=list.reduce((a,b)=>a[k]<b[k]?a:b);
+              const nomAffiche=(best.nom||"Station").toUpperCase();
+              const adresseAffiche=best.adresse||"";
+              const villeAffiche=best.ville||"";
               return (
                 <div key={k}
                   onClick={()=>best.lat&&setNavStation(best)}
-                  style={{background:`linear-gradient(160deg,${meta.color}0b,transparent)`,border:`1.5px solid ${meta.color}20`,borderRadius:18,padding:"15px 13px",position:"relative",overflow:"hidden",cursor:best.lat?"pointer":"default",transition:"all .18s"}}
-                  onMouseEnter={e=>{if(best.lat){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 8px 24px ${meta.color}25`;}}}
+                  style={{
+                    background:`linear-gradient(145deg,${meta.color}14,${meta.color}05)`,
+                    border:`1.5px solid ${meta.color}30`,
+                    borderRadius:20,padding:"0",position:"relative",overflow:"hidden",
+                    cursor:best.lat?"pointer":"default",transition:"transform .18s,box-shadow .18s",
+                    display:"flex",flexDirection:"column",
+                  }}
+                  onMouseEnter={e=>{if(best.lat){e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`0 12px 30px ${meta.color}30`;}}}
                   onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
-                  <div style={{position:"absolute",bottom:-8,right:-8,fontSize:60,opacity:.04,pointerEvents:"none"}}>{meta.icon}</div>
-                  {/* Badge distance */}
-                  {best._dist!=null&&(
-                    <div style={{position:"absolute",top:10,right:10,background:"rgba(167,139,250,0.2)",border:"1px solid rgba(167,139,250,0.35)",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:800,color:"var(--purple)",display:"flex",alignItems:"center",gap:3}}>
-                      📍{fmtKm(best._dist)}
+
+                  {/* ── Bandeau haut coloré ── */}
+                  <div style={{
+                    background:`linear-gradient(135deg,${meta.color}30,${meta.color}12)`,
+                    padding:"12px 14px 10px",
+                    borderBottom:`1px solid ${meta.color}20`,
+                    display:"flex",alignItems:"center",justifyContent:"space-between",
+                  }}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:30,height:30,borderRadius:9,background:`${meta.color}20`,border:`1.5px solid ${meta.color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>
+                        {meta.icon}
+                      </div>
+                      <span style={{fontWeight:900,fontSize:13,color:meta.color,letterSpacing:.4,textTransform:"uppercase"}}>
+                        {meta.label}
+                      </span>
                     </div>
-                  )}
-                  {/* Label */}
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,paddingRight:best._dist!=null?55:0}}>
-                    <div style={{width:27,height:27,borderRadius:8,background:`${meta.color}16`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{meta.icon}</div>
-                    <span style={{fontWeight:900,fontSize:12,color:meta.color,letterSpacing:.3}}>{meta.label}</span>
+                    {/* Badge distance */}
+                    {best._dist!=null&&(
+                      <div style={{background:"rgba(167,139,250,0.18)",border:"1px solid rgba(167,139,250,0.35)",borderRadius:20,padding:"3px 10px",fontSize:10,fontWeight:800,color:"var(--purple)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:3}}>
+                        📍 {fmtKm(best._dist)}
+                      </div>
+                    )}
                   </div>
-                  {/* Prix */}
-                  <div style={{fontFamily:"'Fraunces',serif",fontWeight:900,lineHeight:1,marginBottom:12}}>
-                    <span style={{fontSize:30,color:"var(--text)",letterSpacing:-1}}>{best[k].toFixed(3)}</span>
-                    <span style={{fontSize:11,color:"var(--text3)",fontWeight:400}}> €/L</span>
-                  </div>
-                  {/* Station */}
-                  <div style={{borderTop:`1px solid ${meta.color}12`,paddingTop:9}}>
-                    <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
-                      <BrandIcon nom={best.nom} enseignes={best.enseignes} size={22}/>
-                      <div style={{fontWeight:900,fontSize:11,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:.3,textTransform:"uppercase"}}>
-                        {(best.nom||"Station").toUpperCase().slice(0,18)}
+
+                  {/* ── Corps de la carte ── */}
+                  <div style={{padding:"14px 16px 16px",flex:1,display:"flex",flexDirection:"column",gap:10}}>
+                    {/* Prix en grand */}
+                    <div style={{display:"flex",alignItems:"baseline",gap:4}}>
+                      <span style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:36,color:"var(--text)",letterSpacing:-1.5,lineHeight:1}}>
+                        {best[k].toFixed(3)}
+                      </span>
+                      <span style={{fontSize:12,color:"var(--text3)",fontWeight:500}}>€/L</span>
+                    </div>
+
+                    {/* Infos station */}
+                    <div style={{borderTop:`1px solid ${meta.color}18`,paddingTop:10,display:"flex",alignItems:"flex-start",gap:10}}>
+                      <BrandIcon nom={best.nom} enseignes={best.enseignes} size={36}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        {/* Nom en blanc majuscules, multi-ligne autorisée */}
+                        <div style={{fontWeight:900,fontSize:12,color:"#ffffff",letterSpacing:.4,lineHeight:1.3,marginBottom:4,wordBreak:"break-word",textTransform:"uppercase"}}>
+                          {nomAffiche}
+                        </div>
+                        {/* Adresse — Ville */}
+                        <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.4,wordBreak:"break-word"}}>
+                          {adresseAffiche}{villeAffiche?` — ${villeAffiche}`:""}
+                        </div>
                       </div>
                     </div>
-                    <div style={{fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {best.adresse}{best.ville?` — ${best.ville}`:""}
-                    </div>
-                    {best.lat&&<div style={{fontSize:10,color:"var(--purple)",fontWeight:700,marginTop:3}}>Cliquer pour l'itinéraire →</div>}
+
+                    {/* Footer : lien itinéraire */}
+                    {best.lat&&(
+                      <div style={{display:"flex",alignItems:"center",gap:5,marginTop:"auto",paddingTop:4}}>
+                        <span style={{fontSize:11,color:meta.color,fontWeight:700}}>🗺️ Voir l'itinéraire</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
