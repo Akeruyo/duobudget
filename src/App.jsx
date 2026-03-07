@@ -3277,7 +3277,7 @@ function ImportCICModal({ close, data, update, selMonth }) {
       </div>
       <div style={{ marginBottom:16 }}>
         <label>Données copiées (optionnel — laisser vide pour coller automatiquement)</label>
-        <textarea ref={textRef} value={raw} onChange={e=>setRaw(e.target.value)} placeholder='Colle ici le JSON copié par l'"'"'extension CIC, ou laisse vide pour lecture auto du presse-papiers…' rows={4}
+        <textarea ref={textRef} value={raw} onChange={e=>setRaw(e.target.value)} placeholder="Colle ici le JSON copié par l'extension CIC, ou laisse vide pour lecture auto du presse-papiers…" rows={4}
           style={{ resize:"vertical",fontFamily:"monospace",fontSize:11.5,color:"var(--text3)" }}/>
       </div>
       <div style={{ display:"flex",gap:10 }}>
