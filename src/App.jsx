@@ -289,7 +289,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
   background:rgba(7,6,15,0.94);backdrop-filter:blur(32px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
-.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;transform:translateZ(0);}
+.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;}
 
 /* ── TOPBAR RIGHT WIDGET ── */
 .topbar-clock{display:flex;align-items:center;gap:0;background:linear-gradient(135deg,rgba(167,139,250,0.14),rgba(244,114,182,0.09));border:1px solid rgba(167,139,250,0.25);border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);flex-shrink:0;}
@@ -354,7 +354,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .nav-badge{margin-left:auto;background:rgba(248,113,113,0.18);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:900;border:1px solid rgba(248,113,113,0.3);}
 
 /* ── CARDS ── */
-.glass{background:rgba(18,16,38,0.92);border:1px solid var(--border);border-radius:var(--r);}
+.glass{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--r);}
 .glass-hover{transition:all .2s;}
 .glass-hover:hover{background:var(--glass2);border-color:var(--border2);box-shadow:var(--shadow-glow);transform:translateY(-1px);}
 .card{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);padding:22px;box-shadow:var(--shadow-card);}
@@ -538,12 +538,12 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     border-top:1px solid var(--border);
     justify-content:space-around;
     padding-top:10px;
-    padding-bottom:max(20px, calc(env(safe-area-inset-bottom) + 8px));
+    padding-bottom:max(4px, calc(env(safe-area-inset-bottom) - 10px));
     padding-left:env(safe-area-inset-left);
     padding-right:env(safe-area-inset-right);
     z-index:250;
     /* Ensure tappable area is above iOS home indicator */
-    min-height:calc(64px + env(safe-area-inset-bottom));
+    min-height:calc(56px + env(safe-area-inset-bottom));
   }
   /* Extra tap area for nav items */
   .bnav-item{
@@ -570,9 +570,6 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .topbar-clock-date{display:none;}
   .topbar-clock{border-radius:12px;}
   .topbar-clock-time{padding:8px 14px;}
-  /* Remove backdrop-filter on topbar/bottom-nav on mobile — causes iOS touch offset */
-  .topbar{background:rgba(7,6,15,0.98) !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
-  .bottom-nav{background:rgba(7,6,15,0.99) !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
 
   /* ── EXPENSE ROW — full mobile redesign ── */
   /* Disable hover effects on touch */
