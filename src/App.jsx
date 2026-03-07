@@ -788,8 +788,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .app-shell{ padding-top:0; }
   .auth-shell{ padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom); }
 }
-
-/* ── STANDALONE PWA — "Ajouter à l'écran d'accueil" iOS ── */
+/* ── STANDALONE PWA "Ajouter à l'écran d'accueil" iOS ── */
 @media(display-mode:standalone){
   .topbar{
     height:calc(52px + env(safe-area-inset-top)) !important;
@@ -802,14 +801,17 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     height:calc(60px + env(safe-area-inset-bottom)) !important;
     padding-top:10px !important;
     padding-bottom:env(safe-area-inset-bottom) !important;
+    padding-left:env(safe-area-inset-left) !important;
+    padding-right:env(safe-area-inset-right) !important;
     align-items:flex-start !important;
+    box-sizing:border-box !important;
   }
   .bnav-item{
     padding-top:2px !important;
-    justify-content:flex-start !important;
+    padding-bottom:0 !important;
   }
   .page-content{
-    padding-bottom:calc(68px + env(safe-area-inset-bottom)) !important;
+    padding-bottom:calc(72px + env(safe-area-inset-bottom)) !important;
   }
 }
 `;
@@ -904,8 +906,7 @@ function useFavicon() {
       document.head.appendChild(vp);
     }
     vp.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
-
-    // ── PWA meta tags — safe-area correct en mode standalone (Add to Home Screen iOS) ──
+    // ── PWA meta tags — active safe-area en mode standalone iOS ──
     [
       ['apple-mobile-web-app-capable',          'yes'],
       ['mobile-web-app-capable',                'yes'],
@@ -1691,7 +1692,7 @@ const DashboardRecentTx = memo(function DashboardRecentTx({ transactions, catMap
                 \u003c/div\u003e
                 {/* Right amount */}
                 \u003cdiv style={{ textAlign:"right",flexShrink:0,marginLeft:4 }}\u003e
-                  \u003cdiv style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:17,color:"var(--red)",whiteSpace:"nowrap" }}\u003e-{fmt(tx.amount)}\u003c/div\u003e
+                  \u003cdiv style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,color:"var(--red)",whiteSpace:"nowrap" }}\u003e-{fmt(tx.amount)}\u003c/div\u003e
                   {tx.auto \u0026\u0026 \u003cdiv style={{ fontSize:9,color:"var(--purple)",fontWeight:800,marginTop:1,letterSpacing:.5 }}\u003eAUTO\u003c/div\u003e}
                 \u003c/div\u003e
               \u003c/div\u003e
@@ -2631,7 +2632,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                                 \u003c/div\u003e
                               \u003c/div\u003e
                               {/* Amount */}
-                              \u003cdiv style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:17,color:"var(--red)",flexShrink:0 }}\u003e
+                              \u003cdiv style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,color:"var(--red)",flexShrink:0 }}\u003e
                                 -{fmt(tx.amount)}
                               \u003c/div\u003e
                             \u003c/div\u003e
@@ -2989,7 +2990,7 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
                 \u003cdiv\u003e
                   \u003cdiv style={{ display:"flex",alignItems:"center",gap:6,marginBottom:6 }}\u003e
                     \u003cspan style={{ fontSize:20,lineHeight:1 }}\u003e{dueInfo.icon}\u003c/span\u003e
-                    \u003cdiv style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:17,color:isPaid?"var(--text3)":dueInfo.badgeColor,lineHeight:1.1 }}\u003e{dueInfo.label}\u003c/div\u003e
+                    \u003cdiv style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,color:isPaid?"var(--text3)":dueInfo.badgeColor,lineHeight:1.1 }}\u003e{dueInfo.label}\u003c/div\u003e
                   \u003c/div\u003e
                   {!isPaid \u0026\u0026 (
                     \u003cdiv style={{ display:"inline-flex",alignItems:"center",gap:4,background:dueInfo.badgeBg,border:`1px solid ${dueInfo.badgeBorder}`,color:dueInfo.badgeColor,borderRadius:20,padding:"4px 11px",fontSize:12,fontWeight:900,letterSpacing:.2 }}\u003e
@@ -4881,7 +4882,7 @@ function EssencePage() {
               const dist=best._dist!=null?fmtKm(best._dist):null;
               return (
                 \u003cdiv key={k}
-                  onClick={()=\u003ebest.lat\u0026\u0026setNavStation(best)}
+                  onClick={()=>{if(best.lat){window.open(`maps://?daddr=${best.lat},${best.lng}&dirflg=d`,'_blank');}}}
                   style={{
                     background:`linear-gradient(160deg,${meta.color}18,${meta.color}06)`,
                     border:`1.5px solid ${meta.color}35`,borderRadius:20,
@@ -4899,7 +4900,7 @@ function EssencePage() {
                     \u003c/div\u003e
                     {/* Bouton navigation haut droite */}
                     \u003cbutton
-                      onClick={e=\u003e{e.stopPropagation();best.lat\u0026\u0026setNavStation(best);}}
+                      onClick={e=>{e.stopPropagation();if(best.lat){window.open(`maps://?daddr=${best.lat},${best.lng}&dirflg=d`,'_blank');}}}
                       style={{width:30,height:30,borderRadius:8,border:`1px solid ${meta.color}35`,
                         background:`${meta.color}15`,color:meta.color,cursor:"pointer",fontSize:14,
                         display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
@@ -4967,8 +4968,8 @@ function EssencePage() {
             \u003c/div\u003e
 
             {/* Colonnes header */}
-            \u003cdiv style={{display:"grid",gridTemplateColumns:"minmax(220px,2fr) repeat(4,1fr) 50px",background:"rgba(0,0,0,0.3)",borderBottom:"1px solid rgba(255,255,255,0.06)"}}\u003e
-              \u003cdiv style={{padding:"10px 22px",fontSize:10,fontWeight:900,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.5}}\u003e
+            \u003cdiv style={{display:"grid",gridTemplateColumns:"minmax(130px,2fr) repeat(4,minmax(46px,1fr)) 42px",background:"rgba(0,0,0,0.3)",borderBottom:"1px solid rgba(255,255,255,0.06)"}}\u003e
+              \u003cdiv style={{padding:"10px 10px",fontSize:9,fontWeight:900,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1}}\u003e
                 Station / Adresse
               \u003c/div\u003e
               {Object.entries(FUEL_META).map(([k,m])=\u003e(
@@ -4977,7 +4978,7 @@ function EssencePage() {
                   \u003cspan style={{fontSize:10,color:m.color,fontWeight:900,letterSpacing:.5}}\u003e{m.label}\u003c/span\u003e
                 \u003c/div\u003e
               ))}
-              \u003cdiv style={{padding:"10px 8px",fontSize:10,fontWeight:900,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,textAlign:"center"}}\u003eNav\u003c/div\u003e
+              \u003cdiv style={{padding:"10px 4px",fontSize:9,fontWeight:900,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,textAlign:"center"}}\u003eNav\u003c/div\u003e
             \u003c/div\u003e
 
             {/* Lignes */}
@@ -4987,13 +4988,13 @@ function EssencePage() {
               const nomDisplay=(s.nom||"Station").toUpperCase();
               return (
                 \u003cdiv key={s.id||i}
-                  style={{display:"grid",gridTemplateColumns:"minmax(220px,2fr) repeat(4,1fr) 50px",borderTop:"1px solid rgba(255,255,255,0.04)",background:rowBg,transition:"background .12s",cursor:"pointer"}}
+                  style={{display:"grid",gridTemplateColumns:"minmax(130px,2fr) repeat(4,minmax(46px,1fr)) 42px",borderTop:"1px solid rgba(255,255,255,0.04)",background:rowBg,transition:"background .12s",cursor:"pointer"}}
                   onMouseEnter={e=\u003ee.currentTarget.style.background="rgba(167,139,250,0.06)"}
                   onMouseLeave={e=\u003ee.currentTarget.style.background=rowBg}
-                  onClick={()=\u003es.lat\u0026\u0026setNavStation(s)}\u003e
+                  onClick={()=>{if(s.lat){window.open(`maps://?daddr=${s.lat},${s.lng}&dirflg=d`,'_blank');}}}\u003e
 
                   {/* Colonne station */}
-                  \u003cdiv style={{padding:"13px 22px",display:"flex",alignItems:"center",gap:12,position:"relative"}}\u003e
+                  \u003cdiv style={{padding:"10px 10px",display:"flex",alignItems:"center",gap:8,position:"relative",minWidth:0}}\u003e
                     \u003cBrandIcon nom={s.nom} enseignes={s.enseignes} adresse={s.adresse} size={42}/\u003e
                     \u003cdiv style={{flex:1,minWidth:0}}\u003e
                       \u003cdiv style={{fontWeight:900,fontSize:12,color:"#fff",letterSpacing:.5,marginBottom:2,textTransform:"uppercase",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}\u003e
@@ -5021,7 +5022,7 @@ function EssencePage() {
                       \u003cdiv key={k} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"13px 8px",gap:3}}\u003e
                         {s[k]!=null?(
                           \u003c\u003e
-                            \u003cdiv style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:17,
+                            \u003cdiv style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:15,
                               color:isBest?m.color:"var(--text)",
                               textShadow:isBest?`0 0 16px ${m.color}60`:"none",letterSpacing:-.5}}\u003e
                               {s[k].toFixed(3)}
@@ -5042,7 +5043,7 @@ function EssencePage() {
 
                   {/* Bouton navigation */}
                   \u003cdiv style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"0 6px"}}
-                    onClick={e=\u003e{e.stopPropagation();s.lat\u0026\u0026setNavStation(s);}}\u003e
+                    onClick={e=>{e.stopPropagation();if(s.lat){window.open(`maps://?daddr=${s.lat},${s.lng}&dirflg=d`,'_blank');}}}\u003e
                     {s.lat\u0026\u0026(
                       \u003cdiv style={{width:32,height:32,borderRadius:9,background:"rgba(167,139,250,0.1)",
                         border:"1px solid rgba(167,139,250,0.2)",display:"flex",alignItems:"center",
