@@ -629,7 +629,8 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     justify-content:space-around;
     align-items:center;
     height:56px;
-    padding-top:0;
+    padding-top:4px;
+    padding-bottom:0px;
     padding-left:env(safe-area-inset-left);
     padding-right:env(safe-area-inset-right);
     width:100%;
@@ -5147,130 +5148,186 @@ function MeteoPage() {
   const humidColor = (h) => h<40?"#fbbf24":h<60?"#4ade80":h<80?"#60a5fa":"#a78bfa";
   const rainColor  = (p) => p<20?"#94a3b8":p<50?"#60a5fa":p<80?"#3b82f6":"#1d4ed8";
 
+  // Animated weather particles
+  const isRainy = [51,53,55,61,63,65,80,81,82,85,86,95,96,99].includes(cur?.weather_code);
+  const isStormy = [95,96,99].includes(cur?.weather_code);
+  const isSnowy = [71,73,75,77,85,86].includes(cur?.weather_code);
+  const isSunny = [0,1].includes(cur?.weather_code);
+  const isFoggy = [45,48].includes(cur?.weather_code);
+
   return (
     <div style={{maxWidth:700,margin:"0 auto",paddingBottom:24}}>
+
+      {/* ── Barre de recherche flottante ── */}
+      <div style={{ display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center" }}>
+        <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&searchCity()}
+          placeholder="Ville ou code postal…"
+          style={{ flex:1,minWidth:120,background:"rgba(255,255,255,0.07)",
+            border:"1px solid rgba(255,255,255,0.14)",borderRadius:12,padding:"10px 14px",
+            color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none" }}/>
+        <button onClick={searchCity} disabled={loading}
+          style={{ padding:"10px 16px",borderRadius:12,background:"var(--grad-blue)",
+            border:"none",color:"#fff",cursor:"pointer",
+            fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap",
+            boxShadow:"0 4px 16px rgba(96,165,250,0.3)" }}>
+          {loading?"⟳":"🔍"}
+        </button>
+        <button onClick={geoActive?()=>setGeoActive(false):locateUser} disabled={locating}
+          style={{ padding:"10px 14px",borderRadius:12,
+            background:geoActive?"rgba(74,222,128,0.18)":"rgba(255,255,255,0.06)",
+            border:geoActive?"1px solid rgba(74,222,128,0.4)":"1px solid rgba(255,255,255,0.12)",
+            color:geoActive?"#4ade80":"var(--text2)",cursor:"pointer",
+            fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13 }}>
+          {locating?"⟳":geoActive?"📍 GPS ✓":"📍"}
+        </button>
+      </div>
 
       {/* ── Hero météo actuelle ── */}
       {cur ? (
         <div style={{
-          borderRadius:24,overflow:"hidden",marginBottom:16,position:"relative",
+          borderRadius:28,overflow:"hidden",marginBottom:16,position:"relative",
           background:bgGrad,
-          boxShadow:"0 16px 48px rgba(0,0,0,0.4)",
-          border:"1px solid rgba(255,255,255,0.1)",
+          boxShadow:"0 20px 60px rgba(0,0,0,0.5)",
+          border:"1px solid rgba(255,255,255,0.12)",
         }}>
-          {/* Barre de recherche */}
-          <div style={{ padding:"14px 18px",background:"rgba(0,0,0,0.2)",backdropFilter:"blur(10px)",
-            borderBottom:"1px solid rgba(255,255,255,0.1)",display:"flex",gap:8,flexWrap:"wrap",alignItems:"center" }}>
-            <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&searchCity()}
-              placeholder="Ville ou lieu-dit…"
-              style={{ flex:1,minWidth:120,background:"rgba(255,255,255,0.15)",
-                border:"1px solid rgba(255,255,255,0.25)",borderRadius:10,padding:"8px 13px",
-                color:"#fff",fontFamily:"'Outfit',sans-serif",fontSize:14,outline:"none" }}/>
-            <button onClick={searchCity} disabled={loading}
-              style={{ padding:"8px 16px",borderRadius:10,background:"rgba(255,255,255,0.25)",
-                border:"1px solid rgba(255,255,255,0.3)",color:"#fff",cursor:"pointer",
-                fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap" }}>
-              {loading?"⟳":"🔍"} Chercher
-            </button>
-            <button onClick={geoActive?()=>setGeoActive(false):locateUser} disabled={locating}
-              style={{ padding:"8px 13px",borderRadius:10,
-                background:geoActive?"rgba(74,222,128,0.25)":"rgba(255,255,255,0.12)",
-                border:geoActive?"1px solid rgba(74,222,128,0.5)":"1px solid rgba(255,255,255,0.2)",
-                color:geoActive?"#4ade80":"#fff",cursor:"pointer",
-                fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13 }}>
-              {locating?"⟳ …":geoActive?"📍 Désactiver":"📍 GPS"}
-            </button>
-          </div>
-
-          {/* Contenu principal */}
-          <div style={{ padding:"28px 24px 24px" }}>
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:16 }}>
-              {/* Temp + condition */}
-              <div>
-                <div style={{ fontSize:12,color:"rgba(255,255,255,0.65)",fontWeight:700,marginBottom:10,
-                  display:"flex",alignItems:"center",gap:6 }}>
-                  <span>📍</span>{city}
-                  {geoActive&&<span style={{fontSize:10,background:"rgba(74,222,128,0.3)",
-                    border:"1px solid rgba(74,222,128,0.5)",borderRadius:20,padding:"1px 7px",color:"#4ade80"}}>GPS</span>}
-                </div>
-                <div style={{ display:"flex",alignItems:"flex-start",gap:10 }}>
-                  <span style={{ fontSize:80,lineHeight:1,filter:"drop-shadow(0 4px 12px rgba(0,0,0,0.3))" }}>
-                    {WMO_ICONS[cur.weather_code]||"🌡️"}
-                  </span>
-                  <div>
-                    <div style={{ display:"flex",alignItems:"flex-start",gap:0 }}>
-                      <span style={{ fontFamily:"'Fraunces',serif",fontSize:76,fontWeight:900,lineHeight:1,
-                        color:"#fff",textShadow:"0 2px 20px rgba(0,0,0,0.3)" }}>
-                        {Math.round(cur.temperature_2m)}
-                      </span>
-                      <span style={{ fontFamily:"'Fraunces',serif",fontSize:38,fontWeight:700,color:"rgba(255,255,255,0.7)",marginTop:8 }}>°C</span>
-                    </div>
-                    <div style={{ color:"rgba(255,255,255,0.6)",fontSize:13,marginTop:2 }}>
-                      Ressenti <strong style={{color:"#fff"}}>{Math.round(cur.apparent_temperature)}°</strong>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ fontWeight:700,fontSize:18,color:"rgba(255,255,255,0.95)",marginTop:10 }}>
-                  {WMO_LABELS[cur.weather_code]||""}
-                </div>
-                {daily&&(
-                  <div style={{ marginTop:8,fontSize:13,color:"rgba(255,255,255,0.6)" }}>
-                    ↑ <strong style={{color:"#fff"}}>{Math.round(daily.temperature_2m_max[0])}°</strong>
-                    &nbsp;/&nbsp;
-                    ↓ <strong style={{color:"rgba(255,255,255,0.8)"}}>{Math.round(daily.temperature_2m_min[0])}°</strong>
-                    {daily.sunrise[0]&&(
-                      <span style={{marginLeft:12}}>
-                        🌅 {daily.sunrise[0].slice(11,16)} · 🌇 {daily.sunset[0].slice(11,16)}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Indicateurs droite */}
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,minWidth:200 }}>
-                {[
-                  { icon:"💧", label:"Humidité",    val:`${cur.relative_humidity_2m}%`,
-                    color:humidColor(cur.relative_humidity_2m) },
-                  { icon:"💨", label:"Vent",         val:`${Math.round(cur.wind_speed_10m)} km/h`,
-                    sub:windDir(cur.wind_direction_10m), color:"#93c5fd" },
-                  { icon:"🌧️", label:"Précip.",     val:`${(cur.precipitation||0).toFixed(1)} mm`,
-                    color:"#60a5fa" },
-                  { icon:"☀️", label:"Indice UV",   val:Math.round(cur.uv_index||0),
-                    sub:uvLabel(Math.round(cur.uv_index||0)), color:uvColor(Math.round(cur.uv_index||0)) },
-                  { icon:"🌬️", label:"Pression",    val:`${Math.round(cur.surface_pressure||1013)} hPa`,
-                    color:"#c4b5fd" },
-                  { icon:"👁️", label:"Visibilité",  val:cur.visibility>=10000?"Excellente":`${(cur.visibility/1000).toFixed(1)}km`,
-                    color:"#a3e635" },
-                ].map((item,i) => (
-                  <div key={i} style={{
-                    background:"rgba(0,0,0,0.22)",backdropFilter:"blur(8px)",
-                    borderRadius:16,padding:"14px 14px",
-                    border:"1px solid rgba(255,255,255,0.14)",
-                    display:"flex",flexDirection:"column",justifyContent:"space-between",
-                  }}>
-                    <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:6 }}>
-                      <span style={{fontSize:22}}>{item.icon}</span>
-                      <span style={{ fontSize:10,color:"rgba(255,255,255,0.55)",fontWeight:700,
-                        textTransform:"uppercase",letterSpacing:.8 }}>{item.label}</span>
-                    </div>
-                    <div style={{ fontWeight:900,fontSize:20,color:item.color||"#fff",lineHeight:1 }}>{item.val}</div>
-                    {item.sub&&<div style={{ fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:4,fontWeight:600 }}>{item.sub}</div>}
-                  </div>
-                ))}
-              </div>
+          {/* Animated weather effects */}
+          <style>{`
+            @keyframes rainDrop{0%{transform:translateY(-10px) translateX(0);opacity:0}10%{opacity:.7}90%{opacity:.5}100%{transform:translateY(120px) translateX(-6px);opacity:0}}
+            @keyframes snowFlake{0%{transform:translateY(-10px) rotate(0deg);opacity:0}10%{opacity:.8}90%{opacity:.4}100%{transform:translateY(120px) rotate(360deg);opacity:0}}
+            @keyframes sunRay{0%,100%{opacity:.3;transform:scale(1) rotate(0deg)}50%{opacity:.5;transform:scale(1.08) rotate(180deg)}}
+            @keyframes cloudFloat{0%,100%{transform:translateX(0)}50%{transform:translateX(6px)}}
+            @keyframes lightning{0%,90%,100%{opacity:0}92%,96%{opacity:.9}94%,98%{opacity:0}}
+          `}</style>
+          
+          {/* Sun rays */}
+          {isSunny && (
+            <div style={{position:"absolute",top:20,right:24,width:120,height:120,pointerEvents:"none",zIndex:0}}>
+              {[0,30,60,90,120,150,180,210,240,270,300,330].map(a=>(
+                <div key={a} style={{position:"absolute",top:"50%",left:"50%",
+                  width:2,height:55,transformOrigin:"top center",
+                  transform:`rotate(${a}deg) translateX(-50%)`,
+                  background:"linear-gradient(to bottom,rgba(255,220,100,0.4),transparent)",
+                  animation:`sunRay ${2+a/60}s ease-in-out infinite`,
+                  animationDelay:`${a/180}s`}}/>
+              ))}
+              <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
+                width:40,height:40,borderRadius:"50%",
+                background:"radial-gradient(circle,rgba(255,230,100,0.6),rgba(255,200,50,0.2))",
+                boxShadow:"0 0 30px rgba(255,200,50,0.4)"}}/>
             </div>
-          </div>
+          )}
+          
+          {/* Rain drops */}
+          {isRainy && Array.from({length:18}).map((_,i)=>(
+            <div key={i} style={{position:"absolute",top:0,left:`${5+i*5.5}%`,
+              width:1.5,height:isStormy?18:12,borderRadius:1,
+              background:isStormy?"rgba(180,220,255,0.5)":"rgba(150,200,255,0.4)",
+              animation:`rainDrop ${isStormy?0.5+i*0.04:0.8+i*0.07}s linear infinite`,
+              animationDelay:`${i*0.08}s`,pointerEvents:"none",zIndex:0}}/>
+          ))}
+          
+          {/* Snow flakes */}
+          {isSnowy && Array.from({length:12}).map((_,i)=>(
+            <div key={i} style={{position:"absolute",top:0,left:`${i*8}%`,
+              fontSize:12,
+              animation:`snowFlake ${1.5+i*0.15}s linear infinite`,
+              animationDelay:`${i*0.2}s`,pointerEvents:"none",zIndex:0,
+              color:"rgba(255,255,255,0.7)"}}>❄</div>
+          ))}
+          
+          {/* Lightning */}
+          {isStormy && (
+            <div style={{position:"absolute",top:15,right:40,fontSize:32,
+              animation:"lightning 4s ease-in-out infinite",pointerEvents:"none",zIndex:0,
+              filter:"drop-shadow(0 0 10px #fff8a0)"}}>⚡</div>
+          )}
 
-          {/* Source */}
-          <div style={{ padding:"8px 18px",background:"rgba(0,0,0,0.15)",textAlign:"right",
-            fontSize:9,color:"rgba(255,255,255,0.35)",fontWeight:600 }}>
-            Source : Météo-France · Open-Meteo · Données actualisées
+          {/* Main content */}
+          <div style={{ position:"relative",zIndex:1,padding:"32px 24px 28px",textAlign:"center" }}>
+            {/* City name */}
+            <div style={{ fontSize:28,fontWeight:900,color:"#fff",letterSpacing:0.5,
+              textShadow:"0 2px 12px rgba(0,0,0,0.4)",marginBottom:4,
+              display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+              {city}
+              {geoActive&&<span style={{fontSize:11,background:"rgba(74,222,128,0.35)",
+                border:"1px solid rgba(74,222,128,0.5)",borderRadius:20,padding:"2px 8px",color:"#4ade80",fontWeight:900,letterSpacing:0}}>GPS</span>}
+            </div>
+            
+            {/* Big temperature */}
+            <div style={{ fontFamily:"'Fraunces',serif",fontSize:96,fontWeight:900,lineHeight:1,
+              color:"#fff",textShadow:"0 4px 30px rgba(0,0,0,0.3)",letterSpacing:-4,
+              marginBottom:0 }}>
+              {Math.round(cur.temperature_2m)}°
+            </div>
+            
+            {/* Condition */}
+            <div style={{ fontSize:20,fontWeight:600,color:"rgba(255,255,255,0.85)",
+              marginBottom:8,letterSpacing:0.3 }}>
+              {WMO_LABELS[cur.weather_code]||""}
+            </div>
+            
+            {/* Max/Min */}
+            {daily && (
+              <div style={{ fontSize:16,color:"rgba(255,255,255,0.7)",fontWeight:600 }}>
+                Max. {Math.round(daily.temperature_2m_max[0])}°  Min. {Math.round(daily.temperature_2m_min[0])}°
+              </div>
+            )}
+          </div>
+          
+          {/* Separator */}
+          <div style={{height:1,background:"rgba(255,255,255,0.12)",margin:"0 0"}}/>
+          
+          {/* Precipitation next hour (iOS-style) */}
+          {hourly && hourlyIdx !== null && (()=>{
+            const nextRain = Array.from({length:6},(_,i)=>hourly.precipitation_probability[hourlyIdx+i]||0);
+            const maxRain = Math.max(...nextRain);
+            const hasRain = nextRain.some(v=>v>20);
+            return (
+              <div style={{ padding:"14px 20px 6px",background:"rgba(0,0,0,0.18)",backdropFilter:"blur(8px)" }}>
+                <div style={{ fontSize:12,color:"rgba(255,255,255,0.6)",fontWeight:700,marginBottom:8,letterSpacing:.3 }}>
+                  {hasRain ? `🌧 Risque de pluie dans l'heure` : "🌤 Pas de précipitations attendues"}
+                </div>
+                <div style={{ display:"flex",gap:2,alignItems:"flex-end",height:28 }}>
+                  {nextRain.map((p,i)=>(
+                    <div key={i} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2 }}>
+                      <div style={{ width:"100%",borderRadius:2,
+                        background:p>50?"#60a5fa":p>20?"rgba(96,165,250,0.5)":"rgba(255,255,255,0.12)",
+                        height:`${Math.max(4,(p/100)*24)}px`,transition:"height .3s",minHeight:4 }}/>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:"flex",justifyContent:"space-between",marginTop:4,fontSize:9,color:"rgba(255,255,255,0.4)",fontWeight:600 }}>
+                  <span>Maint.</span><span>15mn</span><span>30mn</span><span>45mn</span><span>1h</span><span>1h15</span>
+                </div>
+              </div>
+            );
+          })()}
+          
+          {/* 4 key indicators (compact iOS-style grid) */}
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",
+            borderTop:"1px solid rgba(255,255,255,0.1)" }}>
+            {[
+              { icon:"💧", label:"HUMIDITÉ",  val:`${cur.relative_humidity_2m}%`, color:humidColor(cur.relative_humidity_2m) },
+              { icon:"💨", label:"VENT",       val:`${Math.round(cur.wind_speed_10m)}`, sub:`km/h ${windDir(cur.wind_direction_10m)}`, color:"#93c5fd" },
+              { icon:"☀️", label:"UV",         val:Math.round(cur.uv_index||0), sub:uvLabel(Math.round(cur.uv_index||0)), color:uvColor(Math.round(cur.uv_index||0)) },
+              { icon:"🌅", label:"LEVER",      val:daily?.sunrise[0]?.slice(11,16)||"—", sub:`Coucher ${daily?.sunset[0]?.slice(11,16)||"—"}`, color:"#fdba74" },
+            ].map((item,i) => (
+              <div key={i} style={{
+                padding:"14px 10px",textAlign:"center",
+                borderRight:i<3?"1px solid rgba(255,255,255,0.08)":"none",
+                background:"rgba(0,0,0,0.15)",backdropFilter:"blur(6px)",
+              }}>
+                <div style={{ fontSize:18,marginBottom:4 }}>{item.icon}</div>
+                <div style={{ fontSize:8,color:"rgba(255,255,255,0.5)",fontWeight:800,letterSpacing:.8,marginBottom:5 }}>{item.label}</div>
+                <div style={{ fontWeight:900,fontSize:17,color:"#fff",lineHeight:1 }}>{item.val}</div>
+                {item.sub&&<div style={{ fontSize:9,color:"rgba(255,255,255,0.5)",marginTop:3,fontWeight:600,lineHeight:1.3 }}>{item.sub}</div>}
+              </div>
+            ))}
           </div>
         </div>
       ) : loading ? (
-        <div style={{ height:220,borderRadius:24,background:"linear-gradient(160deg,#1a2a4a,#2a3a6a)",
+        <div style={{ height:340,borderRadius:28,background:"linear-gradient(160deg,#1a2a4a,#2a3a6a)",
           display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16,
           border:"1px solid rgba(255,255,255,0.1)" }}>
           <div style={{ textAlign:"center",color:"rgba(255,255,255,0.6)" }}>
@@ -5469,10 +5526,14 @@ function MeteoPage() {
 // ═══════════════════════════════════════════════════════════
 function EssencePage() {
   const FUEL_META = {
-    gazole: { label:"Gazole", icon:"🚛", color:"#fbbf24" },
-    sp95:   { label:"SP95",   icon:"⛽", color:"#60a5fa" },
-    e10:    { label:"E10",    icon:"🌿", color:"#4ade80" },
-    sp98:   { label:"SP98",   icon:"🔵", color:"#a78bfa" },
+    gazole: { label:"Gazole", color:"#fbbf24",
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="13" height="18" rx="2" fill="#fbbf24" opacity=".85"/><rect x="7" y="6" width="5" height="4" rx="1" fill="#92400e"/><path d="M16 8h2a1 1 0 0 1 1 1v5a2 2 0 0 1-2 2h-1" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round"/><rect x="5" y="14" width="9" height="4" rx="1" fill="#92400e" opacity=".5"/></svg> },
+    sp95:   { label:"SP95",   color:"#60a5fa",
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="13" height="18" rx="2" fill="#60a5fa" opacity=".85"/><rect x="7" y="6" width="5" height="4" rx="1" fill="#1e3a5f"/><path d="M16 8h2a1 1 0 0 1 1 1v5a2 2 0 0 1-2 2h-1" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round"/><text x="5" y="20" fontSize="5" fill="#1e3a5f" fontWeight="900" fontFamily="sans-serif">95</text></svg> },
+    e10:    { label:"E10",    color:"#4ade80",
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="13" height="18" rx="2" fill="#4ade80" opacity=".85"/><path d="M9 13c0-2 2-4 2-6 0 2 2 3 2 5a2 2 0 0 1-4 0z" fill="#14532d"/><path d="M16 8h2a1 1 0 0 1 1 1v5a2 2 0 0 1-2 2h-1" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+    sp98:   { label:"SP98",   color:"#a78bfa",
+      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="13" height="18" rx="2" fill="#a78bfa" opacity=".85"/><rect x="7" y="6" width="5" height="4" rx="1" fill="#2e1065"/><path d="M16 8h2a1 1 0 0 1 1 1v5a2 2 0 0 1-2 2h-1" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round"/><text x="5" y="20" fontSize="5" fill="#2e1065" fontWeight="900" fontFamily="sans-serif">98</text></svg> },
   };
 
   const LS_KEY = "duobudget_fuel_v7";
@@ -5492,6 +5553,8 @@ function EssencePage() {
   const [userLng,    setUserLng]    = useState(null);
   const [locating,   setLocating]   = useState(false);
   const [navStation, setNavStation] = useState(null);
+  const [simSelectedStationId, setSimSelectedStationId] = useState("__best__");
+  const simRef = useRef(null);
   const intervalRef  = useRef(null);
 
   useEffect(()=>{
@@ -5817,7 +5880,7 @@ function EssencePage() {
                   {/* Bandeau coloré */}
                   <div style={{padding:"11px 14px 10px",background:`linear-gradient(135deg,${meta.color}28,${meta.color}10)`,borderBottom:`1px solid ${meta.color}25`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <div style={{width:28,height:28,borderRadius:8,background:`${meta.color}22`,border:`1.5px solid ${meta.color}45`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{meta.icon}</div>
+                      <div style={{width:28,height:28,borderRadius:8,background:`${meta.color}22`,border:`1.5px solid ${meta.color}45`,display:"flex",alignItems:"center",justifyContent:"center"}}>{meta.icon}</div>
                       <span style={{fontWeight:900,fontSize:13,color:meta.color,letterSpacing:.5,textTransform:"uppercase"}}>{meta.label}</span>
                     </div>
                     {/* Bouton navigation haut droite */}
@@ -5900,8 +5963,10 @@ function EssencePage() {
                 return (
                   <div key={s.id||i}
                     style={{
-                      background:"rgba(255,255,255,0.03)",
-                      border:"1px solid rgba(255,255,255,0.08)",
+                      background: simSelectedStationId === s.id
+                        ? "rgba(167,139,250,0.07)" : "rgba(255,255,255,0.03)",
+                      border: simSelectedStationId === s.id
+                        ? "1.5px solid rgba(167,139,250,0.45)" : "1px solid rgba(255,255,255,0.08)",
                       borderRadius:16,overflow:"hidden",
                       cursor:"default",
                       transition:"transform .15s,box-shadow .15s,border-color .15s",
@@ -5914,7 +5979,7 @@ function EssencePage() {
                       e.currentTarget.style.transform="translateY(-2px)";
                     }}
                     onMouseLeave={e=>{
-                      e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";
+                      e.currentTarget.style.borderColor=simSelectedStationId===s.id?"rgba(167,139,250,0.45)":"rgba(255,255,255,0.08)";
                       e.currentTarget.style.boxShadow="";
                       e.currentTarget.style.transform="";
                     }}>
@@ -5948,25 +6013,45 @@ function EssencePage() {
                         </div>
                       </div>
 
-                      {/* Bouton navigation — ouvre le sélecteur d'appli (CarPlay compatible) */}
-                      {s.lat&&s.lng&&(
+                      {/* Boutons navigation + simulateur */}
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        {/* Bouton Simuler */}
                         <button
-                          onClick={e=>{e.stopPropagation(); setNavStation(s);}}
+                          onClick={e=>{e.stopPropagation(); setSimSelectedStationId(s.id); setTimeout(()=>simRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);}}
                           style={{
                             width:44,height:44,borderRadius:13,flexShrink:0,
-                            background:"linear-gradient(135deg,rgba(167,139,250,0.2),rgba(96,165,250,0.2))",
-                            border:"1px solid rgba(167,139,250,0.4)",
+                            background:simSelectedStationId===s.id
+                              ?"linear-gradient(135deg,rgba(167,139,250,0.45),rgba(244,114,182,0.35))"
+                              :"linear-gradient(135deg,rgba(167,139,250,0.1),rgba(244,114,182,0.1))",
+                            border:`1px solid ${simSelectedStationId===s.id?"rgba(167,139,250,0.7)":"rgba(167,139,250,0.25)"}`,
                             display:"flex",alignItems:"center",justifyContent:"center",
-                            fontSize:22,cursor:"pointer",
-                            boxShadow:"0 2px 12px rgba(167,139,250,0.3)",
+                            fontSize:18,cursor:"pointer",
+                            boxShadow:simSelectedStationId===s.id?"0 2px 12px rgba(167,139,250,0.5)":"none",
                             transition:"all .18s",
                           }}
-                          onTouchStart={e=>{e.currentTarget.style.transform="scale(0.9)";e.currentTarget.style.background="linear-gradient(135deg,rgba(167,139,250,0.35),rgba(96,165,250,0.35))";}}
-                          onTouchEnd={e=>{e.currentTarget.style.transform="";e.currentTarget.style.background="linear-gradient(135deg,rgba(167,139,250,0.2),rgba(96,165,250,0.2))";}}
-                          title="Naviguer vers cette station">
-                          🗺️
+                          title="Simuler le coût du plein">
+                          ⛽
                         </button>
-                      )}
+                        {/* Bouton navigation */}
+                        {s.lat&&s.lng&&(
+                          <button
+                            onClick={e=>{e.stopPropagation(); setNavStation(s);}}
+                            style={{
+                              width:44,height:44,borderRadius:13,flexShrink:0,
+                              background:"linear-gradient(135deg,rgba(167,139,250,0.2),rgba(96,165,250,0.2))",
+                              border:"1px solid rgba(167,139,250,0.4)",
+                              display:"flex",alignItems:"center",justifyContent:"center",
+                              fontSize:22,cursor:"pointer",
+                              boxShadow:"0 2px 12px rgba(167,139,250,0.3)",
+                              transition:"all .18s",
+                            }}
+                            onTouchStart={e=>{e.currentTarget.style.transform="scale(0.9)";e.currentTarget.style.background="linear-gradient(135deg,rgba(167,139,250,0.35),rgba(96,165,250,0.35))";}}
+                            onTouchEnd={e=>{e.currentTarget.style.transform="";e.currentTarget.style.background="linear-gradient(135deg,rgba(167,139,250,0.2),rgba(96,165,250,0.2))";}}
+                            title="Naviguer vers cette station">
+                            🗺️
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Bande prix — redesign coloré */}
@@ -6029,7 +6114,9 @@ function EssencePage() {
               })}
             </div>
           </div>
-          <FuelSimulator stations={stationsWithDist} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch}/>
+          <div ref={simRef}>
+          <FuelSimulator stations={stationsWithDist} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch} preselectedStationId={simSelectedStationId} onStationChange={setSimSelectedStationId}/>
+          </div>
         </div>
       )}
 
@@ -6077,8 +6164,8 @@ function EssencePage() {
           <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
             {Object.entries(FUEL_META).map(([k,m])=>(
               <button key={k} onClick={()=>setChartFuel(k)}
-                style={{padding:"8px 16px",borderRadius:20,border:chartFuel===k?`1.5px solid ${m.color}`:"1px solid var(--border)",background:chartFuel===k?`${m.color}22`:"var(--glass)",color:chartFuel===k?m.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,transition:"all .2s",boxShadow:chartFuel===k?`0 4px 14px ${m.color}30`:"none"}}>
-                {m.icon} {m.label}
+                style={{padding:"8px 16px",borderRadius:20,border:chartFuel===k?`1.5px solid ${m.color}`:"1px solid var(--border)",background:chartFuel===k?`${m.color}22`:"var(--glass)",color:chartFuel===k?m.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,transition:"all .2s",boxShadow:chartFuel===k?`0 4px 14px ${m.color}30`:"none",display:"flex",alignItems:"center",gap:5}}>
+                <span style={{display:"inline-flex"}}>{m.icon}</span> {m.label}
               </button>
             ))}
           </div>
@@ -6086,7 +6173,7 @@ function EssencePage() {
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,gap:10,flexWrap:"wrap"}}>
               <div>
                 <div style={{fontWeight:900,fontSize:16,marginBottom:3}}>
-                  <span style={{color:FUEL_META[chartFuel]?.color}}>{FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label}</span>
+                  <span style={{color:FUEL_META[chartFuel]?.color,display:"inline-flex",alignItems:"center",gap:4}}><span style={{display:"inline-flex"}}>{FUEL_META[chartFuel]?.icon}</span> {FUEL_META[chartFuel]?.label}</span>
                   {" · "}{citySearch}
                 </div>
                 <div style={{fontSize:11,color:"var(--text3)"}}>Actualisation toutes les 10 min · {chartData.length} points</div>
@@ -6187,7 +6274,7 @@ function EssencePage() {
     </div>
   );
 }
-function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
+function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselectedStationId, onStationChange }) {
   const VEHICLES = {
     "Renault": {
       "Clio 1.0 TCe 90": { conso:5.4, fuel:"sp95" }, "Clio 1.5 dCi 85": { conso:3.9, fuel:"gazole" },
@@ -6245,7 +6332,16 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
   const availableFuels = Object.keys(FUEL_META).filter(k => avgPrices[k] != null || stations.some(s => s[k] != null));
   const [fuel, setFuel]           = useState(availableFuels[0] || "gazole");
   const [liters, setLiters]       = useState(50);
-  const [stationId, setStationId] = useState("__best__");
+  const [stationId, setStationIdLocal] = useState(preselectedStationId || "__best__");
+  const setStationId = (id) => { setStationIdLocal(id); onStationChange && onStationChange(id); };
+  // Sync when parent changes selection (from station card click)
+  const prevPreselected = useRef(preselectedStationId);
+  useEffect(() => {
+    if (preselectedStationId !== prevPreselected.current) {
+      prevPreselected.current = preselectedStationId;
+      setStationIdLocal(preselectedStationId || "__best__");
+    }
+  }, [preselectedStationId]);
   const [selMake, setSelMake]     = useState("");
   const [selModel, setSelModel]   = useState("");
   const [manualConso, setManualConso] = useState(7);
@@ -6287,17 +6383,25 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
         borderBottom:`1px solid ${m.color||"#a78bfa"}25`,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
         <div style={{ width:46,height:46,borderRadius:14,background:`linear-gradient(135deg,${m.color||"#a78bfa"}33,${m.color||"#a78bfa"}15)`,
           border:`1.5px solid ${m.color||"#a78bfa"}55`,display:"flex",alignItems:"center",
-          justifyContent:"center",fontSize:24,flexShrink:0,boxShadow:`0 4px 16px ${m.color||"#a78bfa"}30` }}>{m.icon||"⛽"}</div>
+          justifyContent:"center",flexShrink:0,boxShadow:`0 4px 16px ${m.color||"#a78bfa"}30` }}>{m.icon||<span style={{fontSize:24}}>⛽</span>}</div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{ fontWeight:900,fontSize:15,color:"var(--text)" }}>Simulateur de plein</div>
           <div style={{ fontSize:11,color:"var(--text3)",marginTop:2 }}>
             {citySearch} · {vehicleConso ? `${selMake} ${selModel} · ${vehicleConso}L/100` : `${effectiveConso}L/100`}
           </div>
         </div>
-        {/* Badge meilleure station */}
-        {bestS && <div style={{fontSize:10,fontWeight:800,color:"#4ade80",background:"rgba(74,222,128,0.12)",border:"1px solid rgba(74,222,128,0.25)",borderRadius:20,padding:"3px 10px",flexShrink:0}}>
-          ⭐ {bestS[fuel]?.toFixed(3)} €/L
-        </div>}
+        {/* Badge station sélectionnée ou meilleure station */}
+        {selectedStation && (
+          <div style={{
+            fontSize:10,fontWeight:800,
+            color:stationId==="__best__"?"#4ade80":m.color||"#a78bfa",
+            background:stationId==="__best__"?"rgba(74,222,128,0.12)":"rgba(167,139,250,0.12)",
+            border:`1px solid ${stationId==="__best__"?"rgba(74,222,128,0.25)":`${m.color||"#a78bfa"}40`}`,
+            borderRadius:20,padding:"3px 10px",flexShrink:0,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"
+          }}>
+            {stationId==="__best__"?"⭐ ":""}{(()=>{const {nom}=resolveNom(selectedStation);return nom;})().slice(0,20)} · {selectedStation[fuel]?.toFixed(3)} €/L
+          </div>
+        )}
       </div>
 
       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:0 }}>
@@ -6319,7 +6423,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch }) {
                     color:fuel===k ? fm.color||"#a78bfa" : "var(--text3)",
                     transition:"all .15s",
                   }}>
-                    <span style={{marginRight:4}}>{fm.icon||"⛽"}</span>{fm.label||k.toUpperCase()}
+                    <span style={{marginRight:4,display:"inline-flex",verticalAlign:"middle"}}>{fm.icon||"⛽"}</span>{fm.label||k.toUpperCase()}
                   </button>
                 );
               })}
