@@ -707,6 +707,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .nav-item{min-height:46px;}
   .filter-chip{padding:9px 14px !important;font-size:12.5px !important;}
   .fuel-sim-grid{grid-template-columns:1fr !important;}
+  .fuel-best-grid{grid-template-columns:1fr 1fr !important;gap:10px !important;}
   .station-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
   /* Expense title truncation tighter on small screen */
   .expense-row .tx-title{ max-width:140px !important; }
@@ -774,14 +775,24 @@ function GlobalTooltip() {
 // ═══════════════════════════════════════════════════════════
 //  FAVICON — SVG emoji injected dynamically
 // ═══════════════════════════════════════════════════════════
-// Hook mobile — re-évalue si la fenêtre est redimensionnée
+// Hook mobile — détecte correctement iOS même sans meta viewport (innerWidth peut être 980 par défaut)
 function useIsMobile() {
-  const [mob, setMob] = useState(() => window.innerWidth <= 880);
+  const [mob, setMob] = useState(() => {
+    // iOS sans meta viewport reporte innerWidth=980 → utiliser screen.width + ontouchstart
+    const byWidth = Math.min(window.innerWidth, window.screen.width) <= 880;
+    const byTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    return byWidth || byTouch;
+  });
   useEffect(() => {
+    const check = () => {
+      const byWidth = Math.min(window.innerWidth, window.screen.width) <= 880;
+      const byTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      setMob(byWidth || byTouch);
+    };
     const mq = window.matchMedia('(max-width:880px)');
-    const handler = (e) => setMob(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    mq.addEventListener('change', check);
+    window.addEventListener('resize', check, { passive: true });
+    return () => { mq.removeEventListener('change', check); window.removeEventListener('resize', check); };
   }, []);
   return mob;
 }
@@ -2420,16 +2431,22 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                             </div>
                             {/* Row 2: action buttons */}
                             <div style={{ display:"flex",gap:6 }}>
-                              <button onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"8px 6px",borderRadius:10,border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.08)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif" }}>
+                              <button
+                                type="button"
+                                onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 4px",borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 ✏️ Modifier
                               </button>
-                              <button onClick={e => { e.stopPropagation(); duplicate(tx); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"8px 6px",borderRadius:10,border:"1px solid rgba(96,165,250,0.3)",background:"rgba(96,165,250,0.08)",color:"var(--blue)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif" }}>
+                              <button
+                                type="button"
+                                onClick={e => { e.stopPropagation(); duplicate(tx); }}
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 4px",borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 📋 Dupliquer
                               </button>
-                              <button onClick={e => { e.stopPropagation(); del(tx.id); }}
-                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"8px 6px",borderRadius:10,border:"1px solid rgba(248,113,113,0.3)",background:"rgba(248,113,113,0.08)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif" }}>
+                              <button
+                                type="button"
+                                onClick={e => { e.stopPropagation(); del(tx.id); }}
+                                style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"10px 4px",borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 🗑 Suppr.
                               </button>
                             </div>
@@ -4647,7 +4664,7 @@ function EssencePage() {
         <div>
 
           {/* ── 4 cartes meilleurs prix – redesign ── */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}} className="fuel-best-grid">
             {Object.entries(FUEL_META).map(([k,meta])=>{
               const best=bestStation[k];
               if(!best) return null;
@@ -4697,16 +4714,16 @@ function EssencePage() {
                     <div style={{display:"flex",alignItems:"flex-start",gap:10,paddingTop:10,borderTop:`1px solid ${meta.color}18`}}>
                       <BrandIcon nom={best.nom} enseignes={best.enseignes} adresse={best.adresse} size={36}/>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:900,fontSize:11,color:"#fff",textTransform:"uppercase",letterSpacing:.4,lineHeight:1.3,marginBottom:3,wordBreak:"break-word"}}>
+                        <div style={{fontWeight:900,fontSize:11,color:"#fff",textTransform:"uppercase",letterSpacing:.4,lineHeight:1.3,marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                           {(best.nom||"Station").toUpperCase()}
                         </div>
                         {!best.nomIsAdresse&&(
-                          <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.4,wordBreak:"break-word"}}>
-                            {best.adresse}{best.ville?` — ${best.ville}`:""}
+                          <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                            {best.adresse}
                           </div>
                         )}
-                        {best.nomIsAdresse&&best.ville&&(
-                          <div style={{fontSize:10,color:"var(--text3)"}}>{best.ville}</div>
+                        {best.ville&&(
+                          <div style={{fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{best.ville}</div>
                         )}
                         {/* Distance */}
                         {dist&&(
