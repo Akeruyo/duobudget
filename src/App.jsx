@@ -99,7 +99,9 @@ const monthLabel = k => {
 const monthLabelShort = k => {
   if (!k) return "";
   const [y,m] = k.split("-");
-  return new Date(+y,+m-1,1).toLocaleDateString("fr-FR",{month:"short",year:"2-digit"});
+  const d = new Date(+y,+m-1,1);
+  const mo = d.toLocaleDateString("fr-FR",{month:"short"});
+  return `${mo.charAt(0).toUpperCase()+mo.slice(1).replace('.','')} ${y}`;
 };
 const fmt = n => (n||0).toLocaleString("fr-FR",{minimumFractionDigits:0,maximumFractionDigits:2})+" €";
 const fmtCompact = n => {
@@ -801,8 +803,9 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 /* ── STANDALONE PWA — variables --sat/--sab injectées par JS ── */
 :root{ --sat:0px; --sab:0px; }
 body.pwa-standalone .topbar{
-  height:calc(52px + var(--sat)) !important;
-  padding-top:calc(8px + var(--sat)) !important;
+  height:calc(48px + var(--sat)) !important;
+  padding-top:calc(4px + var(--sat)) !important;
+  padding-bottom:4px !important;
 }
 body.pwa-standalone .bnav-inset{
   height:var(--sab) !important;
@@ -1247,6 +1250,42 @@ export default function App() {
     return () => clearInterval(t);
   }, [ready]);
 
+  // ── Swipe depuis bord gauche pour ouvrir la sidebar ──
+  useEffect(() => {
+    let startX = 0, startY = 0, tracking = false;
+    const EDGE = 28; // px depuis le bord gauche
+    const MIN_SWIPE = 60; // distance min horizontale
+    const MAX_VERTICAL = 60; // tolérance verticale
+    const onStart = e => {
+      const t = e.touches?.[0] || e;
+      if (t.clientX > EDGE) { tracking = false; return; }
+      startX = t.clientX; startY = t.clientY; tracking = true;
+    };
+    const onEnd = e => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches?.[0] || e;
+      const dx = t.clientX - startX;
+      const dy = Math.abs(t.clientY - startY);
+      if (dx > MIN_SWIPE && dy < MAX_VERTICAL) setSidebarOpen(true);
+    };
+    // Aussi swipe vers la gauche pour fermer
+    const onMove = e => {
+      if (!sidebarOpen) return;
+      const t = e.touches?.[0] || e;
+      const dx = startX - t.clientX;
+      if (dx > MIN_SWIPE && Math.abs(t.clientY - startY) < MAX_VERTICAL) setSidebarOpen(false);
+    };
+    document.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchend', onEnd, { passive: true });
+    document.addEventListener('touchmove', onMove, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchend', onEnd);
+      document.removeEventListener('touchmove', onMove);
+    };
+  }, [sidebarOpen]);
+
   const update = useCallback(fn => {
     setData(prev => {
       const next = typeof structuredClone === "function"
@@ -1369,6 +1408,11 @@ export default function App() {
               <span>Essence</span>
               <span style={{ fontSize:9,background:"rgba(251,191,36,0.15)",color:"var(--yellow)",borderRadius:20,padding:"2px 7px",fontWeight:800,border:"1px solid rgba(251,191,36,0.3)" }}>LIVE</span>
             </div>
+            <div className={`nav-item tip ${page==="meteo"?"active":""}`} data-tip="Météo locale en temps réel" onClick={() => navigate("meteo")}>
+              <div className="nav-icon-wrap"><span className="nav-icon">🌤️</span></div>
+              <span>Météo</span>
+              <span style={{ fontSize:9,background:"rgba(96,165,250,0.15)",color:"#60a5fa",borderRadius:20,padding:"2px 7px",fontWeight:800,border:"1px solid rgba(96,165,250,0.3)" }}>LIVE</span>
+            </div>
             <div className="nav-section-label">Système</div>
             <div className={`nav-item tip ${page==="settings"?"active":""}`} data-tip="Gérer profils, catégories" onClick={() => navigate("settings")}>
               <div className="nav-icon-wrap"><span className="nav-icon">⚙️</span></div>
@@ -1394,8 +1438,9 @@ export default function App() {
             <button className="menu-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menu">☰</button>
             <div style={{ fontFamily:"'Fraunces',serif",fontSize:19,fontWeight:700,color:"var(--text)",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{pageTitles[page]}</div>
             <div className="topbar-month">
-              <span>📅</span>
-              <select value={selMonth} onChange={e => setSelMonth(e.target.value)}>
+              <span style={{fontSize:14}}>📅</span>
+              <select value={selMonth} onChange={e => setSelMonth(e.target.value)}
+                style={{fontVariantNumeric:"tabular-nums",letterSpacing:"0.02em"}}>
                 {allMonths.map(k => <option key={k} value={k}>{monthLabelShort(k)}</option>)}
               </select>
             </div>
@@ -1442,6 +1487,7 @@ export default function App() {
             {page==="bills"     && <Bills     data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal}/>}
             {page==="stats"     && <Stats     data={data} selMonth={selMonth} mdata={mdata} allMonths={allMonths}/>}
             {page==="essence"   && <Suspense fallback={<div style={{textAlign:"center",padding:60,color:"var(--text3)"}}>⛽ Chargement…</div>}><EssencePage/></Suspense>}
+            {page==="meteo"     && <MeteoPage/>}
             {page==="settings"  && <SettingsPage data={data} update={update} setModal={setModal} user={user} activeUID={activeUID}/>}
           </div>
         </div>
@@ -1483,6 +1529,7 @@ export default function App() {
               {[
                 { id:"incomes",  icon:"💵", label:"Revenus",   desc:"Revenus du mois",          bg:"rgba(74,222,128,0.12)",  color:"#4ade80" },
                 { id:"essence",  icon:"⛽", label:"Carburants",desc:"Prix en temps réel",        bg:"rgba(251,191,36,0.12)",  color:"#fbbf24", badge:"LIVE" },
+                { id:"meteo",    icon:"🌤️", label:"Météo",     desc:"Prévisions locales",         bg:"rgba(96,165,250,0.12)",  color:"#60a5fa", badge:"LIVE" },
                 { id:"settings", icon:"⚙️", label:"Réglages",  desc:"Profils & catégories",      bg:"rgba(167,139,250,0.12)", color:"#a78bfa" },
               ].map(item => (
                 <div key={item.id} className="more-sheet-row" onClick={() => { navigate(item.id); setMoreOpen(false); }}>
@@ -2955,6 +3002,7 @@ function Bills({ data, update, selMonth, mdata, setModal }) {
 }
 
 function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }) {
+  const [justPaid, setJustPaid] = useState(false);
   const isPaid    = bill.paid?.[selMonth];
   const prof      = profiles.find(p => p.id===bill.profileId);
   const dueDate   = bill.dueDate ? new Date(bill.dueDate) : null;
@@ -3042,13 +3090,17 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
 
         {/* Actions */}
         <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-          <button onClick={() => onToggle(bill.id)} style={{
+          <button onClick={() => {
+              if(!isPaid){ setJustPaid(true); setTimeout(()=>setJustPaid(false), 1800); }
+              onToggle(bill.id);
+            }} style={{
             flex:1,padding:"11px",borderRadius:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:14,
-            background:isPaid?"rgba(74,222,128,0.12)":"rgba(167,139,250,0.12)",
-            border:`1px solid ${isPaid?"rgba(74,222,128,0.35)":"rgba(167,139,250,0.35)"}`,
-            color:isPaid?"var(--green)":"var(--purple)",transition:"all .2s",
+            background:justPaid?"rgba(74,222,128,0.25)":isPaid?"rgba(74,222,128,0.12)":"rgba(167,139,250,0.12)",
+            border:`1px solid ${justPaid?"rgba(74,222,128,0.6)":isPaid?"rgba(74,222,128,0.35)":"rgba(167,139,250,0.35)"}`,
+            color:justPaid||isPaid?"var(--green)":"var(--purple)",
+            transition:"all .3s",transform:justPaid?"scale(1.03)":"scale(1)",
           }}>
-            {isPaid?"↩️ Marquer impayée":"✅ Marquer comme payée"}
+            {justPaid ? "✅ Payée !" : isPaid ? "↩️ Annuler" : "❓ Déjà payée ?"}
           </button>
           <div className="bill-hover-actions" style={{ display:"flex",gap:6 }}>
             <button onClick={() => setModal({ type:"editBill",bill })}
@@ -4721,6 +4773,322 @@ function FuelMapLeaflet({ stations, userLat, userLng }) {
   return <div ref={mapRef} style={{width:"100%",height:520,borderRadius:18,overflow:"hidden",border:"1px solid var(--border)",boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}/>;
 }
 
+
+// ═══════════════════════════════════════════════════════════
+//  PAGE MÉTÉO — données Open-Meteo (source Météo-France)
+// ═══════════════════════════════════════════════════════════
+const WMO_ICONS = {
+  0:"☀️",1:"🌤️",2:"⛅",3:"☁️",
+  45:"🌫️",48:"🌫️",
+  51:"🌦️",53:"🌦️",55:"🌧️",
+  61:"🌧️",63:"🌧️",65:"🌧️",
+  71:"❄️",73:"❄️",75:"❄️",77:"🌨️",
+  80:"🌦️",81:"🌧️",82:"⛈️",
+  85:"❄️",86:"❄️",
+  95:"⛈️",96:"⛈️",99:"⛈️",
+};
+const WMO_LABELS = {
+  0:"Ciel dégagé",1:"Peu nuageux",2:"Partiellement nuageux",3:"Couvert",
+  45:"Brouillard",48:"Brouillard givrant",
+  51:"Bruine légère",53:"Bruine modérée",55:"Bruine dense",
+  61:"Pluie légère",63:"Pluie modérée",65:"Pluie forte",
+  71:"Neige légère",73:"Neige modérée",75:"Neige forte",77:"Grains de neige",
+  80:"Averses légères",81:"Averses",82:"Averses violentes",
+  85:"Averses de neige",86:"Averses de neige fortes",
+  95:"Orage",96:"Orage avec grêle",99:"Orage avec forte grêle",
+};
+
+function MeteoPage() {
+  const [city, setCity]           = useState("Saint-Dizier");
+  const [cityInput, setCityInput] = useState("Saint-Dizier");
+  const [coords, setCoords]       = useState({ lat:48.638, lng:4.946 });
+  const [weather, setWeather]     = useState(null);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState("");
+  const [geoActive, setGeoActive] = useState(false);
+  const [locating, setLocating]   = useState(false);
+  const [hourlyIdx, setHourlyIdx] = useState(null);
+
+  // Fetch météo depuis Open-Meteo (données Météo-France pour FR)
+  const fetchWeather = async (lat, lng, cityName) => {
+    setLoading(true); setError("");
+    try {
+      const url = `https://api.open-meteo.com/v1/meteofrance?` +
+        `latitude=${lat}&longitude=${lng}` +
+        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,` +
+        `precipitation,weather_code,wind_speed_10m,wind_direction_10m,uv_index` +
+        `&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,` +
+        `weather_code,wind_speed_10m` +
+        `&daily=weather_code,temperature_2m_max,temperature_2m_min,` +
+        `precipitation_sum,uv_index_max,sunrise,sunset` +
+        `&wind_speed_unit=kmh&timezone=Europe%2FParis&forecast_days=7`;
+      const r = await fetch(url);
+      const d = await r.json();
+      if (d.error) throw new Error(d.reason||"Erreur API");
+      setWeather(d);
+      setCity(cityName);
+      // Trouver l'heure actuelle dans le tableau horaire
+      const now = new Date();
+      const nowH = now.getHours();
+      const todayStr = now.toISOString().slice(0,10);
+      const idx = d.hourly.time.findIndex(t=>t.startsWith(todayStr)&&parseInt(t.slice(11,13))===nowH);
+      setHourlyIdx(idx >= 0 ? idx : 0);
+    } catch(e) {
+      setError("Impossible de récupérer la météo. Vérifiez votre connexion.");
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchWeather(coords.lat, coords.lng, city); }, []);
+
+  // Géocodage via Open-Meteo geocoding
+  const searchCity = async () => {
+    if (!cityInput.trim()) return;
+    setLoading(true); setError("");
+    try {
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityInput)}&count=1&language=fr&format=json`);
+      const d = await r.json();
+      if (!d.results?.length) { setError("Ville introuvable."); setLoading(false); return; }
+      const res = d.results[0];
+      const newCoords = { lat: res.latitude, lng: res.longitude };
+      setCoords(newCoords);
+      setGeoActive(false);
+      await fetchWeather(res.latitude, res.longitude, res.name);
+    } catch { setError("Erreur de géocodage."); setLoading(false); }
+  };
+
+  const locateUser = () => {
+    if(!navigator.geolocation){ setError("Géolocalisation non supportée."); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      setCoords({ lat, lng });
+      setGeoActive(true);
+      // Reverse geocoding
+      try {
+        const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${lat},${lng}&count=1&language=fr&format=json`);
+      } catch {}
+      await fetchWeather(lat, lng, "Ma position");
+      setLocating(false);
+    }, () => { setError("Géolocalisation refusée."); setLocating(false); });
+  };
+
+  const disableGeo = () => { setGeoActive(false); };
+
+  const cur = weather?.current;
+  const daily = weather?.daily;
+  const hourly = weather?.hourly;
+
+  const windDir = (deg) => {
+    const dirs = ["N","NE","E","SE","S","SO","O","NO"];
+    return dirs[Math.round(deg/45)%8];
+  };
+
+  const uvColor = (uv) => uv<=2?"#4ade80":uv<=5?"#fbbf24":uv<=7?"#f97316":uv<=10?"#f87171":"#c084fc";
+  const uvLabel = (uv) => uv<=2?"Faible":uv<=5?"Modéré":uv<=7?"Élevé":uv<=10?"Très élevé":"Extrême";
+
+  const JOURS = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+  const dayLabel = (dateStr) => {
+    const d = new Date(dateStr+"T12:00:00");
+    const today = new Date(); today.setHours(12,0,0,0);
+    const diff = Math.round((d-today)/86400000);
+    if(diff===0) return "Aujourd'hui";
+    if(diff===1) return "Demain";
+    return JOURS[d.getDay()];
+  };
+
+  return (
+    <div style={{maxWidth:680,margin:"0 auto",paddingBottom:16}}>
+
+      {/* ── En-tête + recherche ── */}
+      <div className="card" style={{marginBottom:16,background:"linear-gradient(135deg,rgba(96,165,250,0.08),rgba(167,139,250,0.06))"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+          <div style={{width:48,height:48,borderRadius:15,background:"linear-gradient(135deg,rgba(96,165,250,0.25),rgba(167,139,250,0.2))",
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,
+            border:"1.5px solid rgba(96,165,250,0.3)"}}>🌤️</div>
+          <div>
+            <div style={{fontWeight:900,fontSize:18}}>Météo</div>
+            <div style={{fontSize:11,color:"var(--text3)"}}>Source : Météo-France · Open-Meteo</div>
+          </div>
+        </div>
+
+        {/* Barre de recherche */}
+        <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+          <input
+            value={cityInput} onChange={e=>setCityInput(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&searchCity()}
+            placeholder="Ville ou code postal…"
+            style={{flex:1,minWidth:140,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
+              borderRadius:11,padding:"10px 14px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",
+              fontSize:14,outline:"none"}}/>
+          <button onClick={searchCity} disabled={loading}
+            style={{padding:"10px 18px",borderRadius:11,background:"var(--grad-main)",color:"#fff",
+              border:"none",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,
+              whiteSpace:"nowrap",opacity:loading?0.7:1}}>
+            {loading?"⟳ …":"🔍 Chercher"}
+          </button>
+          <button onClick={geoActive?disableGeo:locateUser} disabled={locating}
+            style={{padding:"10px 14px",borderRadius:11,
+              border:geoActive?"1px solid rgba(74,222,128,0.4)":"1px solid rgba(167,139,250,0.35)",
+              background:geoActive?"rgba(74,222,128,0.1)":"rgba(255,255,255,0.05)",
+              color:geoActive?"var(--green)":"var(--text2)",
+              cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>
+            {locating?"⟳ …":geoActive?"📍 Désactiver GPS":"📍 Me localiser"}
+          </button>
+        </div>
+
+        {error && <div style={{color:"var(--red)",fontSize:12,padding:"8px 12px",background:"rgba(248,113,113,0.07)",borderRadius:9}}>{error}</div>}
+      </div>
+
+      {loading && !weather && (
+        <div style={{textAlign:"center",padding:60}}>
+          <div style={{fontSize:36,animation:"spin .8s linear infinite",display:"inline-block"}}>⟳</div>
+        </div>
+      )}
+
+      {weather && cur && (
+        <>
+          {/* ── Météo actuelle ── */}
+          <div className="card" style={{marginBottom:16,background:`linear-gradient(160deg,rgba(96,165,250,0.12),rgba(167,139,250,0.06))`}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
+              <div>
+                <div style={{fontSize:13,color:"var(--text3)",fontWeight:700,marginBottom:4}}>📍 {city}</div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:72,lineHeight:1}}>{WMO_ICONS[cur.weather_code]||"🌡️"}</span>
+                  <div>
+                    <div style={{fontFamily:"'Fraunces',serif",fontSize:58,fontWeight:900,lineHeight:1,
+                      background:"linear-gradient(135deg,#93c5fd,#c4b5fd)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+                      {Math.round(cur.temperature_2m)}°
+                    </div>
+                    <div style={{fontSize:13,color:"var(--text3)",marginTop:2}}>
+                      Ressenti {Math.round(cur.apparent_temperature)}°
+                    </div>
+                  </div>
+                </div>
+                <div style={{fontWeight:700,fontSize:15,marginTop:8,color:"var(--text2)"}}>
+                  {WMO_LABELS[cur.weather_code]||""}
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"flex-end"}}>
+                {daily && (
+                  <>
+                    <div style={{fontSize:12,color:"var(--text3)",fontWeight:600}}>
+                      ↑ {Math.round(daily.temperature_2m_max[0])}° / ↓ {Math.round(daily.temperature_2m_min[0])}°
+                    </div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>
+                      🌅 {daily.sunrise[0]?.slice(11,16)} · 🌇 {daily.sunset[0]?.slice(11,16)}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Indicateurs */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+              {[
+                { icon:"💧", label:"Humidité", val:`${cur.relative_humidity_2m}%` },
+                { icon:"💨", label:"Vent", val:`${Math.round(cur.wind_speed_10m)} km/h ${windDir(cur.wind_direction_10m)}` },
+                { icon:"🌧️", label:"Précip.", val:`${(cur.precipitation||0).toFixed(1)} mm` },
+                { icon:"☀️", label:`UV — ${uvLabel(Math.round(cur.uv_index||0))}`, val:Math.round(cur.uv_index||0), valColor:uvColor(Math.round(cur.uv_index||0)) },
+              ].map((item,i) => (
+                <div key={i} style={{background:"rgba(255,255,255,0.04)",borderRadius:12,
+                  padding:"10px 8px",border:"1px solid rgba(255,255,255,0.07)",textAlign:"center"}}>
+                  <div style={{fontSize:18,marginBottom:4}}>{item.icon}</div>
+                  <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,marginBottom:2,lineHeight:1.2}}>{item.label}</div>
+                  <div style={{fontWeight:900,fontSize:13,color:item.valColor||"var(--text)"}}>{item.val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Prévisions horaires (aujourd'hui) ── */}
+          {hourly && hourlyIdx!==null && (
+            <div className="card" style={{marginBottom:16}}>
+              <div style={{fontWeight:800,fontSize:14,marginBottom:12,color:"var(--text2)"}}>⏱️ Aujourd'hui — heure par heure</div>
+              <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:6,WebkitOverflowScrolling:"touch"}}>
+                {Array.from({length:24},(_, offset)=>{
+                  const i=hourlyIdx+offset;
+                  if(i>=hourly.time.length) return null;
+                  const h=parseInt(hourly.time[i].slice(11,13));
+                  const isNow=offset===0;
+                  return (
+                    <div key={i} style={{
+                      display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                      minWidth:56,padding:"10px 6px",borderRadius:12,flexShrink:0,
+                      background:isNow?"rgba(96,165,250,0.18)":"rgba(255,255,255,0.03)",
+                      border:isNow?"1px solid rgba(96,165,250,0.4)":"1px solid rgba(255,255,255,0.06)",
+                    }}>
+                      <div style={{fontSize:10,color:isNow?"#93c5fd":"var(--text3)",fontWeight:700}}>{isNow?"Maint.":h+"h"}</div>
+                      <div style={{fontSize:20}}>{WMO_ICONS[hourly.weather_code[i]]||"?"}</div>
+                      <div style={{fontWeight:800,fontSize:13,color:"var(--text)"}}>{Math.round(hourly.temperature_2m[i])}°</div>
+                      <div style={{fontSize:10,color:"#60a5fa",fontWeight:700}}>
+                        {hourly.precipitation_probability[i]}%
+                      </div>
+                      <div style={{fontSize:9,color:"var(--text3)"}}>{Math.round(hourly.wind_speed_10m[i])}km/h</div>
+                    </div>
+                  );
+                }).filter(Boolean)}
+              </div>
+            </div>
+          )}
+
+          {/* ── Prévisions 7 jours ── */}
+          {daily && (
+            <div className="card" style={{marginBottom:16}}>
+              <div style={{fontWeight:800,fontSize:14,marginBottom:12,color:"var(--text2)"}}>📅 Prévisions 7 jours</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {daily.time.map((dateStr,i) => (
+                  <div key={i} style={{
+                    display:"flex",alignItems:"center",gap:12,padding:"10px 12px",
+                    borderRadius:12,background:i===0?"rgba(96,165,250,0.08)":"rgba(255,255,255,0.02)",
+                    border:i===0?"1px solid rgba(96,165,250,0.2)":"1px solid rgba(255,255,255,0.05)",
+                  }}>
+                    <div style={{width:56,fontWeight:i===0?900:700,fontSize:13,color:i===0?"#93c5fd":"var(--text2)",flexShrink:0}}>{dayLabel(dateStr)}</div>
+                    <div style={{fontSize:22,width:28,textAlign:"center"}}>{WMO_ICONS[daily.weather_code[i]]||"?"}</div>
+                    <div style={{flex:1,fontSize:12,color:"var(--text3)"}}>{WMO_LABELS[daily.weather_code[i]]||""}</div>
+                    <div style={{fontSize:10,color:"#60a5fa",fontWeight:700,flexShrink:0}}>
+                      💧 {Math.round(daily.precipitation_sum[i]||0)}mm
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <span style={{fontWeight:800,fontSize:14,color:"var(--text)"}}>{Math.round(daily.temperature_2m_max[i])}°</span>
+                      <span style={{fontWeight:600,fontSize:14,color:"var(--text3)"}}>{Math.round(daily.temperature_2m_min[i])}°</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Humidité détaillée ── */}
+          {hourly && hourlyIdx!==null && (
+            <div className="card" style={{marginBottom:16}}>
+              <div style={{fontWeight:800,fontSize:14,marginBottom:12,color:"var(--text2)"}}>💧 Humidité — 12 prochaines heures</div>
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
+                {Array.from({length:12},(_,offset)=>{
+                  const i=hourlyIdx+offset;
+                  if(i>=hourly.time.length) return null;
+                  const h=parseInt(hourly.time[i].slice(11,13));
+                  const hum=hourly.relative_humidity_2m[i];
+                  const color=hum<40?"#fbbf24":hum<60?"#4ade80":hum<80?"#60a5fa":"#a78bfa";
+                  return (
+                    <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                      minWidth:50,flexShrink:0}}>
+                      <div style={{fontSize:9,color:"var(--text3)",fontWeight:600}}>{offset===0?"Maint.":h+"h"}</div>
+                      <div style={{width:36,height:Math.max(12,Math.round(hum*0.6)),
+                        background:`linear-gradient(to top,${color},${color}66)`,
+                        borderRadius:"4px 4px 0 0",minHeight:8,transition:"height .3s"}}/>
+                      <div style={{fontSize:10,fontWeight:800,color}}>{hum}%</div>
+                    </div>
+                  );
+                }).filter(Boolean)}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════
 function EssencePage() {
   const FUEL_META = {
@@ -5107,9 +5475,10 @@ function EssencePage() {
                 const fuelsAvail=Object.entries(FUEL_META).filter(([k])=>s[k]!=null);
                 // isBest[k] = vrai si cette station est la moins chère pour ce carburant
                 const isBestFor=(k)=>{
-                  if(!s[k]||!bestStation[k]) return false;
-                  const b=bestStation[k];
-                  return b.lat===s.lat&&b.lng===s.lng&&b[k]===s[k];
+                  if(s[k]==null||!bestStation[k]) return false;
+                  // Prix minimal pour ce carburant parmi toutes les stations
+                  const minPrice=Math.min(...stationsWithDist.filter(x=>x[k]!=null).map(x=>x[k]));
+                  return Math.abs(s[k]-minPrice)<0.0005; // tolérance flottant
                 };
                 const mapsUrl=s.lat?`maps://?daddr=${s.lat},${s.lng}&dirflg=d`:null;
                 return (
