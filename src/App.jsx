@@ -225,14 +225,6 @@ button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:mani
   --sw:244px;--r:16px;--r-sm:11px;--r-lg:22px;
 }
 html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);width:100%;height:100%;margin:0;padding:0;overflow:hidden;}
-/* iOS Safari : utiliser dvh (dynamic viewport) pour suivre la barre URL */
-@supports(height:100dvh){
-  html,body,#root{height:100dvh;}
-}
-/* Fallback webkit */
-@supports not (height:100dvh){
-  html,body,#root{height:-webkit-fill-available;}
-}
 
 /* ── AUTH ── */
 .auth-shell{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -271,11 +263,10 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .check-anim{animation:checkDraw .5s ease .1s both;stroke-dasharray:100;stroke-dashoffset:0;}
 
 /* ── SHELL ── */
-.app-shell{position:fixed;inset:0;display:flex;overflow:hidden;height:100dvh;
+.app-shell{position:fixed;inset:0;display:flex;overflow:hidden;
   background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(167,139,250,0.08) 0%,transparent 60%),
              radial-gradient(ellipse 50% 30% at 90% 100%,rgba(244,114,182,0.05) 0%,transparent 60%),
              var(--bg);}
-@supports not (height:100dvh){.app-shell{height:-webkit-fill-available;}}
 
 /* ── SIDEBAR ── */
 .sidebar{width:var(--sw);flex-shrink:0;background:linear-gradient(180deg,#0d0b1e 0%,#09070f 100%);
@@ -287,7 +278,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);z-index:299;}
 
 /* ── MAIN ── */
-.main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;
+.main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;width:0;
   transition:margin-left .3s cubic-bezier(.4,0,.2,1);}
 .topbar{
   height:calc(64px + env(safe-area-inset-top));
@@ -298,7 +289,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
   background:rgba(7,6,15,0.94);backdrop-filter:blur(32px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
-.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:hidden;min-height:0;-webkit-overflow-scrolling:touch;}
+.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;transform:translateZ(0);}
 
 /* ── TOPBAR RIGHT WIDGET ── */
 .topbar-clock{display:flex;align-items:center;gap:0;background:linear-gradient(135deg,rgba(167,139,250,0.14),rgba(244,114,182,0.09));border:1px solid rgba(167,139,250,0.25);border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);flex-shrink:0;}
@@ -449,7 +440,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .tab-item:hover:not(.active){color:var(--text2);background:rgba(255,255,255,0.03);}
 
 /* ── FILTER BAR ── */
-.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;flex-wrap:wrap;}
+.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;flex-wrap:wrap;overflow:visible !important;}
 .filter-bar::-webkit-scrollbar{display:none;}
 .filter-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:22px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text2);cursor:pointer;font-size:12.5px;font-weight:600;white-space:nowrap;flex-shrink:0;transition:all .2s;user-select:none;position:relative;}
 .filter-chip .chip-emoji{font-size:15px;line-height:1;}
@@ -520,16 +511,6 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .float-icon{animation:none !important;}
   .slide-in{animation:fadeIn .2s ease both !important;}
   .scale-in{animation:fadeIn .2s ease both !important;}
-  /* iOS Safari critical fix: fadeUp translateY décale les touch targets */
-  .fade-up{animation:fadeIn .2s ease both !important;}
-  /* iOS Safari critical fix: backdrop-filter dans un container scrollable
-     décale tous les touch events de la page entière */
-  .glass,.glass-hover,.card,.card-sm,.modal-overlay,.modal-box,
-  .topbar,.bottom-nav,.sidebar,
-  [style*="backdrop-filter"]{
-    backdrop-filter:none !important;
-    -webkit-backdrop-filter:none !important;
-  }
 }
 
 /* ── RECHARTS ── */
@@ -540,7 +521,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .sidebar{transform:translateX(calc(-1 * var(--sw)));}
   .sidebar.open{transform:translateX(0);}
   .sidebar-overlay.open{display:block;}
-  .main-area{margin-left:0 !important;max-width:100vw;overflow:hidden;}
+  .main-area{margin-left:0 !important;}
   .content-grid{grid-template-columns:1fr !important;}
   .grid-4{grid-template-columns:1fr 1fr !important;}
   .page-content{
@@ -548,7 +529,6 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     padding-bottom:calc(84px + env(safe-area-inset-bottom));
     padding-left:calc(12px + env(safe-area-inset-left));
     padding-right:calc(12px + env(safe-area-inset-right));
-    overflow-x:hidden !important;
   }
   .bottom-nav{
     display:flex;position:fixed;bottom:0;left:0;right:0;
@@ -2397,8 +2377,8 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
           display:"flex",
           gap:7,
           flexWrap: isMobile ? "nowrap" : "wrap",
-          overflowX: isMobile ? "auto" : "hidden",
-          overflowY: "hidden",
+          overflowX: isMobile ? "auto" : "visible",
+          overflowY: "visible",
           paddingBottom:8,
           paddingTop:4,
           WebkitOverflowScrolling:"touch",
@@ -2573,7 +2553,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                               </div>
                             </div>
 
-                            <div className="tx-amount-col tip" data-tip={`${pct}% du total mensuel`} style={{ marginLeft:"auto",textAlign:"right",flexShrink:0 }}>
+                            <div className="tx-amount-col tip" data-tip={`${pct}% du total mensuel`} style={{ marginLeft:"auto",textAlign:"right",flexShrink:0,minWidth:100 }}>
                               <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:22,color:"var(--red)",textShadow:"0 0 18px rgba(248,113,113,0.3)",letterSpacing:-.5 }}>
                                 -{fmt(tx.amount)}
                               </div>
