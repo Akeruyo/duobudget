@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy, Suspense, useTransition, useDeferredValue } from "react";
 import {
   PieChart, Pie, Cell, AreaChart, Area, BarChart, Bar,
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid
@@ -225,14 +225,6 @@ button,a,[role=button]{-webkit-tap-highlight-color:transparent;touch-action:mani
   --sw:244px;--r:16px;--r-sm:11px;--r-lg:22px;
 }
 html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);width:100%;height:100%;margin:0;padding:0;overflow:hidden;}
-/* iOS Safari : utiliser dvh (dynamic viewport) pour suivre la barre URL */
-@supports(height:100dvh){
-  html,body,#root{height:100dvh;}
-}
-/* Fallback webkit */
-@supports not (height:100dvh){
-  html,body,#root{height:-webkit-fill-available;}
-}
 
 /* ── AUTH ── */
 .auth-shell{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -250,7 +242,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .auth-field input:focus{border-color:rgba(167,139,250,0.6);box-shadow:0 0 0 3px rgba(167,139,250,0.1),inset 0 1px 0 rgba(255,255,255,0.05);}
 .auth-field .field-icon{position:absolute;left:14px;bottom:13px;font-size:16px;pointer-events:none;}
 .auth-field .eye-btn{position:absolute;right:12px;bottom:10px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:17px;padding:3px;transition:color .2s;line-height:1;}
-@media(hover:hover){ ...auth-field .eye-btn:hover{color:var(--text2);}}
+.auth-field .eye-btn:hover{color:var(--text2);}
 
 /* ── AUTH STRENGTH BAR ── */
 .pwd-strength{display:flex;gap:4px;margin-top:8px;}
@@ -266,16 +258,15 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 
 /* ── RESET VIEW ── */
 .reset-back-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;transition:color .2s;margin-bottom:24px;}
-@media(hover:hover){ ...reset-back-btn:hover{color:var(--text);}}
+.reset-back-btn:hover{color:var(--text);}
 @keyframes checkDraw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
 .check-anim{animation:checkDraw .5s ease .1s both;stroke-dasharray:100;stroke-dashoffset:0;}
 
 /* ── SHELL ── */
-.app-shell{position:fixed;inset:0;display:flex;overflow:hidden;height:100dvh;
+.app-shell{position:fixed;inset:0;display:flex;overflow:hidden;
   background:radial-gradient(ellipse 60% 40% at 10% 0%,rgba(167,139,250,0.08) 0%,transparent 60%),
              radial-gradient(ellipse 50% 30% at 90% 100%,rgba(244,114,182,0.05) 0%,transparent 60%),
              var(--bg);}
-@supports not (height:100dvh){ ...app-shell{height:-webkit-fill-available;}}
 
 /* ── SIDEBAR ── */
 .sidebar{width:var(--sw);flex-shrink:0;background:linear-gradient(180deg,#0d0b1e 0%,#09070f 100%);
@@ -283,12 +274,12 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
   position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:300;
   padding-top:env(safe-area-inset-top);
   padding-bottom:env(safe-area-inset-bottom);
-  transition:transform .3s cubic-bezier(...4,0,.2,1);}
+  transition:transform .3s cubic-bezier(.4,0,.2,1);}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);z-index:299;}
 
 /* ── MAIN ── */
 .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;width:0;
-  transition:margin-left .3s cubic-bezier(...4,0,.2,1);}
+  transition:margin-left .3s cubic-bezier(.4,0,.2,1);}
 .topbar{
   height:calc(64px + env(safe-area-inset-top));
   padding-top:calc(10px + env(safe-area-inset-top));
@@ -298,7 +289,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
   background:rgba(7,6,15,0.94);backdrop-filter:blur(32px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
-.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:hidden;min-height:0;overscroll-behavior-y:contain;}
+.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:visible;min-height:0;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;transform:translateZ(0);}
 
 /* ── TOPBAR RIGHT WIDGET ── */
 .topbar-clock{display:flex;align-items:center;gap:0;background:linear-gradient(135deg,rgba(167,139,250,0.14),rgba(244,114,182,0.09));border:1px solid rgba(167,139,250,0.25);border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);flex-shrink:0;}
@@ -311,20 +302,20 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 .photo-upload-btn{position:relative;cursor:pointer;display:inline-block;}
 .photo-upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0;}
 .photo-upload-overlay{position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;font-size:16px;}
-@media(hover:hover){ ...photo-upload-btn:hover .photo-upload-overlay{opacity:1;}}
+.photo-upload-btn:hover .photo-upload-overlay{opacity:1;}
 
 /* ── CONTENT GRIDS ── */
 .content-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;}
 .content-grid.wide{grid-template-columns:1fr !important;}
 
 /* Tooltip classique pour filter chips */
-.filter-bar{position:relative;}
+.filter-bar{position:relative;overflow:visible !important;}
 .filter-chip{position:relative;}
 
 /* ── STATS CARDS ── */
-.stat-kpi-card{border-radius:20px;padding:22px;position:relative;overflow:hidden;transition:all .25s cubic-bezier(...4,0,.2,1);}
+.stat-kpi-card{border-radius:20px;padding:22px;position:relative;overflow:hidden;transition:all .25s cubic-bezier(.4,0,.2,1);}
 .stat-kpi-card::before{content:'';position:absolute;inset:0;opacity:.08;background:radial-gradient(circle at 20% 20%,white,transparent 70%);}
-@media(hover:hover){ ...stat-kpi-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.4)!important;}}
+.stat-kpi-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.4)!important;}
 
 /* ── BILL SECTION HEADERS ── */
 .bill-section-hdr{display:flex;align-items:center;gap:10px;margin:18px 0 10px;font-size:10px;font-weight:900;letter-spacing:2px;text-transform:uppercase;}
@@ -352,14 +343,12 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 /* ── NAV ── */
 .nav-section-label{font-size:9px;font-weight:900;letter-spacing:2.2px;text-transform:uppercase;color:var(--text3);padding:0 18px;margin:20px 0 7px;display:flex;align-items:center;gap:8px;}
 .nav-section-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);margin-left:4px;}
-.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;margin:2px 10px;border-radius:14px;cursor:pointer;transition:all .2s cubic-bezier(...4,0,.2,1);font-size:13.5px;font-weight:600;color:var(--text2);position:relative;user-select:none;border:1px solid transparent;}
-@media(hover:hover){
-  .nav-item:hover{color:var(--text);background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.08);}
-  .nav-item:hover .nav-icon-wrap{background:rgba(255,255,255,0.13);transform:scale(1.08);}
-}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;margin:2px 10px;border-radius:14px;cursor:pointer;transition:all .2s cubic-bezier(.4,0,.2,1);font-size:13.5px;font-weight:600;color:var(--text2);position:relative;user-select:none;border:1px solid transparent;}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.08);}
+.nav-item:hover .nav-icon-wrap{background:rgba(255,255,255,0.13);transform:scale(1.08);}
 .nav-item.active{color:#fff;background:linear-gradient(135deg,rgba(167,139,250,0.2),rgba(244,114,182,0.1));border-color:rgba(167,139,250,0.3);box-shadow:0 2px 20px rgba(167,139,250,0.14),inset 0 1px 0 rgba(255,255,255,0.07);}
 .nav-item.active .nav-icon-wrap{background:var(--grad-main);box-shadow:0 4px 14px rgba(167,139,250,0.45);transform:scale(1);}
-.nav-icon-wrap{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.06);transition:all .2s cubic-bezier(...4,0,.2,1);flex-shrink:0;border:1px solid rgba(255,255,255,0.06);}
+.nav-icon-wrap{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.06);transition:all .2s cubic-bezier(.4,0,.2,1);flex-shrink:0;border:1px solid rgba(255,255,255,0.06);}
 .nav-item.active .nav-icon-wrap{border-color:transparent;}
 .nav-icon{font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;}
 .nav-badge{margin-left:auto;background:rgba(248,113,113,0.18);color:var(--red);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:900;border:1px solid rgba(248,113,113,0.3);}
@@ -367,7 +356,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 /* ── CARDS ── */
 .glass{background:rgba(18,16,38,0.92);border:1px solid var(--border);border-radius:var(--r);}
 .glass-hover{transition:all .2s;}
-@media(hover:hover){ ...glass-hover:hover{background:var(--glass2);border-color:var(--border2);box-shadow:var(--shadow-glow);transform:translateY(-1px);}}
+.glass-hover:hover{background:var(--glass2);border-color:var(--border2);box-shadow:var(--shadow-glow);transform:translateY(-1px);}
 .card{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);padding:22px;box-shadow:var(--shadow-card);}
 .card-sm{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;}
 .card-highlight{border-color:rgba(167,139,250,0.25);background:rgba(167,139,250,0.04);}
@@ -375,21 +364,19 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
 /* ── BUTTONS ── */
 .btn{border:none;border-radius:var(--r-sm);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600;transition:all .2s;font-size:14px;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;}
 .btn-primary{background:var(--grad-main);color:white;padding:10px 20px;box-shadow:0 4px 14px rgba(167,139,250,0.3);}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(167,139,250,0.45);}
 .btn-primary:active{transform:translateY(0);}
 .btn-primary:disabled{opacity:0.4;pointer-events:none;}
 .btn-ghost{background:var(--glass);color:var(--text);border:1px solid var(--border);padding:10px 20px;}
+.btn-ghost:hover{background:var(--glass2);border-color:var(--border2);}
 .btn-sm{padding:7px 14px;font-size:13px;border-radius:9px;}
 .btn-danger{background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.25);padding:10px 18px;}
+.btn-danger:hover{background:rgba(248,113,113,0.2);}
 .btn-icon{background:var(--glass);border:1px solid var(--border);border-radius:9px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;font-size:15px;flex-shrink:0;}
+.btn-icon:hover{background:var(--glass2);border-color:var(--border2);}
 .menu-btn{background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;color:var(--text2);cursor:pointer;font-size:19px;padding:6px 10px;display:none;align-items:center;transition:all .2s;flex-shrink:0;}
-@media(hover:hover){
-  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(167,139,250,0.45);}
-  .btn-ghost:hover{background:var(--glass2);border-color:var(--border2);}
-  .btn-danger:hover{background:rgba(248,113,113,0.2);}
-  .btn-icon:hover{background:var(--glass2);border-color:var(--border2);}
-  .menu-btn:hover{color:var(--text);background:var(--glass2);}
-}
-@media(max-width:880px){ ...menu-btn{display:flex;}}
+.menu-btn:hover{color:var(--text);background:var(--glass2);}
+@media(max-width:880px){.menu-btn{display:flex;}}
 
 /* ── INPUTS ── */
 input,select,textarea{background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);padding:10px 14px;font-size:14px;width:100%;outline:none;transition:border .2s,box-shadow .2s;font-family:'Outfit',sans-serif;}
@@ -404,20 +391,18 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 
 /* ── PROGRESS ── */
 .progress-track{background:rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;}
-.progress-fill{height:100%;border-radius:20px;transition:width .7s cubic-bezier(...4,0,.2,1);}
+.progress-fill{height:100%;border-radius:20px;transition:width .7s cubic-bezier(.4,0,.2,1);}
 
 /* ── TRANSACTIONS ── */
 .tx-row{border-radius:13px;padding:11px 13px;transition:all .2s;border:1px solid transparent;display:flex;align-items:center;gap:12px;}
-@media(hover:hover){ ...tx-row:hover{background:rgba(255,255,255,0.05);border-color:var(--border);}}
+.tx-row:hover{background:rgba(255,255,255,0.05);border-color:var(--border);}
 .tx-row.selected{background:rgba(167,139,250,0.08);border-color:rgba(167,139,250,0.25);}
 
 /* ── EXPENSE ROW PREMIUM HOVER ── */
 .expense-row{transition:background .22s, border-color .22s, box-shadow .22s;cursor:default;}
+.expense-row:hover{background:linear-gradient(135deg,rgba(167,139,250,0.07),rgba(244,114,182,0.04)) !important;border-color:rgba(167,139,250,0.28) !important;box-shadow:0 4px 24px rgba(167,139,250,0.1),inset 0 1px 0 rgba(255,255,255,0.05) !important;}
 .expense-row .row-actions{opacity:0;transform:translateX(8px);transition:opacity .2s, transform .2s;}
-@media(hover:hover){
-  .expense-row:hover{background:linear-gradient(135deg,rgba(167,139,250,0.07),rgba(244,114,182,0.04)) !important;border-color:rgba(167,139,250,0.28) !important;box-shadow:0 4px 24px rgba(167,139,250,0.1),inset 0 1px 0 rgba(255,255,255,0.05) !important;}
-  .expense-row:hover .row-actions{opacity:1;transform:translateX(0);}
-}
+.expense-row:hover .row-actions{opacity:1;transform:translateX(0);}
 /* Badge profil : décoratif seulement, ne doit pas intercepter les clics */
 .tx-badge{pointer-events:none;}
 
@@ -452,57 +437,49 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .tab-bar{display:flex;background:rgba(255,255,255,0.04);border-radius:14px;padding:4px;gap:2px;margin-bottom:20px;}
 .tab-item{flex:1;padding:9px 10px;border-radius:11px;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;color:var(--text3);background:transparent;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:5px;}
 .tab-item.active{background:var(--glass3);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.3);}
-@media(hover:hover){ ...tab-item:hover:not(...active){color:var(--text2);background:rgba(255,255,255,0.03);}}
+.tab-item:hover:not(.active){color:var(--text2);background:rgba(255,255,255,0.03);}
 
 /* ── FILTER BAR ── */
-.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;flex-wrap:wrap;}
+.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;flex-wrap:wrap;overflow:visible !important;}
 .filter-bar::-webkit-scrollbar{display:none;}
 .filter-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:22px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text2);cursor:pointer;font-size:12.5px;font-weight:600;white-space:nowrap;flex-shrink:0;transition:all .2s;user-select:none;position:relative;}
 .filter-chip .chip-emoji{font-size:15px;line-height:1;}
 .filter-chip.active{border-color:rgba(167,139,250,0.55);background:rgba(167,139,250,0.14);color:var(--purple);box-shadow:0 2px 12px rgba(167,139,250,0.15),inset 0 1px 0 rgba(167,139,250,0.12);}
-@media(hover:hover){ ...filter-chip:hover:not(...active){background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.15);transform:translateY(-1px);}}
+.filter-chip:hover:not(.active){background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.15);transform:translateY(-1px);}
 
 /* ── ACTION BUTTONS WITH LABELS ── */
 .action-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:11px;border:1px solid;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;transition:all .2s;white-space:nowrap;flex-shrink:0;letter-spacing:.2px;}
 .action-btn-edit{background:rgba(167,139,250,0.07);border-color:rgba(167,139,250,0.2);color:var(--purple);}
+.action-btn-edit:hover{background:rgba(167,139,250,0.22);border-color:rgba(167,139,250,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(167,139,250,0.25);}
 .action-btn-dup{background:rgba(96,165,250,0.07);border-color:rgba(96,165,250,0.2);color:var(--blue);}
+.action-btn-dup:hover{background:rgba(96,165,250,0.22);border-color:rgba(96,165,250,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(96,165,250,0.25);}
 .action-btn-del{background:rgba(248,113,113,0.07);border-color:rgba(248,113,113,0.2);color:var(--red);}
-@media(hover:hover){
-  .action-btn-edit:hover{background:rgba(167,139,250,0.22);border-color:rgba(167,139,250,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(167,139,250,0.25);}
-  .action-btn-dup:hover{background:rgba(96,165,250,0.22);border-color:rgba(96,165,250,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(96,165,250,0.25);}
-  .action-btn-del:hover{background:rgba(248,113,113,0.22);border-color:rgba(248,113,113,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(248,113,113,0.25);}
-}
+.action-btn-del:hover{background:rgba(248,113,113,0.22);border-color:rgba(248,113,113,0.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(248,113,113,0.25);}
 
-/* ── DASHBOARD BILL ITEMS ── */
-.dash-bill-item{transition:all .28s cubic-bezier(...4,0,.2,1);}
-@media(hover:hover){
-  .dash-bill-item:hover{transform:translateX(5px) !important;box-shadow:0 0 0 1.5px rgba(167,139,250,0.45),0 6px 28px rgba(167,139,250,0.18) !important;}
-  .dash-bill-item.overdue:hover{transform:translateX(5px) !important;box-shadow:0 0 0 1.5px rgba(248,113,113,0.55),0 6px 28px rgba(248,113,113,0.22) !important;}
-}
+/* ── DASHBOARD BILL ITEMS — effet de bord hover ── */
+.dash-bill-item{transition:all .28s cubic-bezier(.4,0,.2,1);}
+.dash-bill-item:hover{transform:translateX(5px) !important;box-shadow:0 0 0 1.5px rgba(167,139,250,0.45),0 6px 28px rgba(167,139,250,0.18) !important;}
+.dash-bill-item.overdue:hover{transform:translateX(5px) !important;box-shadow:0 0 0 1.5px rgba(248,113,113,0.55),0 6px 28px rgba(248,113,113,0.22) !important;}
 
 /* ── CARD HOVER GLOW ── */
-.card-glow{transition:all .28s cubic-bezier(...4,0,.2,1);}
-@media(hover:hover){ ...card-glow:hover{box-shadow:0 0 0 1.5px rgba(167,139,250,0.35),0 8px 36px rgba(167,139,250,0.14),var(--shadow-card) !important;transform:translateY(-2px);}}
+.card-glow{transition:all .28s cubic-bezier(.4,0,.2,1);}
+.card-glow:hover{box-shadow:0 0 0 1.5px rgba(167,139,250,0.35),0 8px 36px rgba(167,139,250,0.14),var(--shadow-card) !important;transform:translateY(-2px);}
 
 /* ── INCOME CARD ── */
-.income-card{border-radius:var(--r);position:relative;overflow:hidden;transition:all .28s cubic-bezier(...4,0,.2,1);}
+.income-card{border-radius:var(--r);position:relative;overflow:hidden;transition:all .28s cubic-bezier(.4,0,.2,1);}
+.income-card:hover{transform:translateY(-3px);box-shadow:0 0 0 1.5px rgba(167,139,250,0.4),0 12px 40px rgba(0,0,0,0.35),0 0 60px rgba(167,139,250,0.08) !important;}
 .income-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;background:radial-gradient(ellipse 80% 60% at 50% -20%,rgba(167,139,250,0.07),transparent);pointer-events:none;}
-@media(hover:hover){
-  .income-card:hover{transform:translateY(-3px);box-shadow:0 0 0 1.5px rgba(167,139,250,0.4),0 12px 40px rgba(0,0,0,0.35),0 0 60px rgba(167,139,250,0.08) !important;}
-  .income-card:hover::before{opacity:1;}
-}
+.income-card:hover::before{opacity:1;}
 
-/* ── BILL CARD ROW ── */
-.bill-card-row{transition:all .28s cubic-bezier(...4,0,.2,1);}
-.bill-hover-actions{opacity:0;transform:translateX(10px);transition:all .22s cubic-bezier(...4,0,.2,1);}
-@media(hover:hover){
-  .bill-card-row:hover{transform:translateY(-2px);box-shadow:0 0 0 1.5px rgba(167,139,250,0.3),0 8px 32px rgba(0,0,0,0.3) !important;}
-  .bill-card-row:hover .bill-hover-actions{opacity:1;transform:translateX(0);}
-}
+/* ── BILL CARD ROW HOVER ACTIONS (like transactions) ── */
+.bill-card-row{transition:all .28s cubic-bezier(.4,0,.2,1);}
+.bill-card-row:hover{transform:translateY(-2px);box-shadow:0 0 0 1.5px rgba(167,139,250,0.3),0 8px 32px rgba(0,0,0,0.3) !important;}
+.bill-hover-actions{opacity:0;transform:translateX(10px);transition:all .22s cubic-bezier(.4,0,.2,1);}
+.bill-card-row:hover .bill-hover-actions{opacity:1;transform:translateX(0);}
 
-/* ── PROFILE CARD ── */
-.profile-card{border-radius:var(--r);position:relative;cursor:pointer;transition:all .25s cubic-bezier(...4,0,.2,1);}
-@media(hover:hover){ ...profile-card:hover{transform:translateY(-2px);box-shadow:0 8px 36px rgba(0,0,0,0.3),0 0 0 1.5px rgba(167,139,250,0.25) !important;}}
+/* ── PROFILE CARD HOVER ── */
+.profile-card{border-radius:var(--r);position:relative;cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);}
+.profile-card:hover{transform:translateY(-2px);box-shadow:0 8px 36px rgba(0,0,0,0.3),0 0 0 1.5px rgba(167,139,250,0.25) !important;}
 
 /* ── BOTTOM NAV ── */
 .bottom-nav{display:none;}
@@ -511,38 +488,31 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(167,139,250,0.25);border-radius:3px;}
-@media(hover:hover){::-webkit-scrollbar-thumb:hover{background:rgba(167,139,250,0.45);}}
+::-webkit-scrollbar-thumb:hover{background:rgba(167,139,250,0.45);}
 
 /* ── ANIMATIONS ── */
-@keyframes fadeUp{from{opacity:0}to{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes scaleIn{from{opacity:0;transform:scale(...97)}to{opacity:1;transform:scale(1)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 @keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
-.fade-up{animation:fadeUp .25s ease both;}
+.fade-up{animation:fadeUp .3s ease both;}
 .fade-in{animation:fadeIn .2s ease both;}
-.scale-in{animation:scaleIn .28s cubic-bezier(...34,1.56,.64,1) both;}
+.scale-in{animation:scaleIn .28s cubic-bezier(.34,1.56,.64,1) both;}
 .slide-in{animation:slideIn .25s ease both;}
 .stagger-1{animation-delay:.04s}.stagger-2{animation-delay:.08s}.stagger-3{animation-delay:.12s}.stagger-4{animation-delay:.16s}.stagger-5{animation-delay:.2s}
 .float-icon{animation:float 3s ease-in-out infinite;}
 .pulse-dot{animation:pulse 2s infinite;}
 .spin{animation:spin .7s linear infinite;}
+/* iOS Safari : translateY dans les animations décale les touch targets → désactivé sur touch */
 @media(hover:none){
+  .fade-up{animation:fadeIn .25s ease both !important;}
+  .slide-in{animation:fadeIn .2s ease both !important;}
+  .scale-in{animation:fadeIn .2s ease both !important;}
   .float-icon{animation:none !important;}
-  .slide-in{animation:none !important;}
-  .scale-in{animation:none !important;}
-  /* Sur iOS, toute animation sur le wrapper d'une page = touch offset potentiel */
-  .fade-up{animation:none !important;opacity:1 !important;}
-  /* iOS Safari: backdrop-filter dans un container scrollable décale les touch events */
-  .glass,.glass-hover,.card,.card-sm,.modal-overlay,.modal-box,
-  .topbar,.bottom-nav,.sidebar,
-  [style*="backdrop-filter"]{
-    backdrop-filter:none !important;
-    -webkit-backdrop-filter:none !important;
-  }
 }
 
 /* ── RECHARTS ── */
@@ -557,47 +527,53 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .content-grid{grid-template-columns:1fr !important;}
   .grid-4{grid-template-columns:1fr 1fr !important;}
   .page-content{
-    padding:12px 12px 90px 12px;
-    overflow-x:hidden !important;
+    padding:12px;
+    padding-bottom:calc(84px + env(safe-area-inset-bottom));
+    padding-left:calc(12px + env(safe-area-inset-left));
+    padding-right:calc(12px + env(safe-area-inset-right));
   }
-  .topbar{
-    height:54px !important;
-    padding-top:10px !important;
-    padding-left:14px;
-    padding-right:14px;
-    background:rgba(7,6,15,0.99) !important;
-    backdrop-filter:none !important;
-    -webkit-backdrop-filter:none !important;
-  }
-  .topbar-clock-date{display:none;}
-  .topbar-clock{border-radius:12px;}
-  .topbar-clock-time{padding:8px 14px;}
   .bottom-nav{
-    display:flex;
-    position:fixed;bottom:0;left:0;right:0;
-    background:rgba(7,6,15,0.99);
-    backdrop-filter:none !important;
-    -webkit-backdrop-filter:none !important;
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    background:rgba(7,6,15,0.97);backdrop-filter:blur(24px);
     border-top:1px solid var(--border);
     justify-content:space-around;
-    align-items:center;
-    padding:8px 0 max(16px, env(safe-area-inset-bottom));
+    padding-top:10px;
+    padding-bottom:max(20px, calc(env(safe-area-inset-bottom) + 8px));
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
     z-index:250;
+    /* Ensure tappable area is above iOS home indicator */
+    min-height:calc(64px + env(safe-area-inset-bottom));
   }
+  /* Extra tap area for nav items */
   .bnav-item{
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:3px;padding:4px 8px;border-radius:12px;cursor:pointer;
-    font-size:9px;font-weight:700;color:var(--text3);
-    text-transform:uppercase;letter-spacing:.3px;
-    min-width:44px;min-height:44px;
+    gap:3px;padding:6px 10px;border-radius:12px;cursor:pointer;
+    transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);
+    text-transform:uppercase;letter-spacing:.3px;min-width:48px;
     position:relative;
-    -webkit-tap-highlight-color:transparent;
-    touch-action:manipulation;
+    /* Bigger tap target */
+    min-height:48px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
   .bnav-item.active{color:var(--purple);}
   .bnav-item.active .bnav-icon-wrap{background:rgba(167,139,250,0.18);border-radius:12px;}
-  .bnav-icon{font-size:20px;}
-  .bnav-icon-wrap{padding:2px 10px;border-radius:10px;}
+  .bnav-icon{font-size:22px;}
+  .bnav-icon-wrap{padding:4px 12px;border-radius:10px;transition:all .18s;}
+  .topbar{
+    height:calc(56px + env(safe-area-inset-top)) !important;
+    padding-left:calc(14px + env(safe-area-inset-left));
+    padding-right:calc(14px + env(safe-area-inset-right));
+  }
+  /* Compact clock on mobile */
+  .topbar-clock-date{display:none;}
+  .topbar-clock{border-radius:12px;}
+  .topbar-clock-time{padding:8px 14px;}
+  /* Remove backdrop-filter on topbar/bottom-nav on mobile — causes iOS touch offset */
+  .topbar{background:rgba(7,6,15,0.98) !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
+  .bottom-nav{background:rgba(7,6,15,0.99) !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
+
   /* ── EXPENSE ROW — full mobile redesign ── */
   /* Disable hover effects on touch */
   .expense-row{
@@ -614,6 +590,7 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
     grid-column:1;
     grid-row:1 / 3;
     align-self:center;
+    overflow:visible;
   }
   .expense-row .tx-icon-wrap .tx-icon{
     width:46px !important;
@@ -684,6 +661,11 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   }
   /* Hide proportion bar on mobile */
   .expense-row .tx-bar-row{ display:none !important; }
+  /* Disable hover border-left animation */
+  .expense-row:hover{
+    transform:none !important;
+    padding-left:14px !important;
+  }
   /* Prevent tooltip popups from showing on touch */
   .tip::after,.tip::before{ display:none !important; }
 
@@ -745,6 +727,11 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 /* Disable tooltips on touch-only devices */
 @media(hover:none){
   .gtip{ display:none !important; }
+}
+/* iPhone notch / safe area */
+@supports(padding-top: env(safe-area-inset-top)){
+  .app-shell{padding-top:0;}
+  .auth-shell{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
 }
 `;
 
@@ -935,7 +922,7 @@ function AuthScreen({ onLinked }) {
         <button className="reset-back-btn" onClick={() => switchView("login")}>← Retour à la connexion</button>
         {resetSent ? (
           <div style={{ textAlign:"center",padding:"10px 0 20px" }} className="fade-up">
-            <div style={{ width:80,height:80,borderRadius:"50%",background:"radial-gradient(circle,rgba(74,222,128,0.2),rgba(74,222,128,0.05))",border:"2px solid rgba(74,222,128,0.4)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 30px rgba(74,222,128,0.2)",margin:"0 auto 24px",animation:"scaleIn .4s cubic-bezier(...34,1.56,.64,1) both" }}>
+            <div style={{ width:80,height:80,borderRadius:"50%",background:"radial-gradient(circle,rgba(74,222,128,0.2),rgba(74,222,128,0.05))",border:"2px solid rgba(74,222,128,0.4)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 30px rgba(74,222,128,0.2)",margin:"0 auto 24px",animation:"scaleIn .4s cubic-bezier(.34,1.56,.64,1) both" }}>
               <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path className="check-anim" d="M8 18l7 7 13-13" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
             <div style={{ fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:700,marginBottom:10 }}>Email envoyé !</div>
@@ -1086,7 +1073,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeUID, setActiveUID] = useState(null);
   const [isLinked, setIsLinked] = useState(false);
-  const navigateTo = useCallback((p) => { setPage(p); setSidebarOpen(false); }, []);
+  const [, startTransition] = useTransition();
+  const navigateTo = useCallback((p) => { startTransition(() => setPage(p)); setSidebarOpen(false); }, []);
 
   const saveTimer = useRef(null);
   const isSaving = useRef(false);
@@ -1189,11 +1177,6 @@ export default function App() {
   ];
 
   const navigate = navigateTo;
-  const pageContentRef = useRef(null);
-  // iOS fix: reset scroll position on every page change to avoid touch offset
-  useEffect(() => {
-    if (pageContentRef.current) pageContentRef.current.scrollTop = 0;
-  }, [page]);
   const pageTitles = { dashboard:"Tableau de bord",incomes:"Revenus",expenses:"Dépenses",bills:"Factures",stats:"Statistiques",settings:"Réglages",essence:"⛽ Prix des carburants" };
   const syncLabel = { synced:"Synchronisé ✓",saving:"Sauvegarde…",error:"Erreur sync !" };
   const syncColor = { synced:"var(--green)",saving:"var(--yellow)",error:"var(--red)" };
@@ -1321,7 +1304,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="page-content" ref={pageContentRef}>
+          <div className="page-content">
             {page==="dashboard" && <Dashboard data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal} allMonths={allMonths}/>}
             {page==="incomes"   && <Incomes   data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal}/>}
             {page==="expenses"  && <Expenses  data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal}/>}
@@ -1764,10 +1747,10 @@ function Dashboard({ data, update, selMonth, mdata, setModal, allMonths }) {
                   background:`linear-gradient(135deg, ${p.color} 0%, ${p.color}99 100%)`,
                   color:"white",
                   boxShadow:`0 6px 22px ${p.color}45, inset 0 1px 0 rgba(255,255,255,0.18)`,
-                  transition:"all .22s cubic-bezier(...4,0,.2,1)",
+                  transition:"all .22s cubic-bezier(.4,0,.2,1)",
                 }}
-                onMouseEnter={isTouchDevice()?undefined:e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=`0 10px 30px ${p.color}65, inset 0 1px 0 rgba(255,255,255,0.18)`; }}
-                onMouseLeave={isTouchDevice()?undefined:e=>{ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=`0 6px 22px ${p.color}45, inset 0 1px 0 rgba(255,255,255,0.18)`; }}
+                onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=`0 10px 30px ${p.color}65, inset 0 1px 0 rgba(255,255,255,0.18)`; }}
+                onMouseLeave={e=>{ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=`0 6px 22px ${p.color}45, inset 0 1px 0 rgba(255,255,255,0.18)`; }}
                 onClick={e=>{ e.stopPropagation(); setModal({ type:"editIncome",profileId:p.id,selMonth }); }}>
                 <div style={{ width:30,height:30,borderRadius:9,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0 }}>✏️</div>
                 <span style={{ flex:1,textAlign:"left" }}>Modifier le revenu de <strong>{p.name}</strong></span>
@@ -2101,8 +2084,8 @@ function Incomes({ data, update, selMonth, mdata, setModal }) {
                   ].map(s => (
                     <div key={s.label} className="tip" data-tip={s.tip}
                       style={{ textAlign:"center",padding:"12px 8px",background:s.bg,borderRadius:13,border:`1px solid ${s.bd}`,transition:"all .2s",cursor:"default" }}
-                      onMouseEnter={isTouchDevice()?undefined:e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.2)";}}
-                      onMouseLeave={isTouchDevice()?undefined:e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+                      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.2)";}}
+                      onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
                       <div style={{ fontSize:20,marginBottom:5 }}>{s.icon}</div>
                       <div style={{ fontSize:9,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.5,fontWeight:800,marginBottom:4 }}>{s.fullLabel}</div>
                       <div className="stat-num" style={{ fontSize:14,fontWeight:900,color:s.color }}>{s.val}</div>
@@ -2151,7 +2134,7 @@ function Incomes({ data, update, selMonth, mdata, setModal }) {
                     width:"100%",justifyContent:"center",padding:"14px",fontSize:14,
                     letterSpacing:.3,borderRadius:14,cursor:"pointer",
                     fontFamily:"'Outfit',sans-serif",fontWeight:800,
-                    border:"none",transition:"all .25s cubic-bezier(...4,0,.2,1)",
+                    border:"none",transition:"all .25s cubic-bezier(.4,0,.2,1)",
                     display:"flex",alignItems:"center",gap:8,
                     background: p.id==="common"
                       ? `linear-gradient(135deg,#60a5fa,#a78bfa)`
@@ -2161,8 +2144,8 @@ function Incomes({ data, update, selMonth, mdata, setModal }) {
                     color:"white",
                     boxShadow:`0 4px 18px ${p.color}45`,
                   }}
-                  onMouseEnter={isTouchDevice()?undefined:e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 8px 28px ${p.color}60`;}}
-                  onMouseLeave={isTouchDevice()?undefined:e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=`0 4px 18px ${p.color}45`;}}
+                  onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 8px 28px ${p.color}60`;}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=`0 4px 18px ${p.color}45`;}}
                   onClick={() => setModal({ type:"editIncome",profileId:p.id,selMonth })}>
                   <div style={{ width:26,height:26,borderRadius:8,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14 }}>✏️</div>
                   Modifier le revenu de <strong>{p.name}</strong>
@@ -2234,16 +2217,16 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
   const [sort, setSort]       = useState("date_desc");
   const [groupBy, setGroupBy] = useState("none");
   const [confirmClear, setConfirmClear] = useState(false);
-  const deferredSearch = search;
+  const deferredSearch = useDeferredValue(search);
 
   const catMap  = useMemo(() => Object.fromEntries(data.categories.map(c=>[c.id,c])), [data.categories]);
   const profMap = useMemo(() => Object.fromEntries(data.profiles.map(p=>[p.id,p])), [data.profiles]);
 
   const filtered = useMemo(() => {
     let txs = filter==="all" ? transactions : transactions.filter(t => t.profileId===filter||t.categoryId===filter);
-    if (search.trim()) { const q=search.toLowerCase(); txs = txs.filter(t => t.label.toLowerCase().includes(q)||(catMap[t.categoryId]?.name||"").toLowerCase().includes(q)); }
+    if (deferredSearch.trim()) { const q=deferredSearch.toLowerCase(); txs = txs.filter(t => t.label.toLowerCase().includes(q)||(catMap[t.categoryId]?.name||"").toLowerCase().includes(q)); }
     return txs;
-  }, [transactions,filter,search,catMap]);
+  }, [transactions,filter,deferredSearch,catMap]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -2396,8 +2379,8 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
           display:"flex",
           gap:7,
           flexWrap: isMobile ? "nowrap" : "wrap",
-          overflowX: isMobile ? "auto" : "hidden",
-          overflowY: "hidden",
+          overflowX: isMobile ? "auto" : "visible",
+          overflowY: "visible",
           paddingBottom:8,
           paddingTop:4,
           WebkitOverflowScrolling:"touch",
@@ -2458,8 +2441,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                   </div>
                 )}
 
-                <div style={{ background:"var(--glass)",border:"1px solid var(--border)",borderRadius:18,overflow:"hidden",boxShadow:"0 2px 20px rgba(0,0,0,0.2)",position:"relative",
-                  touchAction:"pan-y",overscrollBehavior:"contain" }}>
+                <div style={{ background:"var(--glass)",border:"1px solid var(--border)",borderRadius:18,overflow:"visible",boxShadow:"0 2px 20px rgba(0,0,0,0.2)",position:"relative" }}>
                   {group.items.map((tx, idx) => {
                     const cat  = catMap[tx.categoryId]||{ icon:"❓",color:"#888",name:"Autre" };
                     const prof = profMap[tx.profileId]||{ avatar:"❓",name:"?",color:"#888" };
@@ -2509,24 +2491,27 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                                 -{fmt(tx.amount)}
                               </div>
                             </div>
-                            {/* Row 2: action buttons */}
+                            {/* Row 2: action buttons — height fixe pour éviter le décalage iOS */}
                             <div style={{ display:"flex",gap:6 }}>
                               <button
                                 type="button"
-                                onClick={() => setModal({ type:"editTransaction",tx,selMonth })}
-                                style={{ flex:1,height:44,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
+                                onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
+                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 ✏️ Modifier
                               </button>
                               <button
                                 type="button"
-                                onClick={() => duplicate(tx)}
-                                style={{ flex:1,height:44,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); duplicate(tx); }}
+                                onClick={e => { e.stopPropagation(); duplicate(tx); }}
+                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 📋 Dupliquer
                               </button>
                               <button
                                 type="button"
-                                onClick={() => del(tx.id)}
-                                style={{ flex:1,height:44,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); del(tx.id); }}
+                                onClick={e => { e.stopPropagation(); del(tx.id); }}
+                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 🗑 Suppr.
                               </button>
                             </div>
@@ -2570,7 +2555,7 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                               </div>
                             </div>
 
-                            <div className="tx-amount-col tip" data-tip={`${pct}% du total mensuel`} style={{ marginLeft:"auto",textAlign:"right",flexShrink:0 }}>
+                            <div className="tx-amount-col tip" data-tip={`${pct}% du total mensuel`} style={{ marginLeft:"auto",textAlign:"right",flexShrink:0,minWidth:100 }}>
                               <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:22,color:"var(--red)",textShadow:"0 0 18px rgba(248,113,113,0.3)",letterSpacing:-.5 }}>
                                 -{fmt(tx.amount)}
                               </div>
@@ -2822,7 +2807,7 @@ function BillRow({ bill, selMonth, onToggle, onDelete, profiles, idx, setModal }
 
   return (
     <div className={`bill-card-row fade-up stagger-${(idx%5)+1}`}
-      style={{ marginBottom:14,background:"var(--glass)",border:`1px solid ${statusBorder}`,borderRadius:18,overflow:"hidden",opacity:isPaid?0.72:1,transition:"all .28s cubic-bezier(...4,0,.2,1)",boxShadow:isOverdue?"0 0 20px rgba(248,113,113,0.1)":undefined,position:"relative" }}>
+      style={{ marginBottom:14,background:"var(--glass)",border:`1px solid ${statusBorder}`,borderRadius:18,overflow:"hidden",opacity:isPaid?0.72:1,transition:"all .28s cubic-bezier(.4,0,.2,1)",boxShadow:isOverdue?"0 0 20px rgba(248,113,113,0.1)":undefined,position:"relative" }}>
       <div style={{ height:3,background:`linear-gradient(90deg,${statusColor},transparent)` }}/>
       <div style={{ padding:"16px 18px" }}>
         {/* Header */}
@@ -4759,7 +4744,7 @@ function EssencePage() {
                     overflow:"hidden",cursor:best.lat?"pointer":"default",
                     transition:"transform .18s,box-shadow .18s",position:"relative",
                   }}
-                  onMouseEnter={e=>{if(best.lat&&!isTouchDevice()){e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`0 14px 36px ${meta.color}30`;}}}
+                  onMouseEnter={e=>{if(best.lat){e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`0 14px 36px ${meta.color}30`;}}}
                   onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
 
                   {/* Bandeau coloré */}
