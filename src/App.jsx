@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy, Suspense, useTransition, useDeferredValue } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy, Suspense } from "react";
 import {
   PieChart, Pie, Cell, AreaChart, Area, BarChart, Bar,
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid
@@ -1086,8 +1086,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeUID, setActiveUID] = useState(null);
   const [isLinked, setIsLinked] = useState(false);
-  const [, startTransition] = useTransition();
-  const navigateTo = useCallback((p) => { startTransition(() => setPage(p)); setSidebarOpen(false); }, []);
+  const navigateTo = useCallback((p) => { setPage(p); setSidebarOpen(false); }, []);
 
   const saveTimer = useRef(null);
   const isSaving = useRef(false);
@@ -2235,16 +2234,16 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
   const [sort, setSort]       = useState("date_desc");
   const [groupBy, setGroupBy] = useState("none");
   const [confirmClear, setConfirmClear] = useState(false);
-  const deferredSearch = useDeferredValue(search);
+  const deferredSearch = search;
 
   const catMap  = useMemo(() => Object.fromEntries(data.categories.map(c=>[c.id,c])), [data.categories]);
   const profMap = useMemo(() => Object.fromEntries(data.profiles.map(p=>[p.id,p])), [data.profiles]);
 
   const filtered = useMemo(() => {
     let txs = filter==="all" ? transactions : transactions.filter(t => t.profileId===filter||t.categoryId===filter);
-    if (deferredSearch.trim()) { const q=deferredSearch.toLowerCase(); txs = txs.filter(t => t.label.toLowerCase().includes(q)||(catMap[t.categoryId]?.name||"").toLowerCase().includes(q)); }
+    if (search.trim()) { const q=search.toLowerCase(); txs = txs.filter(t => t.label.toLowerCase().includes(q)||(catMap[t.categoryId]?.name||"").toLowerCase().includes(q)); }
     return txs;
-  }, [transactions,filter,deferredSearch,catMap]);
+  }, [transactions,filter,search,catMap]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
