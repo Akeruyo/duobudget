@@ -3632,10 +3632,9 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
 
 
 // ═══════════════════════════════════════════════════════════
-//  ESSENCE — API Gouvernement prix carburants
+//  ESSENCE — Prix carburants France
 // ═══════════════════════════════════════════════════════════
 
-// ── Helpers géo ──
 const haversineKm = (la1,lo1,la2,lo2) => {
   const R=6371, d2r=Math.PI/180;
   const dLa=(la2-la1)*d2r, dLo=(lo2-lo1)*d2r;
@@ -3644,177 +3643,286 @@ const haversineKm = (la1,lo1,la2,lo2) => {
 };
 const fmtKm = km => km==null ? null : km<1 ? `${Math.round(km*1000)} m` : `${km.toFixed(1)} km`;
 
-// ── Données marques (couleurs + initiales) ──
-const BRAND_DB = [
-  // pattern, { abbr, bg, fg, label }
-  [/e\.?\s*leclerc|petro\s*est|sodibrag|galec|sodia/i,  { abbr:"E.",  bg:"#003f8f", fg:"#fff", label:"E. Leclerc" }],
-  [/intermarche|intermarché|jeandeline|vert.?bois/i,     { abbr:"IN",  bg:"#E30613", fg:"#fff", label:"Intermarché" }],
-  [/totalenergies/i,   { abbr:"TE",  bg:"linear-gradient(135deg,#E8000D,#FF6B00,#00A650)", fg:"#fff", label:"TotalEnergies", gradient:true }],
-  [/total\s*access/i,  { abbr:"TA",  bg:"#E8000D", fg:"#fff", label:"Total Access" }],
-  [/total/i,           { abbr:"TO",  bg:"#E8000D", fg:"#fff", label:"Total" }],
-  [/esso\s*express/i,  { abbr:"EE",  bg:"#003399", fg:"#fff", label:"Esso Express" }],
-  [/esso/i,            { abbr:"ES",  bg:"#003399", fg:"#fff", label:"Esso" }],
-  [/shell/i,           { abbr:"SH",  bg:"#FBCE07", fg:"#C00",  label:"Shell" }],
-  [/\bbp\b/i,          { abbr:"BP",  bg:"#00672A", fg:"#FBCE07", label:"BP" }],
-  [/carrefour\s*market/i, { abbr:"CM", bg:"#0070f0", fg:"#fff", label:"Carrefour Market" }],
-  [/carrefour\s*contact/i,{ abbr:"CC", bg:"#0070f0", fg:"#fff", label:"Carrefour Contact" }],
-  [/carrefour/i,       { abbr:"CF",  bg:"#0070f0", fg:"#fff", label:"Carrefour" }],
-  [/auchan/i,          { abbr:"AU",  bg:"#e63226", fg:"#fff", label:"Auchan" }],
-  [/géant\s*casino|geant\s*casino/i, { abbr:"GC", bg:"#e31e24", fg:"#fff", label:"Géant Casino" }],
-  [/casino/i,          { abbr:"CA",  bg:"#e31e24", fg:"#fff", label:"Casino" }],
-  [/\bcora\b/i,        { abbr:"CO",  bg:"#e8751a", fg:"#fff", label:"Cora" }],
-  [/super\s*u\b/i,     { abbr:"SU",  bg:"#005baf", fg:"#fff", label:"Super U" }],
-  [/hyper\s*u\b/i,     { abbr:"HU",  bg:"#005baf", fg:"#fff", label:"Hyper U" }],
-  [/u\s*express/i,     { abbr:"UE",  bg:"#005baf", fg:"#fff", label:"U Express" }],
-  [/système\s*u|systeme\s*u/i, { abbr:"SY", bg:"#005baf", fg:"#fff", label:"Système U" }],
-  [/\blidl\b/i,        { abbr:"LI",  bg:"#0050aa", fg:"#FBCE07", label:"Lidl" }],
-  [/\bnetto\b/i,       { abbr:"NE",  bg:"#e63226", fg:"#fff", label:"Netto" }],
-  [/colruyt/i,         { abbr:"CL",  bg:"#e63226", fg:"#fff", label:"Colruyt" }],
-  [/simply/i,          { abbr:"SM",  bg:"#ff6600", fg:"#fff", label:"Simply Market" }],
-  [/dyneff/i,          { abbr:"DY",  bg:"#ff6600", fg:"#fff", label:"Dyneff" }],
-  [/\bvito\b/i,        { abbr:"VI",  bg:"#7c3aed", fg:"#fff", label:"Vito" }],
-  [/relais\s*du\s*der/i,{ abbr:"RD", bg:"#f59e0b", fg:"#1a1a1a", label:"Relais du Der" }],
-  [/\brelais\b/i,      { abbr:"RL",  bg:"#f59e0b", fg:"#1a1a1a", label:"Relais" }],
-  [/elan|élan/i,       { abbr:"EL",  bg:"#0ea5e9", fg:"#fff", label:"Élan" }],
-  [/oil!/i,            { abbr:"OI",  bg:"#ff6600", fg:"#fff", label:"Oil!" }],
-  [/sarl\s*brivot/i,   { abbr:"SB",  bg:"#374151", fg:"#fff", label:"Sarl Brivot" }],
-];
-
-const getBrand = (nom, enseignes) => {
-  const haystack = `${nom||""} ${Array.isArray(enseignes)?enseignes.join(" "):(enseignes||"")}`;
-  for (const [re, b] of BRAND_DB) {
-    if (re.test(haystack)) return b;
-  }
-  // initiales sur fond neutre
-  const clean = (nom||"Station").trim();
-  const abbr  = clean.split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase() || "⛽";
-  return { abbr, bg:"#1e293b", fg:"rgba(255,255,255,0.7)", label:clean };
+// ── Base de données marques avec SVG logos inline ──
+const BRAND_DATA = {
+  "totalenergies": {
+    label:"TotalEnergies", abbr:"TE", bg:"#150A00", fg:"#fff",
+    patterns:[/totalenergies/i, /total\s*energies/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#150A00"/>
+        <defs>
+          <linearGradient id="teg1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#E8000D"/><stop offset="55%" stopColor="#FF6B00"/><stop offset="100%" stopColor="#00A650"/>
+          </linearGradient>
+          <linearGradient id="teg2" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0%" stopColor="#003F9B"/><stop offset="100%" stopColor="#00A4E4"/>
+          </linearGradient>
+        </defs>
+        <rect x="18" y="18" width="64" height="16" rx="8" fill="url(#teg1)"/>
+        <rect x="42" y="18" width="16" height="56" rx="8" fill="url(#teg1)"/>
+        <path d="M14 66 Q14 50 30 50 Q46 50 46 66 Q46 76 38 79 Q22 83 14 74 Z" fill="url(#teg2)"/>
+        <rect x="14" y="62" width="32" height="6" rx="3" fill="#150A00"/>
+      </svg>
+    )
+  },
+  "total_access": {
+    label:"Total Access", abbr:"TA", bg:"#E8000D", fg:"#fff",
+    patterns:[/total\s*access/i],
+    logo: null
+  },
+  "total": {
+    label:"Total", abbr:"TO", bg:"#E8000D", fg:"#fff",
+    patterns:[/\btotal\b/i],
+    logo: null
+  },
+  "leclerc": {
+    label:"E. Leclerc", abbr:"E.", bg:"#00309A", fg:"#fff",
+    patterns:[/e\.?\s*leclerc/i, /petro\s*est/i, /sodibrag/i, /galec/i, /sodia/i, /\bleclerc\b/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#00309A"/>
+        <text x="50" y="62" textAnchor="middle" fill="#fff"
+          style={{fontFamily:"Arial Black,sans-serif",fontSize:42,fontWeight:900,letterSpacing:-2}}>E.</text>
+        <text x="50" y="82" textAnchor="middle" fill="#FFD700"
+          style={{fontFamily:"Arial,sans-serif",fontSize:14,fontWeight:700,letterSpacing:0.5}}>LECLERC</text>
+      </svg>
+    )
+  },
+  "intermarche": {
+    label:"Intermarché", abbr:"IN", bg:"#E30613", fg:"#fff",
+    patterns:[/intermarche/i, /intermarché/i, /jeandeline/i, /vert.?bois/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#E30613"/>
+        <circle cx="50" cy="42" r="22" fill="#fff"/>
+        <circle cx="50" cy="42" r="14" fill="#E30613"/>
+        <circle cx="50" cy="42" r="7" fill="#fff"/>
+        <rect x="16" y="70" width="68" height="12" rx="3" fill="#fff"/>
+        <text x="50" y="80" textAnchor="middle" fill="#E30613"
+          style={{fontFamily:"Arial,sans-serif",fontSize:10,fontWeight:900}}>INTERMARCHÉ</text>
+      </svg>
+    )
+  },
+  "shell": {
+    label:"Shell", abbr:"SH", bg:"#FBCE07", fg:"#CC0000",
+    patterns:[/\bshell\b/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#FBCE07"/>
+        <path d="M50 10 L58 35 L85 35 L63 52 L72 78 L50 61 L28 78 L37 52 L15 35 L42 35 Z" fill="#CC0000"/>
+      </svg>
+    )
+  },
+  "bp": {
+    label:"BP", abbr:"BP", bg="#00772A", fg:"#FBCE07",
+    patterns:[/\bbp\b/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#00772A"/>
+        <circle cx="50" cy="50" r="36" fill="#FBCE07" opacity="0.2"/>
+        <text x="50" y="64" textAnchor="middle" fill="#FBCE07"
+          style={{fontFamily:"Helvetica,Arial,sans-serif",fontSize:44,fontWeight:900,letterSpacing:-2}}>bp</text>
+      </svg>
+    )
+  },
+  "esso": {
+    label:"Esso", abbr:"ES", bg:"#003399", fg:"#fff",
+    patterns:[/\besso\b/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#003399"/>
+        <text x="50" y="65" textAnchor="middle" fill="#fff"
+          style={{fontFamily:"Arial Black,sans-serif",fontSize:40,fontWeight:900,fontStyle:"italic"}}>esso</text>
+      </svg>
+    )
+  },
+  "carrefour": {
+    label:"Carrefour", abbr:"CF", bg:"#004B93", fg:"#fff",
+    patterns:[/carrefour/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#004B93"/>
+        <path d="M50 20 L50 80" stroke="#fff" strokeWidth="0"/>
+        <path d="M30 20 L50 50 L30 80" fill="#004B93" stroke="none"/>
+        <path d="M70 20 L50 50 L70 80" fill="#004B93" stroke="none"/>
+        <polygon points="28,18 50,50 28,82 38,82 60,50 38,18" fill="#E30613"/>
+        <polygon points="72,18 50,50 72,82 62,82 40,50 62,18" fill="#004B93"/>
+        <polygon points="50,18 72,18 62,18 50,50" fill="#E30613"/>
+        <polygon points="50,82 72,82 62,82 50,50" fill="#E30613"/>
+        <polygon points="28,18 50,18 38,18 50,50" fill="#004B93"/>
+        <polygon points="28,82 50,82 38,82 50,50" fill="#004B93"/>
+        <path d="M42 18 L58 18 L68 34 L50 50 L32 34 Z" fill="#E30613"/>
+        <path d="M42 82 L58 82 L68 66 L50 50 L32 66 Z" fill="#E30613"/>
+      </svg>
+    )
+  },
+  "auchan": {
+    label:"Auchan", abbr:"AU", bg:"#E42312", fg:"#fff",
+    patterns:[/auchan/i],
+    logo: null
+  },
+  "casino": {
+    label:"Casino", abbr:"CA", bg:"#E31E24", fg:"#fff",
+    patterns:[/géant\s*casino/i, /geant\s*casino/i, /\bcasino\b/i],
+    logo: null
+  },
+  "cora": {
+    label:"Cora", abbr:"CO", bg:"#E8751A", fg:"#fff",
+    patterns:[/\bcora\b/i],
+    logo: null
+  },
+  "super_u": {
+    label:"Super U", abbr:"SU", bg:"#005BAF", fg:"#fff",
+    patterns:[/super\s*u\b/i, /hyper\s*u\b/i, /u\s*express/i, /syst.me\s*u/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#005BAF"/>
+        <text x="50" y="68" textAnchor="middle" fill="#fff"
+          style={{fontFamily:"Arial Black,sans-serif",fontSize:58,fontWeight:900,letterSpacing:-2}}>U</text>
+      </svg>
+    )
+  },
+  "lidl": {
+    label:"Lidl", abbr:"LI", bg:"#0050AA", fg:"#FBCE07",
+    patterns:[/\blidl\b/i],
+    logo: (s) => (
+      <svg width={s} height={s} viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="20" fill="#0050AA"/>
+        <circle cx="50" cy="42" r="26" fill="#E8000D" stroke="#fff" strokeWidth="3"/>
+        <circle cx="50" cy="42" r="18" fill="#FBCE07"/>
+        <text x="50" y="95" textAnchor="middle" fill="#fff"
+          style={{fontFamily:"Arial Black,sans-serif",fontSize:14,fontWeight:900,letterSpacing:1}}>LIDL</text>
+      </svg>
+    )
+  },
+  "colruyt": { label:"Colruyt", abbr:"CL", bg:"#E63226", fg:"#fff", patterns:[/colruyt/i], logo:null },
+  "netto":   { label:"Netto",   abbr:"NE", bg:"#E63226", fg:"#fff", patterns:[/\bnetto\b/i], logo:null },
+  "elan":    { label:"Élan",    abbr:"EL", bg:"#0EA5E9", fg:"#fff", patterns:[/elan|élan/i], logo:null },
+  "vito":    { label:"Vito",    abbr:"VI", bg:"#7C3AED", fg:"#fff", patterns:[/\bvito\b/i], logo:null },
+  "relais":  { label:"Relais",  abbr:"RL", bg:"#F59E0B", fg:"#1a1a1a", patterns:[/\brelais\b/i], logo:null },
+  "dyneff":  { label:"Dyneff",  abbr:"DY", bg:"#FF6600", fg:"#fff", patterns:[/dyneff/i], logo:null },
 };
 
-// ── Icône de marque (SVG inline pour TotalEnergies, sinon badge CSS) ──
-function BrandIcon({ nom, enseignes, size=44 }) {
-  const b = getBrand(nom, enseignes);
-  const r = Math.round(size*0.28);
+// ── Détection marque (cherche dans nom, enseignes ET adresse) ──
+const detectBrand = (nom, enseignes, adresse) => {
+  const src = `${nom||""} ${Array.isArray(enseignes)?enseignes.join(" "):(enseignes||"")} ${adresse||""}`.toLowerCase();
+  for(const [key, b] of Object.entries(BRAND_DATA)){
+    if(b.patterns.some(re=>re.test(src))) return {...b, key};
+  }
+  return null;
+};
 
-  if (/totalenergies/i.test(`${nom||""}${Array.isArray(enseignes)?enseignes.join(""):(enseignes||"")}`)) {
-    // TotalEnergies — logo coloré en SVG
+// ── Composant icône de marque ──
+function BrandIcon({ nom, enseignes, adresse, size=44 }) {
+  const brand = detectBrand(nom, enseignes, adresse);
+  const r = Math.round(size * 0.26);
+
+  if(brand?.logo){
     return (
-      <div style={{ width:size, height:size, borderRadius:r, overflow:"hidden", flexShrink:0,
-        boxShadow:"0 3px 14px rgba(232,0,13,0.35)", background:"#fff", display:"flex",
-        alignItems:"center", justifyContent:"center" }}>
-        <svg width={size*0.78} height={size*0.78} viewBox="0 0 60 60" fill="none">
-          <defs>
-            <linearGradient id="te1" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#E8000D"/>
-              <stop offset="50%" stopColor="#FF6B00"/>
-              <stop offset="100%" stopColor="#00A650"/>
-            </linearGradient>
-            <linearGradient id="te2" x1="0" y1="1" x2="1" y2="0">
-              <stop offset="0%" stopColor="#003F9B"/>
-              <stop offset="100%" stopColor="#00A4E4"/>
-            </linearGradient>
-          </defs>
-          {/* T stylisé */}
-          <rect x="10" y="10" width="40" height="10" rx="5" fill="url(#te1)"/>
-          <rect x="25" y="10" width="10" height="35" rx="5" fill="url(#te1)"/>
-          {/* e stylisé */}
-          <path d="M8 38 Q8 28 20 28 Q32 28 32 38 Q32 44 26 46 Q14 50 8 44 Z" fill="url(#te2)" opacity="0.85"/>
-          <rect x="8" y="36" width="20" height="4" rx="2" fill="#fff"/>
-        </svg>
+      <div style={{width:size,height:size,borderRadius:r,overflow:"hidden",flexShrink:0,
+        boxShadow:`0 3px 12px ${brand.bg}60`}}>
+        {brand.logo(size)}
       </div>
     );
   }
 
-  if (/\bshell\b/i.test(`${nom||""}${Array.isArray(enseignes)?enseignes.join(""):(enseignes||"")}`)) {
-    return (
-      <div style={{ width:size, height:size, borderRadius:r, overflow:"hidden", flexShrink:0,
-        background:"#FBCE07", boxShadow:"0 3px 14px rgba(251,206,7,0.5)", display:"flex",
-        alignItems:"center", justifyContent:"center" }}>
-        <svg width={size*0.7} height={size*0.7} viewBox="0 0 60 60">
-          <path d="M30 5 L35 20 L52 20 L39 30 L44 47 L30 37 L16 47 L21 30 L8 20 L25 20 Z" fill="#CC0000"/>
-        </svg>
-      </div>
-    );
-  }
-
-  if (/\bbp\b/i.test(nom||"")) {
-    return (
-      <div style={{ width:size, height:size, borderRadius:r, flexShrink:0,
-        background:"#00672A", boxShadow:"0 3px 14px rgba(0,103,42,0.5)",
-        display:"flex", alignItems:"center", justifyContent:"center" }}>
-        <span style={{ fontFamily:"Georgia,serif", fontWeight:900, fontSize:size*0.38,
-          color:"#FBCE07", letterSpacing:-1 }}>bp</span>
-      </div>
-    );
-  }
-
-  // Badge générique coloré
+  // Badge générique avec initiales
+  const b = brand || {
+    abbr: (nom||"?").split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase().slice(0,2)||"⛽",
+    bg:"#1e293b", fg:"rgba(255,255,255,0.8)"
+  };
   return (
     <div style={{
-      width:size, height:size, borderRadius:r, flexShrink:0,
-      background: b.gradient ? b.bg : b.bg,
-      backgroundImage: b.gradient ? b.bg : undefined,
-      boxShadow: `0 3px 14px ${b.bg.startsWith("linear") ? "rgba(167,139,250,0.4)" : b.bg}55`,
-      display:"flex", alignItems:"center", justifyContent:"center",
-      fontSize:Math.round(size*0.33), fontWeight:900,
-      color:b.fg, letterSpacing:-0.5,
-      fontFamily:"'Outfit',sans-serif",
+      width:size,height:size,borderRadius:r,flexShrink:0,
+      background:b.bg, color:b.fg,
+      boxShadow:`0 3px 12px ${b.bg === "#1e293b" ? "rgba(0,0,0,0.4)" : b.bg+"60"}`,
+      display:"flex",alignItems:"center",justifyContent:"center",
+      fontSize:Math.round(size*0.31),fontWeight:900,
+      fontFamily:"'Outfit',sans-serif",letterSpacing:-0.5,
     }}>{b.abbr}</div>
   );
 }
 
+// ── Résolution du vrai nom d'établissement ──
+// Cherche dans enseignes, puis nom API, puis tente OSM plus tard
+const resolveNom = (r) => {
+  const adresse = (r.adresse||"").trim();
+
+  // 1. Champ enseignes officiel
+  let ens = r.enseignes;
+  if(typeof ens==="string"){ try{ens=JSON.parse(ens);}catch{ens=ens?[ens]:[];} }
+  const ensStr = Array.isArray(ens) ? ens.filter(Boolean).join(" ").trim() : (ens||"").trim();
+  if(ensStr) return { nom:ensStr, nomIsAdresse:false };
+
+  // 2. Vérifier si r.nom est différent de l'adresse
+  const nomApi = (r.nom||"").trim();
+  const norm = s => s.toLowerCase().replace(/[,.']/g,"").replace(/\s+/g," ").trim();
+  const nomSameAsAddr = !nomApi ||
+    norm(nomApi) === norm(adresse) ||
+    norm(adresse).includes(norm(nomApi).slice(0,15)) ||
+    norm(nomApi).includes(norm(adresse).slice(0,15));
+
+  if(nomApi && !nomSameAsAddr){
+    return { nom:nomApi, nomIsAdresse:false };
+  }
+
+  // 3. Détection depuis adresse (stations autoroute, grandes surfaces connues)
+  const brand = detectBrand("", "", adresse);
+  if(brand) return { nom:brand.label, nomIsAdresse:false };
+
+  // 4. Fallback → adresse courte
+  const adresseComp = adresse.split(",")[0].trim() || nomApi || `Station`;
+  return { nom:adresseComp, nomIsAdresse:true };
+};
+
 // ── Modal navigation ──
-function NavModal({ station, onClose }) {
+function NavModal({ station, userLat, userLng, onClose }) {
   const lat = station.lat, lng = station.lng;
-  const name = encodeURIComponent(station.nom || "Station");
-  if (!lat || !lng) return null;
+  if(!lat || !lng) return null;
+  const dist = (userLat&&userLng&&station._dist!=null) ? fmtKm(station._dist) : null;
   const opts = [
     { label:"Apple Plans",  icon:"🍎", sub:"Navigation native iOS / macOS",  href:`https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d` },
     { label:"Google Maps",  icon:"🗺️", sub:"Tous appareils",                  href:`https://maps.google.com/maps?daddr=${lat},${lng}` },
     { label:"Waze",         icon:"🔵", sub:"Trafic en temps réel",            href:`https://waze.com/ul?ll=${lat},${lng}&navigate=yes` },
-    { label:"Here WeGo",    icon:"📡", sub:"Offline disponible",              href:`https://share.here.com/r/${lat},${lng}` },
+    { label:"Here WeGo",    icon:"📡", sub:"Navigation offline",              href:`https://share.here.com/r/${lat},${lng}` },
   ];
   return (
-    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(14px)",
-      display:"flex",alignItems:"center",justifyContent:"center",zIndex:3000,padding:16 }}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{ background:"linear-gradient(145deg,#110f24,#1a1635)",border:"1px solid rgba(255,255,255,0.14)",
-        borderRadius:24,padding:24,width:"100%",maxWidth:400,animation:"scaleIn .25s ease both" }}>
-        {/* Header */}
-        <div style={{ display:"flex",alignItems:"flex-start",gap:12,marginBottom:20 }}>
-          <BrandIcon nom={station.nom} enseignes={station.enseignes} size={46}/>
-          <div style={{ flex:1,minWidth:0 }}>
-            <div style={{ fontWeight:900,fontSize:15,color:"#fff",marginBottom:4,
-              textTransform:"uppercase",letterSpacing:.5 }}>
+    <div onClick={e=>e.target===e.currentTarget&&onClose()}
+      style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(16px)",
+        display:"flex",alignItems:"center",justifyContent:"center",zIndex:3000,padding:20}}>
+      <div style={{background:"linear-gradient(145deg,#0d0b1e,#1a1635)",border:"1px solid rgba(255,255,255,0.12)",
+        borderRadius:24,padding:24,width:"100%",maxWidth:400}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:20}}>
+          <BrandIcon nom={station.nom} enseignes={station.enseignes} adresse={station.adresse} size={50}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:900,fontSize:15,color:"#fff",textTransform:"uppercase",letterSpacing:.5,marginBottom:3}}>
               {(station.nom||"Station").toUpperCase()}
             </div>
-            <div style={{ fontSize:12,color:"var(--text3)" }}>
+            <div style={{fontSize:11,color:"var(--text3)",lineHeight:1.5}}>
               {station.adresse}{station.ville?` — ${station.ville}`:""}
             </div>
-            {station._dist!=null&&<div style={{ fontSize:11,marginTop:4,color:"var(--yellow)",fontWeight:700 }}>
-              📍 {fmtKm(station._dist)}
-            </div>}
+            {dist&&<div style={{fontSize:12,color:"var(--yellow)",fontWeight:800,marginTop:5}}>📍 {dist}</div>}
           </div>
-          <button onClick={onClose} style={{ background:"none",border:"none",color:"var(--text3)",
-            cursor:"pointer",fontSize:22,lineHeight:1,padding:0 }}>×</button>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,0.08)",border:"none",
+            color:"var(--text3)",cursor:"pointer",fontSize:18,width:32,height:32,borderRadius:8,
+            display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
-
-        <div style={{ fontSize:11,color:"var(--text3)",marginBottom:14,fontWeight:700,
-          textTransform:"uppercase",letterSpacing:1 }}>Choisir l'application de navigation</div>
-
+        <div style={{fontSize:10,color:"var(--text3)",marginBottom:12,fontWeight:700,
+          textTransform:"uppercase",letterSpacing:1.2}}>Navigation vers cette station</div>
         {opts.map(o=>(
           <a key={o.label} href={o.href} target="_blank" rel="noopener noreferrer"
-            style={{ display:"flex",alignItems:"center",gap:14,padding:"14px 16px",
-              marginBottom:8,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.09)",
-              borderRadius:14,textDecoration:"none",color:"var(--text)",transition:"all .18s" }}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.borderColor="rgba(167,139,250,0.3)";}}
-            onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.05)";e.currentTarget.style.borderColor="rgba(255,255,255,0.09)";}}>
-            <span style={{ fontSize:26,flexShrink:0 }}>{o.icon}</span>
-            <div style={{ flex:1 }}>
-              <div style={{ fontWeight:700,fontSize:14 }}>{o.label}</div>
-              <div style={{ fontSize:11,color:"var(--text3)",marginTop:1 }}>{o.sub}</div>
+            style={{display:"flex",alignItems:"center",gap:14,padding:"13px 16px",marginBottom:8,
+              background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",
+              borderRadius:14,textDecoration:"none",color:"#fff",transition:"all .18s",cursor:"pointer"}}
+            onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.12)";e.currentTarget.style.borderColor="rgba(167,139,250,0.3)"}}
+            onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.04)";e.currentTarget.style.borderColor="rgba(255,255,255,0.08)"}}>
+            <span style={{fontSize:24,flexShrink:0}}>{o.icon}</span>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:13}}>{o.label}</div>
+              <div style={{fontSize:11,color:"var(--text3)"}}>{o.sub}</div>
             </div>
-            <span style={{ color:"var(--text3)",fontSize:20 }}>›</span>
+            <span style={{color:"var(--text3)",fontSize:18}}>›</span>
           </a>
         ))}
       </div>
@@ -3824,85 +3932,49 @@ function NavModal({ station, onClose }) {
 
 // ── Carte Leaflet ──
 function FuelMapLeaflet({ stations, userLat, userLng }) {
-  const mapRef  = useRef(null);
-  const instRef = useRef(null);
-
+  const mapRef=useRef(null), instRef=useRef(null);
   useEffect(()=>{
     if(!mapRef.current) return;
-    const init = () => {
-      if(instRef.current){ instRef.current.remove(); instRef.current=null; }
-      const L = window.L;
-      const center = userLat&&userLng ? [userLat,userLng] : [48.638,4.946];
-      const map = L.map(mapRef.current,{zoomControl:true}).setView(center, userLat?13:10);
-      instRef.current = map;
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-        attribution:"© OpenStreetMap",maxZoom:19
-      }).addTo(map);
-
-      // Marqueur utilisateur
+    const init=()=>{
+      if(instRef.current){instRef.current.remove();instRef.current=null;}
+      const L=window.L;
+      const center=userLat&&userLng?[userLat,userLng]:[48.638,4.946];
+      const map=L.map(mapRef.current,{zoomControl:true}).setView(center,userLat?13:10);
+      instRef.current=map;
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(map);
       if(userLat&&userLng){
-        const ui=L.divIcon({
-          html:`<div style="width:18px;height:18px;background:#a78bfa;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(167,139,250,0.3)"></div>`,
-          className:"",iconSize:[18,18],iconAnchor:[9,9]
-        });
-        L.marker([userLat,userLng],{icon:ui}).addTo(map)
-          .bindPopup("<b style='font-family:Outfit,sans-serif'>📍 Vous êtes ici</b>");
+        const ui=L.divIcon({html:`<div style="width:20px;height:20px;background:#a78bfa;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 5px rgba(167,139,250,0.25)"></div>`,className:"",iconSize:[20,20],iconAnchor:[10,10]});
+        L.marker([userLat,userLng],{icon:ui}).addTo(map).bindPopup("<b>📍 Vous êtes ici</b>");
       }
-
-      // Marqueurs stations
       stations.forEach(s=>{
         if(!s.lat||!s.lng) return;
-        const b = getBrand(s.nom, s.enseignes);
-        const dist = (userLat&&userLng) ? fmtKm(haversineKm(userLat,userLng,s.lat,s.lng)) : null;
-        const nomCourt = (s.nom||"Station").toUpperCase().slice(0,22);
-        const fuels = ['gazole','sp95','e10','sp98']
-          .filter(k=>s[k]!=null)
-          .map(k=>`<span style="background:#1e293b;color:#e2e8f0;padding:2px 7px;border-radius:5px;font-size:11px;margin:2px 2px 0 0;display:inline-block"><b>${k.toUpperCase()}</b> ${s[k].toFixed(3)}€</span>`)
-          .join("");
-
-        const bg = b.bg.startsWith("linear") ? "#E8000D" : b.bg;
-        const icon = L.divIcon({
-          html:`<div style="background:${bg};color:${b.fg};width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;font-family:Outfit,sans-serif;border:2.5px solid rgba(255,255,255,0.9);box-shadow:0 4px 12px ${bg}80;cursor:pointer">${b.abbr}</div>`,
-          className:"",iconSize:[36,36],iconAnchor:[18,18]
+        const brand=detectBrand(s.nom,s.enseignes,s.adresse)||{abbr:"⛽",bg:"#374151",fg:"#fff"};
+        const dist=(userLat&&userLng)?fmtKm(haversineKm(userLat,userLng,s.lat,s.lng)):null;
+        const fuels=['gazole','sp95','e10','sp98'].filter(k=>s[k]!=null)
+          .map(k=>`<span style="background:#1e293b;color:#e2e8f0;padding:2px 6px;border-radius:5px;font-size:11px;margin:2px">${k.toUpperCase()} ${s[k].toFixed(3)}€</span>`).join("");
+        const icon=L.divIcon({
+          html:`<div style="background:${brand.bg};color:${brand.fg};width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;font-family:Outfit,sans-serif;border:2.5px solid rgba(255,255,255,0.9);box-shadow:0 4px 12px rgba(0,0,0,0.4)">${brand.abbr}</div>`,
+          className:"",iconSize:[38,38],iconAnchor:[19,19]
         });
-        L.marker([s.lat,s.lng],{icon}).addTo(map).bindPopup(
-          L.popup({maxWidth:260}).setContent(`
-            <div style="font-family:Outfit,sans-serif;padding:4px 2px">
-              <div style="font-weight:900;font-size:14px;color:#0f172a;margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px">${nomCourt}</div>
-              <div style="font-size:11px;color:#64748b;margin-bottom:6px">${s.adresse||""}${s.ville?" · "+s.ville:""}</div>
-              ${dist?`<div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:8px">📍 ${dist}</div>`:""}
-              <div style="margin-bottom:10px">${fuels}</div>
-              <a href="https://maps.google.com/maps?daddr=${s.lat},${s.lng}" target="_blank"
-                style="display:block;text-align:center;background:linear-gradient(135deg,#a78bfa,#f472b6);color:#fff;padding:9px;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px">
-                🗺️ Démarrer l'itinéraire
-              </a>
-            </div>
-          `)
-        );
+        L.marker([s.lat,s.lng],{icon}).addTo(map).bindPopup(L.popup({maxWidth:270}).setContent(`
+          <div style="font-family:Outfit,sans-serif;padding:4px">
+            <div style="font-weight:900;font-size:14px;text-transform:uppercase;margin-bottom:2px">${(s.nom||"Station").slice(0,28)}</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:6px">${s.adresse||""}${s.ville?" · "+s.ville:""}</div>
+            ${dist?`<div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px">📍 ${dist}</div>`:""}
+            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:2px">${fuels}</div>
+            <a href="https://maps.google.com/maps?daddr=${s.lat},${s.lng}" target="_blank"
+              style="display:block;text-align:center;background:linear-gradient(135deg,#a78bfa,#f472b6);color:#fff;padding:9px;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px">🗺️ Démarrer</a>
+          </div>`));
       });
     };
-
     if(!window.L){
-      if(!document.querySelector("#lf-css")){
-        const l=document.createElement("link");
-        l.id="lf-css";l.rel="stylesheet";
-        l.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-        document.head.appendChild(l);
-      }
-      if(!document.querySelector("#lf-js")){
-        const s=document.createElement("script");
-        s.id="lf-js";s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-        s.onload=init; document.head.appendChild(s);
-      } else { setTimeout(init,100); }
-    } else { init(); }
-
-    return ()=>{ if(instRef.current){instRef.current.remove();instRef.current=null;} };
+      if(!document.querySelector("#lf-css")){const l=document.createElement("link");l.id="lf-css";l.rel="stylesheet";l.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(l);}
+      if(!document.querySelector("#lf-js")){const s=document.createElement("script");s.id="lf-js";s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";s.onload=init;document.head.appendChild(s);}
+      else{setTimeout(init,100);}
+    } else{init();}
+    return()=>{if(instRef.current){instRef.current.remove();instRef.current=null;}};
   },[stations,userLat,userLng]);
-
-  return (
-    <div ref={mapRef} style={{ width:"100%",height:520,borderRadius:18,overflow:"hidden",
-      border:"1px solid var(--border)",boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }}/>
-  );
+  return <div ref={mapRef} style={{width:"100%",height:520,borderRadius:18,overflow:"hidden",border:"1px solid var(--border)",boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}/>;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3914,355 +3986,229 @@ function EssencePage() {
     sp98:   { label:"SP98",   icon:"🔵", color:"#a78bfa" },
   };
 
-  const LS_KEY = "duobudget_fuel_v6";
+  const LS_KEY = "duobudget_fuel_v7";
 
-  const [stations,    setStations]    = useState([]);
-  const [loading,     setLoading]     = useState(false);
-  const [error,       setError]       = useState("");
-  const [lastUpdate,  setLastUpdate]  = useState(null);
-  const [history,     setHistory]     = useState([]);
-  const [activeTab,   setActiveTab]   = useState("prices");
-  const [chartFuel,   setChartFuel]   = useState("sp95");
-  const [citySearch,  setCitySearch]  = useState("Saint-Dizier");
-  const [cityInput,   setCityInput]   = useState("Saint-Dizier");
-  const [radius,      setRadius]      = useState(10);
-  const [countdown,   setCountdown]   = useState(600);
-  const [userLat,     setUserLat]     = useState(null);
-  const [userLng,     setUserLng]     = useState(null);
-  const [locating,    setLocating]    = useState(false);
-  const [navStation,  setNavStation]  = useState(null);
-  const intervalRef = useRef(null);
+  const [stations,   setStations]   = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [history,    setHistory]    = useState([]);
+  const [activeTab,  setActiveTab]  = useState("prices");
+  const [chartFuel,  setChartFuel]  = useState("sp95");
+  const [citySearch, setCitySearch] = useState("Saint-Dizier");
+  const [cityInput,  setCityInput]  = useState("Saint-Dizier");
+  const [radius,     setRadius]     = useState(10);
+  const [countdown,  setCountdown]  = useState(600);
+  const [userLat,    setUserLat]    = useState(null);
+  const [userLng,    setUserLng]    = useState(null);
+  const [locating,   setLocating]   = useState(false);
+  const [navStation, setNavStation] = useState(null);
+  const intervalRef  = useRef(null);
 
-  // Cache
   useEffect(()=>{
-    try {
+    try{
       const s=localStorage.getItem(LS_KEY);
-      if(s){
-        const{stations:st,history:h,city,ts}=JSON.parse(s);
+      if(s){const{stations:st,history:h,city,ts}=JSON.parse(s);
         if(st){setStations(st);setLastUpdate(new Date(ts));}
         if(h) setHistory(h);
         if(city){setCitySearch(city);setCityInput(city);}
       }
-    } catch{}
+    }catch{}
   },[]);
 
-  // Countdown
   useEffect(()=>{
     const t=setInterval(()=>setCountdown(c=>c<=1?600:c-1),1000);
-    return ()=>clearInterval(t);
+    return()=>clearInterval(t);
   },[]);
 
-  // ── Géolocalisation toggle ON / OFF ──
+  // ── GPS toggle ──
   const locateUser = () => {
-    if(userLat && userLng) {
-      // GPS déjà actif → on le désactive et on revient à la recherche manuelle
+    if(userLat&&userLng){
       setUserLat(null); setUserLng(null);
       doFetch(citySearch, radius);
       return;
     }
-    if(!navigator.geolocation){ setError("Géolocalisation non supportée par ce navigateur."); return; }
+    if(!navigator.geolocation){setError("Géolocalisation non supportée.");return;}
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      ({coords})=>{
-        setUserLat(coords.latitude); setUserLng(coords.longitude);
-        setLocating(false);
-        doFetchGeo(coords.latitude, coords.longitude, radius);
-      },
-      ()=>{ setLocating(false); setError("Localisation refusée. Vérifiez les permissions du navigateur."); },
-      {enableHighAccuracy:true, timeout:9000}
+      ({coords})=>{setUserLat(coords.latitude);setUserLng(coords.longitude);setLocating(false);doFetchGeo(coords.latitude,coords.longitude,radius);},
+      ()=>{setLocating(false);setError("Localisation refusée.");},
+      {enableHighAccuracy:true,timeout:9000}
     );
   };
 
-  const doFetchGeo = useCallback(async(lat,lng,km)=>{
-    setLoading(true); setError(""); setCountdown(600);
-    try {
+  const parseResults=(results,city)=>results.map(r=>{
+    const fuels={};
+    Object.keys(FUEL_META).forEach(k=>{const v=parseFloat(r[k+"_prix"]);fuels[k]=isNaN(v)?null:v;});
+    const geo=r.geom?.coordinates||r.coordonnees?.coordinates;
+    const lat=geo?geo[1]:null, lng=geo?geo[0]:null;
+    const adresse=(r.adresse||"").trim();
+    const {nom,nomIsAdresse}=resolveNom(r);
+    return {
+      id:r.id||adresse, nom, nomIsAdresse,
+      enseignes:r.enseignes||"", adresse,
+      ville:r.ville||city, cp:r.cp||"",
+      lat,lng, ...fuels,
+    };
+  }).filter(s=>Object.keys(FUEL_META).some(k=>s[k]!=null));
+
+  const finalize=async(parsed,city)=>{
+    // ── Enrichissement OSM ──
+    let enriched=parsed;
+    const withGeo=parsed.filter(s=>s.lat&&s.lng);
+    if(withGeo.length>0){
+      try{
+        const lats=withGeo.map(s=>s.lat),lngs=withGeo.map(s=>s.lng);
+        const pad=0.03;
+        const bbox=[(Math.min(...lats)-pad).toFixed(5),(Math.min(...lngs)-pad).toFixed(5),(Math.max(...lats)+pad).toFixed(5),(Math.max(...lngs)+pad).toFixed(5)].join(",");
+        const ovQ=`[out:json][timeout:10];(node[amenity=fuel](${bbox});way[amenity=fuel](${bbox}););out center tags;`;
+        const ENDPOINTS=["https://overpass-api.de/api/interpreter","https://overpass.kuro.mu/api/interpreter","https://overpass.openstreetmap.ru/api/interpreter"];
+        let ovData=null;
+        for(const ep of ENDPOINTS){
+          try{const r=await fetch(ep,{method:"POST",body:"data="+encodeURIComponent(ovQ),signal:AbortSignal.timeout(8000)});if(r.ok){ovData=await r.json();break;}}catch{}
+        }
+        if(ovData?.elements?.length){
+          const haverM=(la1,lo1,la2,lo2)=>{const R=6371000,d2r=Math.PI/180,dLa=(la2-la1)*d2r,dLo=(lo2-lo1)*d2r,a=Math.sin(dLa/2)**2+Math.cos(la1*d2r)*Math.cos(la2*d2r)*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));};
+          const osmNodes=ovData.elements.map(el=>({
+            lat:el.lat??el.center?.lat,lng:el.lon??el.center?.lon,
+            // Priority: brand > operator > name
+            name:el.tags?.brand||el.tags?.operator||el.tags?.name||"",
+          })).filter(n=>n.lat&&n.lng&&n.name&&n.name.length>2&&!/^\d/.test(n.name));
+
+          enriched=parsed.map(s=>{
+            if(!s.lat||!s.lng) return s;
+            // Distance max 300m pour matcher
+            let best=null,bestDist=300;
+            osmNodes.forEach(n=>{const d=haverM(s.lat,s.lng,n.lat,n.lng);if(d<bestDist){bestDist=d;best=n;}});
+            if(!best) return s;
+            return{...s,nom:best.name,enseignes:best.name,nomIsAdresse:false};
+          });
+        }
+      }catch{}
+    }
+    setStations(enriched);
+    setLastUpdate(new Date());
+    const ts=new Date().toISOString();
+    const tsFmt=new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"short"})+" "+new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+    const newE=enriched.map(s=>({ts,tsFmt,stationId:s.id,stationNom:(s.nom||"Station").slice(0,20),...Object.fromEntries(Object.keys(FUEL_META).map(k=>[k,s[k]]))}));
+    setHistory(prev=>{
+      const cutoff=new Date(Date.now()-86400000*30).toISOString(),last10=new Date(Date.now()-600000).toISOString();
+      const next=[...prev.filter(e=>e.ts>=cutoff&&e.ts<last10),...newE].slice(-800);
+      try{localStorage.setItem(LS_KEY,JSON.stringify({stations:enriched,history:next,city,ts:Date.now()}));}catch{}
+      return next;
+    });
+  };
+
+  const doFetchGeo=useCallback(async(lat,lng,km)=>{
+    setLoading(true);setError("");setCountdown(600);
+    try{
       const BASE="https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
       const w=encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${Math.round(km*1000)}m)`);
       const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
       if(!res.ok) throw new Error(`Erreur API ${res.status}`);
       const json=await res.json();
-      const parsed=parseResults(json.results||[], "Ma position");
+      const parsed=parseResults(json.results||[],"Ma position");
       if(!parsed.length) throw new Error("Aucune station trouvée dans ce rayon.");
-      finalize(parsed,"Ma position");
-    } catch(e){ setError(e.message||"Erreur inconnue"); }
+      await finalize(parsed,"Ma position");
+    }catch(e){setError(e.message||"Erreur inconnue");}
     setLoading(false);
   },[]);
 
-  const parseResults = (results, city) => {
-    return results.map(r=>{
-      const fuels={};
-      Object.keys(FUEL_META).forEach(k=>{
-        const v=parseFloat(r[k+"_prix"]);
-        fuels[k]=isNaN(v)?null:v;
-      });
-      const geo=r.geom?.coordinates||r.coordonnees?.coordinates;
-      const lat=geo?geo[1]:null;
-      const lng=geo?geo[0]:null;
-
-      // ── Résolution du nom : priorité enseignes → nom propre → adresse ──
-      // L'API retourne souvent l'adresse dans r.nom pour les stations indépendantes
-      const adresse = (r.adresse||"").trim();
-
-      // 1. Enseigne officielle (marque de la chaîne)
-      let ens = r.enseignes;
-      if(typeof ens==="string"){ try{ens=JSON.parse(ens);}catch{ens=ens?[ens]:[];} }
-      const ensStr = Array.isArray(ens) ? ens.filter(Boolean).join(" ").trim() : (ens||"");
-
-      // 2. Nom brut depuis l'API (peut être = adresse)
-      const nomApi = (r.nom||"").trim();
-      // Normalise pour comparer : minuscules, sans virgules/chiffres en tête
-      const norm = s => s.toLowerCase().replace(/[,\.]/g,"").replace(/\s+/g," ").trim();
-      const nomSameAsAddr = norm(nomApi) === norm(adresse) ||
-                            norm(adresse).startsWith(norm(nomApi)) ||
-                            norm(nomApi).startsWith(norm(adresse).slice(0,20));
-
-      // 3. Nom final : enseigne > nom propre (si ≠ adresse) > adresse
-      let nom, nomIsAdresse;
-      if(ensStr) {
-        nom = ensStr;
-        nomIsAdresse = false;
-      } else if(nomApi && !nomSameAsAddr) {
-        nom = nomApi;
-        nomIsAdresse = false;
-      } else {
-        // La station n'a pas de nom propre distinct → on affiche l'adresse une seule fois
-        nom = adresse.split(",")[0].trim() || nomApi || `Station ${r.cp||""}`;
-        nomIsAdresse = true;
-      }
-
-      return {
-        id: r.id||adresse,
-        nom,
-        nomIsAdresse,   // true = nom == adresse → ne pas afficher l'adresse en doublon
-        enseignes: ensStr||nomApi,
-        adresse,
-        ville: r.ville||city,
-        cp: r.cp||"",
-        lat, lng,
-        ...fuels,
-      };
-    }).filter(s=>Object.keys(FUEL_META).some(k=>s[k]!=null));
-  }
-
-  const finalize = async (parsed, city) => {
-    // ── Enrichissement OSM : récupère le vrai nom/enseigne de chaque station ──
-    let enriched = parsed;
-    const withGeo = parsed.filter(s=>s.lat&&s.lng);
-    if(withGeo.length > 0){
-      try{
-        const lats=withGeo.map(s=>s.lat), lngs=withGeo.map(s=>s.lng);
-        const pad=0.025;
-        const bbox=[
-          (Math.min(...lats)-pad).toFixed(5),(Math.min(...lngs)-pad).toFixed(5),
-          (Math.max(...lats)+pad).toFixed(5),(Math.max(...lngs)+pad).toFixed(5),
-        ].join(",");
-        const ovQ=`[out:json][timeout:8];(node[amenity=fuel](${bbox});way[amenity=fuel](${bbox}););out center tags;`;
-        const ENDPOINTS=[
-          "https://overpass-api.de/api/interpreter",
-          "https://overpass.kuro.mu/api/interpreter",
-          "https://overpass.openstreetmap.ru/api/interpreter",
-        ];
-        let ovData=null;
-        for(const ep of ENDPOINTS){
-          try{
-            const r=await fetch(ep,{method:"POST",body:"data="+encodeURIComponent(ovQ),signal:AbortSignal.timeout(6000)});
-            if(r.ok){ ovData=await r.json(); break; }
-          }catch{ /* essaie suivant */ }
-        }
-        if(ovData?.elements?.length){
-          const haverM=(la1,lo1,la2,lo2)=>{
-            const R=6371000,d2r=Math.PI/180;
-            const dLa=(la2-la1)*d2r,dLo=(lo2-lo1)*d2r;
-            const a=Math.sin(dLa/2)**2+Math.cos(la1*d2r)*Math.cos(la2*d2r)*Math.sin(dLo/2)**2;
-            return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-          };
-          const osmNodes=ovData.elements.map(el=>({
-            lat:el.lat??el.center?.lat, lng:el.lon??el.center?.lon,
-            name:el.tags?.brand||el.tags?.name||el.tags?.operator||"",
-          })).filter(n=>n.lat&&n.lng&&n.name&&n.name.length>2);
-
-          enriched=parsed.map(s=>{
-            if(!s.lat||!s.lng) return s;
-            let best=null, bestDist=100; // max 100m
-            osmNodes.forEach(n=>{
-              const d=haverM(s.lat,s.lng,n.lat,n.lng);
-              if(d<bestDist){bestDist=d;best=n;}
-            });
-            if(!best) return s;
-            const osmName=best.name;
-            if(osmName && !/^\d/.test(osmName) && osmName.length>2){
-              return {...s, nom:osmName, enseignes:osmName, nomIsAdresse:false};
-            }
-            return s;
-          });
-        }
-      }catch{ /* OSM optionnel */ }
-    }
-
-    setStations(enriched);
-    setLastUpdate(new Date());
-    const ts=new Date().toISOString();
-    const tsFmt=new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"short"})+" "+
-                new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
-    const newEntries=enriched.map(s=>({
-      ts,tsFmt,stationId:s.id,stationNom:(s.nom||"Station").slice(0,20),
-      ...Object.fromEntries(Object.keys(FUEL_META).map(k=>[k,s[k]])),
-    }));
-    setHistory(prev=>{
-      const cutoff=new Date(Date.now()-86400000*30).toISOString();
-      const last10=new Date(Date.now()-600000).toISOString();
-      const cleaned=prev.filter(e=>e.ts>=cutoff&&e.ts<last10);
-      const next=[...cleaned,...newEntries].slice(-800);
-      try{ localStorage.setItem(LS_KEY,JSON.stringify({stations:enriched,history:next,city,ts:Date.now()})); }catch{}
-      return next;
-    });
-  };
-
-  const doFetch = useCallback(async(city=citySearch, km=radius)=>{
-    setLoading(true); setError(""); setCountdown(600);
-    try {
+  const doFetch=useCallback(async(city=citySearch,km=radius)=>{
+    setLoading(true);setError("");setCountdown(600);
+    try{
       const BASE="https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
       const isCP=/^\d{5}$/.test(city.trim());
       let results=[];
-
-      const geoSearch=async(lat,lng,kmR)=>{
-        const w=encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${Math.round(kmR*1000)}m)`);
-        const r=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
-        if(!r.ok) return [];
-        const j=await r.json(); return j.results||[];
-      };
-
+      const geoSearch=async(lat,lng,kmR)=>{const w=encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${Math.round(kmR*1000)}m)`);const r=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);if(!r.ok)return[];const j=await r.json();return j.results||[];};
       if(isCP){
         const w=encodeURIComponent(`cp="${city.trim()}"`);
         const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
         if(!res.ok) throw new Error(`Erreur API ${res.status}`);
-        const json=await res.json();
-        results=json.results||[];
+        const json=await res.json(); results=json.results||[];
         if(km>0&&results.length>0){
           const geo=results[0].geom?.coordinates||results[0].coordonnees?.coordinates;
-          if(geo){
-            const[lng,lat]=geo;
-            const extra=await geoSearch(lat,lng,km);
-            const seen=new Set(results.map(r=>r.id||r.adresse));
-            extra.forEach(r=>{ if(!seen.has(r.id||r.adresse)){seen.add(r.id||r.adresse);results.push(r);} });
-          }
+          if(geo){const[lng,lat]=geo;const extra=await geoSearch(lat,lng,km);const seen=new Set(results.map(r=>r.id||r.adresse));extra.forEach(r=>{if(!seen.has(r.id||r.adresse)){seen.add(r.id||r.adresse);results.push(r);}});}
         }
       } else {
         let cLat=null,cLng=null;
-        try{
-          const nr=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city.trim())}&countrycodes=fr&format=json&limit=1`,
-            {headers:{"Accept-Language":"fr"}});
-          if(nr.ok){const nj=await nr.json();if(nj.length){cLat=parseFloat(nj[0].lat);cLng=parseFloat(nj[0].lon);}}
-        }catch{}
-        if(cLat&&cLng){
-          results=await geoSearch(cLat,cLng,Math.max(km,5));
-        } else {
+        try{const nr=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city.trim())}&countrycodes=fr&format=json&limit=1`,{headers:{"Accept-Language":"fr"}});if(nr.ok){const nj=await nr.json();if(nj.length){cLat=parseFloat(nj[0].lat);cLng=parseFloat(nj[0].lon);}}}catch{}
+        if(cLat&&cLng){results=await geoSearch(cLat,cLng,Math.max(km,5));}
+        else{
           const cityN=city.trim().toUpperCase();
           const w=encodeURIComponent(`ville="${cityN}"`);
           const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
-          if(!res.ok) throw new Error(`Erreur API ${res.status}`);
-          const json=await res.json();
-          results=json.results||[];
-          if(!results.length){
-            const w2=encodeURIComponent(`ville like "${cityN}%"`);
-            const r2=await fetch(`${BASE}?where=${w2}&limit=100&timezone=Europe%2FParis`);
-            if(r2.ok){const j2=await r2.json();results=j2.results||[];}
-          }
+          if(!res.ok)throw new Error(`Erreur API ${res.status}`);
+          const json=await res.json();results=json.results||[];
+          if(!results.length){const w2=encodeURIComponent(`ville like "${cityN}%"`);const r2=await fetch(`${BASE}?where=${w2}&limit=100&timezone=Europe%2FParis`);if(r2.ok){const j2=await r2.json();results=j2.results||[];}}
         }
       }
-      if(!results.length) throw new Error(`Aucune station trouvée pour "${city}". Essayez le code postal.`);
+      if(!results.length) throw new Error(`Aucune station trouvée pour "${city}".`);
       const parsed=parseResults(results,city);
       if(!parsed.length) throw new Error(`Aucun prix disponible pour "${city}".`);
-      finalize(parsed,city);
-    }catch(e){ setError(e.message||"Erreur inconnue"); }
+      await finalize(parsed,city);
+    }catch(e){setError(e.message||"Erreur inconnue");}
     setLoading(false);
   },[citySearch]);
 
   useEffect(()=>{
     doFetch(citySearch);
-    if(intervalRef.current) clearInterval(intervalRef.current);
+    if(intervalRef.current)clearInterval(intervalRef.current);
     intervalRef.current=setInterval(()=>doFetch(citySearch),10*60*1000);
-    return ()=>clearInterval(intervalRef.current);
+    return()=>clearInterval(intervalRef.current);
   },[citySearch]);
 
-  const handleSearch=()=>{ const c=cityInput.trim(); if(!c)return; setCitySearch(c); doFetch(c,radius); };
+  const handleSearch=()=>{const c=cityInput.trim();if(!c)return;setCitySearch(c);doFetch(c,radius);};
 
-  // Stations avec distance
-  const stationsWithDist = useMemo(()=>{
+  const stationsWithDist=useMemo(()=>{
     if(!userLat||!userLng) return stations;
-    return [...stations].map(s=>({
-      ...s,
-      _dist: (s.lat&&s.lng) ? haversineKm(userLat,userLng,s.lat,s.lng) : null,
-    })).sort((a,b)=>(a._dist??9999)-(b._dist??9999));
+    return [...stations].map(s=>({...s,_dist:(s.lat&&s.lng)?haversineKm(userLat,userLng,s.lat,s.lng):null})).sort((a,b)=>(a._dist??9999)-(b._dist??9999));
   },[stations,userLat,userLng]);
-
-  // Chart
-  const chartData=useMemo(()=>{
-    const byTs={};
-    history.forEach(e=>{
-      if(!byTs[e.ts]) byTs[e.ts]={ts:e.ts,tsFmt:e.tsFmt};
-      if(e[chartFuel]!=null) byTs[e.ts][e.stationNom]=e[chartFuel];
-    });
-    return Object.values(byTs).sort((a,b)=>a.ts.localeCompare(b.ts)).slice(-60);
-  },[history,chartFuel]);
-
-  const chartLines=useMemo(()=>{
-    const names=new Set();
-    chartData.forEach(d=>Object.keys(d).filter(k=>k!=="ts"&&k!=="tsFmt").forEach(k=>names.add(k)));
-    const COLORS=["#60a5fa","#f472b6","#4ade80","#fbbf24","#a78bfa","#f87171","#34d399"];
-    return [...names].map((n,i)=>({key:n,color:COLORS[i%COLORS.length]}));
-  },[chartData]);
-
-  const avgPrices=useMemo(()=>{
-    const res={};
-    Object.keys(FUEL_META).forEach(k=>{
-      const vals=stationsWithDist.map(s=>s[k]).filter(v=>v!=null);
-      res[k]=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
-    });
-    return res;
-  },[stationsWithDist]);
 
   const bestStation=useMemo(()=>{
     const res={};
-    Object.keys(FUEL_META).forEach(k=>{
-      const sorted=stationsWithDist.filter(s=>s[k]!=null).sort((a,b)=>a[k]-b[k]);
-      res[k]=sorted[0]||null;
-    });
+    Object.keys(FUEL_META).forEach(k=>{const sorted=stationsWithDist.filter(s=>s[k]!=null).sort((a,b)=>a[k]-b[k]);res[k]=sorted[0]||null;});
     return res;
   },[stationsWithDist]);
 
+  const avgPrices=useMemo(()=>{
+    const res={};
+    Object.keys(FUEL_META).forEach(k=>{const vals=stationsWithDist.map(s=>s[k]).filter(v=>v!=null);res[k]=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;});
+    return res;
+  },[stationsWithDist]);
+
+  const chartData=useMemo(()=>{const byTs={};history.forEach(e=>{if(!byTs[e.ts])byTs[e.ts]={ts:e.ts,tsFmt:e.tsFmt};if(e[chartFuel]!=null)byTs[e.ts][e.stationNom]=e[chartFuel];});return Object.values(byTs).sort((a,b)=>a.ts.localeCompare(b.ts)).slice(-60);},[history,chartFuel]);
+  const chartLines=useMemo(()=>{const names=new Set();chartData.forEach(d=>Object.keys(d).filter(k=>k!=="ts"&&k!=="tsFmt").forEach(k=>names.add(k)));const COLORS=["#60a5fa","#f472b6","#4ade80","#fbbf24","#a78bfa","#f87171"];return[...names].map((n,i)=>({key:n,color:COLORS[i%COLORS.length]}));},[chartData]);
+
   const fmtUpd=d=>d?d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"})+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):null;
-  const mm=String(Math.floor(countdown/60)).padStart(2,"0");
-  const ss2=String(countdown%60).padStart(2,"0");
+  const mm=String(Math.floor(countdown/60)).padStart(2,"0"),ss2=String(countdown%60).padStart(2,"0");
 
   const FuelTooltip=({active,payload,label})=>{
-    if(!active||!payload?.length) return null;
-    return <div style={{background:"var(--card,#1a1635)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px",fontSize:12}}>
+    if(!active||!payload?.length)return null;
+    return<div style={{background:"var(--card,#1a1635)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px",fontSize:12}}>
       <div style={{fontWeight:800,marginBottom:6,color:"var(--text2)"}}>{label}</div>
       {payload.map(p=><div key={p.dataKey} style={{color:p.color,fontWeight:700,marginBottom:3}}>{p.name}: {p.value?.toFixed(3)} €/L</div>)}
     </div>;
   };
 
-  // ── RENDER ──
   return (
-    <div className="fade-up" style={{maxWidth:1100,margin:"0 auto"}}>
+    <div className="fade-up" style={{maxWidth:1140,margin:"0 auto"}}>
 
-      {/* Header */}
-      <div className="card" style={{marginBottom:16,background:"linear-gradient(135deg,rgba(251,191,36,0.06),rgba(167,139,250,0.04))",borderColor:"rgba(251,191,36,0.15)"}}>
+      {/* ── Header ── */}
+      <div className="card" style={{marginBottom:18,background:"linear-gradient(135deg,rgba(251,191,36,0.06),rgba(167,139,250,0.04))",borderColor:"rgba(251,191,36,0.2)"}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,flexWrap:"wrap"}}>
           <div style={{width:48,height:48,borderRadius:15,background:"linear-gradient(135deg,#f59e0b,#fbbf24)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,boxShadow:"0 6px 20px rgba(251,191,36,0.4)",flexShrink:0}}>⛽</div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:900,fontSize:17,marginBottom:2}}>Prix des carburants</div>
             <div style={{fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-              {loading ? <><span style={{color:"var(--yellow)",animation:"spin .7s linear infinite",display:"inline-block"}}>⟳</span> Actualisation…</>
-                : error ? <span style={{color:"var(--red)"}}>⚠️ Erreur</span>
-                : stationsWithDist.length>0 ? <><span style={{color:"var(--green)"}}>●</span> {stationsWithDist.length} station{stationsWithDist.length>1?"s":""} · {fmtUpd(lastUpdate)}</>
-                : "En attente…"}
+              {loading?<><span style={{color:"var(--yellow)",animation:"spin .7s linear infinite",display:"inline-block"}}>⟳</span> Actualisation…</>
+                :error?<span style={{color:"var(--red)"}}>⚠️ Erreur</span>
+                :stationsWithDist.length>0?<><span style={{color:"var(--green)"}}>●</span> {stationsWithDist.length} station{stationsWithDist.length>1?"s":""} · {fmtUpd(lastUpdate)}</>
+                :"En attente…"}
               {!loading&&<span>· Actu dans <strong style={{color:"var(--yellow)"}}>{mm}:{ss2}</strong></span>}
               {userLat&&<span style={{color:"var(--purple)",fontWeight:700}}>· 📍 GPS actif</span>}
             </div>
           </div>
-          {/* Tabs */}
           <div style={{display:"flex",gap:5,flexShrink:0,flexWrap:"wrap"}}>
             {[["prices","💰 Prix"],["map","🗺️ Carte"],["chart","📈 Courbes"]].map(([id,lb])=>(
               <button key={id} onClick={()=>setActiveTab(id)}
@@ -4276,241 +4222,231 @@ function EssencePage() {
             </button>
           </div>
         </div>
-
-        {/* Barre de recherche + géoloc */}
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           <div style={{flex:1,minWidth:180,position:"relative"}}>
             <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:14,pointerEvents:"none"}}>🔍</span>
-            <input value={cityInput} onChange={e=>setCityInput(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&handleSearch()}
+            <input value={cityInput} onChange={e=>setCityInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSearch()}
               placeholder="Code postal (52100) ou ville…"
               style={{paddingLeft:34,fontSize:13,borderRadius:11,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border)"}}/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.04)",border:"1px solid var(--border)",borderRadius:11,padding:"0 10px",flexShrink:0,height:42}}>
             <span style={{fontSize:12,color:"var(--text3)",fontWeight:700,whiteSpace:"nowrap"}}>📍 Rayon</span>
             <select value={radius} onChange={e=>setRadius(+e.target.value)}
-              style={{background:"transparent",border:"none",color:"var(--yellow)",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,cursor:"pointer",padding:"0 4px",outline:"none",width:"auto"}}>
+              style={{background:"transparent",border:"none",color:"var(--yellow)",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,cursor:"pointer",padding:"0 4px",outline:"none"}}>
               {[2,5,10,20,30,50].map(v=><option key={v} value={v}>{v} km</option>)}
             </select>
           </div>
           <button className="btn btn-primary" onClick={handleSearch} disabled={loading||!cityInput.trim()}
-            style={{padding:"11px 20px",fontSize:13,whiteSpace:"nowrap",flexShrink:0}}>
-            Chercher
-          </button>
-          {/* Bouton géolocalisation */}
+            style={{padding:"11px 20px",fontSize:13,whiteSpace:"nowrap",flexShrink:0}}>Chercher</button>
           <button onClick={locateUser} disabled={locating}
-            style={{padding:"11px 16px",borderRadius:11,
+            style={{padding:"11px 16px",borderRadius:11,flexShrink:0,cursor:"pointer",
               border:userLat?"1px solid rgba(248,113,113,0.4)":"1px solid rgba(167,139,250,0.35)",
               background:userLat?"rgba(248,113,113,0.12)":"rgba(255,255,255,0.05)",
-              color:userLat?"var(--red)":"var(--text2)",cursor:"pointer",
-              fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap",
-              display:"flex",alignItems:"center",gap:7,flexShrink:0,transition:"all .2s"}}>
-            {locating
-              ? <><span style={{animation:"spin .7s linear infinite",display:"inline-block"}}>⟳</span> Localisation…</>
-              : userLat
-                ? <>📍 Désactiver GPS</>
-                : <>📍 Me localiser</>}
+              color:userLat?"var(--red)":"var(--text2)",
+              fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,
+              display:"flex",alignItems:"center",gap:7,transition:"all .2s",whiteSpace:"nowrap"}}>
+            {locating?<><span style={{animation:"spin .7s linear infinite",display:"inline-block"}}>⟳</span> Localisation…</>
+              :userLat?<>📍 Désactiver GPS</>
+              :<>📍 Me localiser</>}
           </button>
         </div>
       </div>
 
       {error&&(
         <div style={{background:"rgba(248,113,113,0.07)",border:"1px solid rgba(248,113,113,0.22)",borderRadius:14,padding:"14px 18px",marginBottom:16}}>
-          <div style={{fontWeight:800,color:"var(--red)",marginBottom:5}}>⚠️ {error}</div>
-          <div style={{fontSize:11,color:"var(--text3)"}}>Essayez un autre nom de ville, un code postal, ou vérifiez votre connexion.</div>
+          <div style={{fontWeight:800,color:"var(--red)",marginBottom:4}}>⚠️ {error}</div>
+          <div style={{fontSize:11,color:"var(--text3)"}}>Essayez un code postal ou vérifiez votre connexion.</div>
         </div>
       )}
 
       {/* ══ TAB PRIX ══ */}
-      {activeTab==="prices" && stationsWithDist.length>0 && (
+      {activeTab==="prices"&&stationsWithDist.length>0&&(
         <div>
-          {/* ── Cartes meilleurs prix (redesign) ── */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12,marginBottom:22}}>
+
+          {/* ── 4 cartes meilleurs prix – redesign ── */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
             {Object.entries(FUEL_META).map(([k,meta])=>{
-              const list=stationsWithDist.filter(s=>s[k]!=null);
-              if(!list.length) return null;
-              const best=list.reduce((a,b)=>a[k]<b[k]?a:b);
-              const nomAffiche=(best.nom||"Station").toUpperCase();
-              const adresseAffiche=best.adresse||"";
-              const villeAffiche=best.ville||"";
+              const best=bestStation[k];
+              if(!best) return null;
+              const brand=detectBrand(best.nom,best.enseignes,best.adresse);
+              const dist=best._dist!=null?fmtKm(best._dist):null;
               return (
                 <div key={k}
                   onClick={()=>best.lat&&setNavStation(best)}
                   style={{
-                    background:`linear-gradient(145deg,${meta.color}14,${meta.color}05)`,
-                    border:`1.5px solid ${meta.color}30`,
-                    borderRadius:20,padding:"0",position:"relative",overflow:"hidden",
-                    cursor:best.lat?"pointer":"default",transition:"transform .18s,box-shadow .18s",
-                    display:"flex",flexDirection:"column",
+                    background:`linear-gradient(160deg,${meta.color}18,${meta.color}06)`,
+                    border:`1.5px solid ${meta.color}35`,borderRadius:20,
+                    overflow:"hidden",cursor:best.lat?"pointer":"default",
+                    transition:"transform .18s,box-shadow .18s",position:"relative",
                   }}
-                  onMouseEnter={e=>{if(best.lat){e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`0 12px 30px ${meta.color}30`;}}}
+                  onMouseEnter={e=>{if(best.lat){e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`0 14px 36px ${meta.color}30`;}}}
                   onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
 
-                  {/* ── Bandeau haut coloré ── */}
-                  <div style={{
-                    background:`linear-gradient(135deg,${meta.color}30,${meta.color}12)`,
-                    padding:"12px 14px 10px",
-                    borderBottom:`1px solid ${meta.color}20`,
-                    display:"flex",alignItems:"center",justifyContent:"space-between",
-                  }}>
+                  {/* Bandeau coloré */}
+                  <div style={{padding:"11px 14px 10px",background:`linear-gradient(135deg,${meta.color}28,${meta.color}10)`,borderBottom:`1px solid ${meta.color}25`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <div style={{width:30,height:30,borderRadius:9,background:`${meta.color}20`,border:`1.5px solid ${meta.color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>
-                        {meta.icon}
-                      </div>
-                      <span style={{fontWeight:900,fontSize:13,color:meta.color,letterSpacing:.4,textTransform:"uppercase"}}>
-                        {meta.label}
-                      </span>
+                      <div style={{width:28,height:28,borderRadius:8,background:`${meta.color}22`,border:`1.5px solid ${meta.color}45`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{meta.icon}</div>
+                      <span style={{fontWeight:900,fontSize:13,color:meta.color,letterSpacing:.5,textTransform:"uppercase"}}>{meta.label}</span>
                     </div>
-                    {/* Badge distance */}
-                    {best._dist!=null&&(
-                      <div style={{background:"rgba(167,139,250,0.18)",border:"1px solid rgba(167,139,250,0.35)",borderRadius:20,padding:"3px 10px",fontSize:10,fontWeight:800,color:"var(--purple)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:3}}>
-                        📍 {fmtKm(best._dist)}
-                      </div>
-                    )}
+                    {/* Bouton navigation haut droite */}
+                    <button
+                      onClick={e=>{e.stopPropagation();best.lat&&setNavStation(best);}}
+                      style={{width:30,height:30,borderRadius:8,border:`1px solid ${meta.color}35`,
+                        background:`${meta.color}15`,color:meta.color,cursor:"pointer",fontSize:14,
+                        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                        transition:"all .15s"}}
+                      title="Démarrer l'itinéraire"
+                      onMouseEnter={e=>{e.currentTarget.style.background=`${meta.color}30`;}}
+                      onMouseLeave={e=>{e.currentTarget.style.background=`${meta.color}15`;}}>
+                      🗺️
+                    </button>
                   </div>
 
-                  {/* ── Corps de la carte ── */}
-                  <div style={{padding:"14px 16px 16px",flex:1,display:"flex",flexDirection:"column",gap:10}}>
-                    {/* Prix en grand */}
-                    <div style={{display:"flex",alignItems:"baseline",gap:4}}>
-                      <span style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:36,color:"var(--text)",letterSpacing:-1.5,lineHeight:1}}>
-                        {best[k].toFixed(3)}
-                      </span>
+                  {/* Corps */}
+                  <div style={{padding:"14px 16px 16px"}}>
+                    {/* Prix */}
+                    <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:14}}>
+                      <span style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:38,color:"var(--text)",letterSpacing:-2,lineHeight:1}}>{best[k].toFixed(3)}</span>
                       <span style={{fontSize:12,color:"var(--text3)",fontWeight:500}}>€/L</span>
                     </div>
 
-                    {/* Infos station */}
-                    <div style={{borderTop:`1px solid ${meta.color}18`,paddingTop:10,display:"flex",alignItems:"flex-start",gap:10}}>
-                      <BrandIcon nom={best.nom} enseignes={best.enseignes} size={36}/>
+                    {/* Station */}
+                    <div style={{display:"flex",alignItems:"flex-start",gap:10,paddingTop:10,borderTop:`1px solid ${meta.color}18`}}>
+                      <BrandIcon nom={best.nom} enseignes={best.enseignes} adresse={best.adresse} size={36}/>
                       <div style={{flex:1,minWidth:0}}>
-                        {/* Nom en blanc majuscules, multi-ligne autorisée */}
-                        <div style={{fontWeight:900,fontSize:12,color:"#ffffff",letterSpacing:.4,lineHeight:1.3,marginBottom:4,wordBreak:"break-word",textTransform:"uppercase"}}>
-                          {nomAffiche}
+                        <div style={{fontWeight:900,fontSize:11,color:"#fff",textTransform:"uppercase",letterSpacing:.4,lineHeight:1.3,marginBottom:3,wordBreak:"break-word"}}>
+                          {(best.nom||"Station").toUpperCase()}
                         </div>
-                        {/* Adresse — Ville : masquée si doublon du nom */}
-                        {!best.nomIsAdresse && (
+                        {!best.nomIsAdresse&&(
                           <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.4,wordBreak:"break-word"}}>
-                            {adresseAffiche}{villeAffiche?` — ${villeAffiche}`:""}
+                            {best.adresse}{best.ville?` — ${best.ville}`:""}
                           </div>
                         )}
-                        {best.nomIsAdresse && villeAffiche && (
-                          <div style={{fontSize:10,color:"var(--text3)",lineHeight:1.4}}>
-                            {villeAffiche}
+                        {best.nomIsAdresse&&best.ville&&(
+                          <div style={{fontSize:10,color:"var(--text3)"}}>{best.ville}</div>
+                        )}
+                        {/* Distance */}
+                        {dist&&(
+                          <div style={{marginTop:5,display:"inline-flex",alignItems:"center",gap:4,
+                            background:"rgba(167,139,250,0.14)",border:"1px solid rgba(167,139,250,0.3)",
+                            borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:800,color:"var(--purple)"}}>
+                            📍 {dist}
                           </div>
                         )}
                       </div>
                     </div>
-
-                    {/* Footer : lien itinéraire */}
-                    {best.lat&&(
-                      <div style={{display:"flex",alignItems:"center",gap:5,marginTop:"auto",paddingTop:4}}>
-                        <span style={{fontSize:11,color:meta.color,fontWeight:700}}>🗺️ Voir l'itinéraire</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* Tableau stations */}
-          <div style={{borderRadius:18,overflow:"hidden",border:"1px solid var(--border)",marginBottom:14}}>
+          {/* ── Tableau stations – redesign pro ── */}
+          <div style={{borderRadius:20,overflow:"hidden",border:"1px solid var(--border)",
+            boxShadow:"0 4px 24px rgba(0,0,0,0.35)",marginBottom:14}}>
+
             {/* Header tableau */}
-            <div style={{padding:"14px 20px",background:"rgba(255,255,255,0.03)",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:32,height:32,borderRadius:10,background:"rgba(251,191,36,0.14)",border:"1px solid rgba(251,191,36,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>📍</div>
+            <div style={{padding:"16px 22px",background:"linear-gradient(135deg,rgba(251,191,36,0.08),rgba(167,139,250,0.04))",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:36,height:36,borderRadius:11,background:"rgba(251,191,36,0.16)",border:"1px solid rgba(251,191,36,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>📍</div>
               <div>
-                <div style={{fontWeight:900,fontSize:15}}>Stations à <span style={{color:"var(--yellow)"}}>{stationsWithDist[0]?.ville||citySearch}</span></div>
-                <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>Prix en €/L · Données gouvernementales temps réel</div>
+                <div style={{fontWeight:900,fontSize:16}}>Stations à <span style={{color:"var(--yellow)"}}>{stationsWithDist[0]?.ville||citySearch}</span></div>
+                <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>Prix en €/L · Données gouvernementales · Temps réel</div>
               </div>
-              <div style={{marginLeft:"auto",background:"rgba(251,191,36,0.12)",border:"1px solid rgba(251,191,36,0.25)",borderRadius:20,padding:"4px 12px",fontSize:11,color:"var(--yellow)",fontWeight:800,flexShrink:0}}>
+              <div style={{marginLeft:"auto",background:"rgba(251,191,36,0.14)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:20,padding:"5px 14px",fontSize:12,color:"var(--yellow)",fontWeight:800,flexShrink:0}}>
                 {stationsWithDist.length} station{stationsWithDist.length>1?"s":""}
               </div>
             </div>
 
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead>
-                  <tr style={{background:"rgba(0,0,0,0.25)"}}>
-                    <th style={{padding:"12px 18px",textAlign:"left",color:"var(--text3)",fontSize:10,textTransform:"uppercase",letterSpacing:1.4,fontWeight:900,whiteSpace:"nowrap",minWidth:240}}>
-                      Station / Adresse
-                    </th>
-                    {Object.entries(FUEL_META).map(([k,m])=>(
-                      <th key={k} style={{padding:"10px 8px",textAlign:"center",minWidth:80}}>
-                        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                          <div style={{width:30,height:30,borderRadius:9,background:`${m.color}1a`,border:`1.5px solid ${m.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{m.icon}</div>
-                          <span style={{fontSize:10,color:m.color,fontWeight:900,letterSpacing:.4}}>{m.label}</span>
+            {/* Colonnes header */}
+            <div style={{display:"grid",gridTemplateColumns:"minmax(220px,2fr) repeat(4,1fr) 50px",background:"rgba(0,0,0,0.3)",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+              <div style={{padding:"10px 22px",fontSize:10,fontWeight:900,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1.5}}>
+                Station / Adresse
+              </div>
+              {Object.entries(FUEL_META).map(([k,m])=>(
+                <div key={k} style={{padding:"8px 0",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3}}>
+                  <div style={{width:32,height:32,borderRadius:10,background:`${m.color}18`,border:`1.5px solid ${m.color}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{m.icon}</div>
+                  <span style={{fontSize:10,color:m.color,fontWeight:900,letterSpacing:.5}}>{m.label}</span>
+                </div>
+              ))}
+              <div style={{padding:"10px 8px",fontSize:10,fontWeight:900,color:"var(--text3)",textTransform:"uppercase",letterSpacing:1,textAlign:"center"}}>Nav</div>
+            </div>
+
+            {/* Lignes */}
+            {stationsWithDist.map((s,i)=>{
+              const isEven=i%2===0;
+              const rowBg=isEven?"rgba(255,255,255,0.012)":"transparent";
+              const nomDisplay=(s.nom||"Station").toUpperCase();
+              return (
+                <div key={s.id||i}
+                  style={{display:"grid",gridTemplateColumns:"minmax(220px,2fr) repeat(4,1fr) 50px",borderTop:"1px solid rgba(255,255,255,0.04)",background:rowBg,transition:"background .12s",cursor:"pointer"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="rgba(167,139,250,0.06)"}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}
+                  onClick={()=>s.lat&&setNavStation(s)}>
+
+                  {/* Colonne station */}
+                  <div style={{padding:"13px 22px",display:"flex",alignItems:"center",gap:12,position:"relative"}}>
+                    <BrandIcon nom={s.nom} enseignes={s.enseignes} adresse={s.adresse} size={42}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:900,fontSize:12,color:"#fff",letterSpacing:.5,marginBottom:2,textTransform:"uppercase",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {nomDisplay}
+                      </div>
+                      {!s.nomIsAdresse&&s.adresse&&(
+                        <div style={{fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          {s.adresse}{s.ville?` — ${s.ville}`:""}
                         </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {stationsWithDist.map((s,i)=>{
-                    const isEven=i%2===0;
-                    const rowBg=isEven?"rgba(255,255,255,0.015)":"transparent";
-                    const nomDisplay=(s.nom||"Station").toUpperCase();
+                      )}
+                      {(s.nomIsAdresse||!s.adresse)&&s.ville&&(
+                        <div style={{fontSize:10,color:"var(--text3)"}}>{s.ville}</div>
+                      )}
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
+                        {s.cp&&<span style={{fontSize:9,color:"var(--text3)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"1px 6px",fontWeight:700}}>📮 {s.cp}</span>}
+                        {s._dist!=null&&<span style={{fontSize:9,fontWeight:800,color:"var(--purple)",background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:20,padding:"1px 7px"}}>📍 {fmtKm(s._dist)}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Colonnes prix */}
+                  {Object.entries(FUEL_META).map(([k,m])=>{
+                    const isBest=s[k]!=null&&s[k]===bestStation[k]?.[k]&&stationsWithDist.filter(x=>x[k]!=null).length>1;
                     return (
-                      <tr key={s.id||i}
-                        style={{borderTop:"1px solid rgba(255,255,255,0.04)",background:rowBg,transition:"all .15s",cursor:s.lat?"pointer":"default"}}
-                        onClick={()=>s.lat&&setNavStation(s)}
-                        onMouseEnter={e=>e.currentTarget.style.background="rgba(167,139,250,0.07)"}
-                        onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
-                        <td style={{padding:"14px 18px",minWidth:240}}>
-                          <div style={{display:"flex",alignItems:"center",gap:12,position:"relative"}}>
-                            {/* Icône marque */}
-                            <BrandIcon nom={s.nom} enseignes={s.enseignes} size={44}/>
-                            {/* Texte */}
-                            <div style={{flex:1,minWidth:0}}>
-                              {/* NOM EN BLANC MAJUSCULES */}
-                              <div style={{fontWeight:900,fontSize:13,color:"#ffffff",letterSpacing:.5,marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textTransform:"uppercase"}}>
-                                {nomDisplay}
-                              </div>
-                              {/* Adresse — Ville : masquée si c'est le même que le nom (doublon) */}
-                              {!s.nomIsAdresse && (
-                                <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                  {s.adresse}{s.ville?` — ${s.ville}`:""}
-                                </div>
-                              )}
-                              {s.nomIsAdresse && s.ville && (
-                                <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                  {s.ville}
-                                </div>
-                              )}
-                              {s.cp&&<span style={{display:"inline-block",marginTop:3,fontSize:9,color:"var(--text3)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"1px 6px",fontWeight:700}}>📮 {s.cp}</span>}
+                      <div key={k} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"13px 8px",gap:3}}>
+                        {s[k]!=null?(
+                          <>
+                            <div style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:17,
+                              color:isBest?m.color:"var(--text)",
+                              textShadow:isBest?`0 0 16px ${m.color}60`:"none",letterSpacing:-.5}}>
+                              {s[k].toFixed(3)}
                             </div>
-                            {/* Badge distance en haut à droite */}
-                            {s._dist!=null&&(
-                              <div style={{position:"absolute",top:-4,right:0,background:"rgba(167,139,250,0.14)",border:"1px solid rgba(167,139,250,0.3)",borderRadius:20,padding:"3px 10px",fontSize:10,fontWeight:800,color:"var(--purple)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:3}}>
-                                📍{fmtKm(s._dist)}
-                              </div>
+                            {isBest&&(
+                              <span style={{fontSize:9,fontWeight:900,color:m.color,background:`${m.color}16`,
+                                border:`1px solid ${m.color}35`,borderRadius:6,padding:"1px 6px",whiteSpace:"nowrap"}}>
+                                ✓ Moins cher
+                              </span>
                             )}
-                          </div>
-                        </td>
-                        {Object.entries(FUEL_META).map(([k,m])=>{
-                          const isBest=s[k]!=null&&s[k]===bestStation[k]?.[k]&&stationsWithDist.filter(x=>x[k]!=null).length>1;
-                          return (
-                            <td key={k} style={{padding:"14px 8px",textAlign:"center",verticalAlign:"middle"}}>
-                              {s[k]!=null?(
-                                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                                  <div style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:16,
-                                    color:isBest?m.color:"var(--text)",
-                                    textShadow:isBest?`0 0 18px ${m.color}70`:"none"}}>
-                                    {s[k].toFixed(3)}
-                                  </div>
-                                  {isBest&&<span style={{fontSize:9,fontWeight:900,color:m.color,background:`${m.color}18`,border:`1px solid ${m.color}35`,borderRadius:6,padding:"1px 6px",whiteSpace:"nowrap"}}>✓ Moins cher</span>}
-                                </div>
-                              ):(
-                                <span style={{color:"rgba(255,255,255,0.1)",fontSize:20,fontWeight:100}}>—</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
+                          </>
+                        ):(
+                          <span style={{color:"rgba(255,255,255,0.1)",fontSize:18}}>—</span>
+                        )}
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+
+                  {/* Bouton navigation */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"0 6px"}}
+                    onClick={e=>{e.stopPropagation();s.lat&&setNavStation(s);}}>
+                    {s.lat&&(
+                      <div style={{width:32,height:32,borderRadius:9,background:"rgba(167,139,250,0.1)",
+                        border:"1px solid rgba(167,139,250,0.2)",display:"flex",alignItems:"center",
+                        justifyContent:"center",fontSize:14,cursor:"pointer",transition:"all .15s"}}
+                        onMouseEnter={e=>{e.currentTarget.style.background="rgba(167,139,250,0.22)";e.currentTarget.style.borderColor="rgba(167,139,250,0.4)";}}
+                        onMouseLeave={e=>{e.currentTarget.style.background="rgba(167,139,250,0.1)";e.currentTarget.style.borderColor="rgba(167,139,250,0.2)";}}>
+                        🗺️
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <FuelSimulator stations={stationsWithDist} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch}/>
@@ -4520,22 +4456,22 @@ function EssencePage() {
       {activeTab==="prices"&&!loading&&stationsWithDist.length===0&&!error&&(
         <div style={{textAlign:"center",padding:"60px 20px",color:"var(--text3)"}}>
           <div style={{fontSize:52,marginBottom:12}}>⛽</div>
-          <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>Recherchez une ville pour afficher les prix</div>
+          <div style={{fontWeight:700,fontSize:15}}>Recherchez une ville pour afficher les prix</div>
         </div>
       )}
 
       {/* ══ TAB CARTE ══ */}
-      {activeTab==="map" && (
+      {activeTab==="map"&&(
         <div>
           {!userLat&&(
             <div style={{background:"rgba(167,139,250,0.07)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:14,padding:"14px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:12}}>
-              <span style={{fontSize:24}}>📍</span>
+              <span style={{fontSize:22}}>📍</span>
               <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:13,marginBottom:3}}>Activez la géolocalisation</div>
-                <div style={{fontSize:12,color:"var(--text3)"}}>Pour voir les distances et trier les stations par proximité</div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>Activez la géolocalisation</div>
+                <div style={{fontSize:11,color:"var(--text3)"}}>Pour voir les distances et trier par proximité</div>
               </div>
               <button onClick={locateUser} disabled={locating}
-                style={{padding:"9px 16px",borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.15)",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap",flexShrink:0}}>
+                style={{padding:"9px 16px",borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.15)",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>
                 {locating?"⟳ …":"📍 Me localiser"}
               </button>
             </div>
@@ -4543,7 +4479,6 @@ function EssencePage() {
           {loading?(
             <div className="card" style={{textAlign:"center",padding:60}}>
               <div style={{fontSize:34,animation:"spin .8s linear infinite",display:"inline-block",marginBottom:14}}>⟳</div>
-              <div style={{color:"var(--text3)"}}>Chargement de la carte…</div>
             </div>
           ):stationsWithDist.length>0?(
             <FuelMapLeaflet stations={stationsWithDist} userLat={userLat} userLng={userLng}/>
@@ -4560,7 +4495,6 @@ function EssencePage() {
       {activeTab==="chart"&&(
         <div>
           <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-            <span style={{fontWeight:700,fontSize:12,color:"var(--text3)",alignSelf:"center"}}>Carburant :</span>
             {Object.entries(FUEL_META).map(([k,m])=>(
               <button key={k} onClick={()=>setChartFuel(k)}
                 style={{padding:"6px 12px",borderRadius:9,border:chartFuel===k?`1px solid ${m.color}`:"1px solid var(--border)",background:chartFuel===k?`${m.color}18`:"var(--glass)",color:chartFuel===k?m.color:"var(--text3)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12}}>
@@ -4569,8 +4503,8 @@ function EssencePage() {
             ))}
           </div>
           <div className="card" style={{marginBottom:14}}>
-            <div style={{fontWeight:800,fontSize:14,marginBottom:4}}>📈 Évolution — {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label} · {citySearch}</div>
-            <div style={{fontSize:11,color:"var(--text3)",marginBottom:16}}>Actualisation toutes les 10 min · {chartData.length} points enregistrés</div>
+            <div style={{fontWeight:800,fontSize:14,marginBottom:4}}>📈 {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label} · {citySearch}</div>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:16}}>Actualisation toutes les 10 min · {chartData.length} points</div>
             {chartData.length>=2?(
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartData} margin={{top:5,right:20,left:0,bottom:5}}>
@@ -4579,26 +4513,22 @@ function EssencePage() {
                   <YAxis domain={["auto","auto"]} tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={false} tickFormatter={v=>v?.toFixed(3)+"€"}/>
                   <Tooltip content={<FuelTooltip/>}/>
                   <Legend wrapperStyle={{fontSize:11,paddingTop:10}}/>
-                  {chartLines.map(l=>(
-                    <Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color} strokeWidth={2.5}
-                      dot={{r:3,fill:l.color,strokeWidth:0}} activeDot={{r:5,strokeWidth:0}} name={l.key}/>
-                  ))}
+                  {chartLines.map(l=>(<Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color} strokeWidth={2.5} dot={{r:3,fill:l.color,strokeWidth:0}} activeDot={{r:5,strokeWidth:0}} name={l.key}/>))}
                 </LineChart>
               </ResponsiveContainer>
             ):(
               <div style={{textAlign:"center",padding:"40px 20px",color:"var(--text3)"}}>
                 <div style={{fontSize:44,marginBottom:10}}>📊</div>
-                <div style={{fontWeight:700,marginBottom:6}}>Historique en cours de constitution</div>
-                <div style={{fontSize:12,marginBottom:16,lineHeight:1.6}}>L'app enregistre les prix toutes les 10 min.<br/>Revenez dans quelques heures pour voir l'évolution !</div>
+                <div style={{fontWeight:700,marginBottom:16}}>Historique en cours de constitution</div>
                 <button className="btn btn-primary" onClick={()=>doFetch(citySearch)} disabled={loading}>🔄 Actualiser</button>
               </div>
             )}
           </div>
           {stationsWithDist.length>0&&avgPrices[chartFuel]!=null&&(
             <div className="card">
-              <div style={{fontWeight:800,fontSize:14,marginBottom:14}}>📊 Comparatif stations — {FUEL_META[chartFuel]?.icon} {FUEL_META[chartFuel]?.label}</div>
+              <div style={{fontWeight:800,fontSize:14,marginBottom:14}}>📊 Comparatif — {FUEL_META[chartFuel]?.label}</div>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={stationsWithDist.filter(s=>s[chartFuel]!=null).map(s=>({nom:(s.nom||"Station").slice(0,16),prix:s[chartFuel]}))} margin={{top:0,right:16,left:0,bottom:0}}>
+                <BarChart data={stationsWithDist.filter(s=>s[chartFuel]!=null).map(s=>({nom:(s.nom||"Station").slice(0,14),prix:s[chartFuel]}))} margin={{top:0,right:16,left:0,bottom:0}}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false}/>
                   <XAxis dataKey="nom" tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={{stroke:"var(--border)"}}/>
                   <YAxis domain={["auto","auto"]} tick={{fill:"var(--text3)",fontSize:10}} tickLine={false} axisLine={false} tickFormatter={v=>v.toFixed(3)}/>
@@ -4612,11 +4542,10 @@ function EssencePage() {
       )}
 
       <div style={{marginTop:16,padding:"10px 14px",fontSize:11,color:"var(--text3)",textAlign:"center"}}>
-        Source : <strong style={{color:"var(--text2)"}}>data.economie.gouv.fr</strong> — API officielle du gouvernement · Actualisation automatique toutes les 10 min
+        Source : <strong style={{color:"var(--text2)"}}>data.economie.gouv.fr</strong> — API officielle · Actualisation toutes les 10 min · OpenStreetMap pour les noms
       </div>
 
-      {/* Modal navigation */}
-      {navStation&&<NavModal station={navStation} onClose={()=>setNavStation(null)}/>}
+      {navStation&&<NavModal station={navStation} userLat={userLat} userLng={userLng} onClose={()=>setNavStation(null)}/>}
     </div>
   );
 }
