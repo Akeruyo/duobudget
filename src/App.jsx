@@ -518,12 +518,11 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 .spin{animation:spin .7s linear infinite;}
 @media(hover:none){
   .float-icon{animation:none !important;}
-  .slide-in{animation:fadeIn .2s ease both !important;}
-  .scale-in{animation:fadeIn .2s ease both !important;}
-  /* iOS Safari critical fix: fadeUp translateY décale les touch targets */
-  .fade-up{animation:fadeIn .2s ease both !important;}
-  /* iOS Safari critical fix: backdrop-filter dans un container scrollable
-     décale tous les touch events de la page entière */
+  .slide-in{animation:none !important;}
+  .scale-in{animation:none !important;}
+  /* Sur iOS, toute animation sur le wrapper d'une page = touch offset potentiel */
+  .fade-up{animation:none !important;opacity:1 !important;}
+  /* iOS Safari: backdrop-filter dans un container scrollable décale les touch events */
   .glass,.glass-hover,.card,.card-sm,.modal-overlay,.modal-box,
   .topbar,.bottom-nav,.sidebar,
   [style*="backdrop-filter"]{
@@ -545,53 +544,69 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .grid-4{grid-template-columns:1fr 1fr !important;}
   .page-content{
     padding:12px;
-    padding-bottom:calc(84px + env(safe-area-inset-bottom));
-    padding-left:calc(12px + env(safe-area-inset-left));
-    padding-right:calc(12px + env(safe-area-inset-right));
+    /* Valeur fixe pour page-content : iOS safe-area env() dans les heights/padding
+       recalcule le layout APRÈS le premier rendu et décale les touch targets.
+       On utilise une valeur fixe généreuse (90px couvre tous les iPhones) */
+    padding-bottom:90px;
+    padding-left:12px;
+    padding-right:12px;
     overflow-x:hidden !important;
   }
   .bottom-nav{
     display:flex;position:fixed;bottom:0;left:0;right:0;
-    background:rgba(7,6,15,0.97);backdrop-filter:blur(24px);
+    background:rgba(7,6,15,0.99);
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
     border-top:1px solid var(--border);
     justify-content:space-around;
     padding-top:10px;
-    padding-bottom:max(20px, calc(env(safe-area-inset-bottom) + 8px));
-    padding-left:env(safe-area-inset-left);
-    padding-right:env(safe-area-inset-right);
+    /* Hauteur fixe — pas d'env() ici pour éviter le re-layout iOS */
+    padding-bottom:22px;
     z-index:250;
-    /* Ensure tappable area is above iOS home indicator */
-    min-height:calc(64px + env(safe-area-inset-bottom));
+    height:68px;
+    /* Safe area gérée via le pseudo-element ::after pour ne pas affecter le layout */
+    box-sizing:content-box;
+  }
+  /* Safe area home indicator via pseudo-element — n'affecte pas le layout du nav */
+  .bottom-nav::after{
+    content:'';display:block;
+    position:absolute;bottom:0;left:0;right:0;
+    height:env(safe-area-inset-bottom,0px);
+    background:rgba(7,6,15,0.99);
+    pointer-events:none;
   }
   /* Extra tap area for nav items */
   .bnav-item{
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:3px;padding:6px 10px;border-radius:12px;cursor:pointer;
-    transition:all .18s;font-size:9px;font-weight:700;color:var(--text3);
+    transition:background .15s;font-size:9px;font-weight:700;color:var(--text3);
     text-transform:uppercase;letter-spacing:.3px;min-width:48px;
-    position:relative;
-    /* Bigger tap target */
-    min-height:48px;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
+    position:relative;height:48px;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
   }
   .bnav-item.active{color:var(--purple);}
   .bnav-item.active .bnav-icon-wrap{background:rgba(167,139,250,0.18);border-radius:12px;}
   .bnav-icon{font-size:22px;}
-  .bnav-icon-wrap{padding:4px 12px;border-radius:10px;transition:all .18s;}
+  .bnav-icon-wrap{padding:4px 12px;border-radius:10px;transition:background .15s;}
   .topbar{
-    height:calc(56px + env(safe-area-inset-top)) !important;
-    padding-left:calc(14px + env(safe-area-inset-left));
-    padding-right:calc(14px + env(safe-area-inset-right));
+    /* Hauteur fixe — env(safe-area-inset-top) géré via padding-top uniquement */
+    height:54px !important;
+    padding-top:0 !important;
+    padding-left:14px;
+    padding-right:14px;
   }
+  /* Safe area topbar via padding sur main-area */
+  .main-area{
+    padding-top:env(safe-area-inset-top,0px);
+  }
+  /* Remove backdrop-filter everywhere on mobile */
+  .topbar{background:rgba(7,6,15,0.99) !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
+
   /* Compact clock on mobile */
   .topbar-clock-date{display:none;}
   .topbar-clock{border-radius:12px;}
   .topbar-clock-time{padding:8px 14px;}
-  /* Remove backdrop-filter on topbar/bottom-nav on mobile — causes iOS touch offset */
-  .topbar{background:rgba(7,6,15,0.98) !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
-  .bottom-nav{background:rgba(7,6,15,0.99) !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
-
   /* ── EXPENSE ROW — full mobile redesign ── */
   /* Disable hover effects on touch */
   .expense-row{
@@ -744,11 +759,6 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
 /* Disable tooltips on touch-only devices */
 @media(hover:none){
   .gtip{ display:none !important; }
-}
-/* iPhone notch / safe area */
-@supports(padding-top: env(safe-area-inset-top)){
-  .app-shell{padding-top:0;}
-  .auth-shell{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
 }
 `;
 
@@ -1194,6 +1204,11 @@ export default function App() {
   ];
 
   const navigate = navigateTo;
+  const pageContentRef = useRef(null);
+  // iOS fix: reset scroll position on every page change to avoid touch offset
+  useEffect(() => {
+    if (pageContentRef.current) pageContentRef.current.scrollTop = 0;
+  }, [page]);
   const pageTitles = { dashboard:"Tableau de bord",incomes:"Revenus",expenses:"Dépenses",bills:"Factures",stats:"Statistiques",settings:"Réglages",essence:"⛽ Prix des carburants" };
   const syncLabel = { synced:"Synchronisé ✓",saving:"Sauvegarde…",error:"Erreur sync !" };
   const syncColor = { synced:"var(--green)",saving:"var(--yellow)",error:"var(--red)" };
@@ -1321,7 +1336,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="page-content">
+          <div className="page-content" ref={pageContentRef}>
             {page==="dashboard" && <Dashboard data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal} allMonths={allMonths}/>}
             {page==="incomes"   && <Incomes   data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal}/>}
             {page==="expenses"  && <Expenses  data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal}/>}
