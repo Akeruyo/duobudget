@@ -799,7 +799,16 @@ label{font-size:12px;color:var(--text2);font-weight:600;display:block;margin-bot
   .app-shell{ padding-top:0; }
   .auth-shell{ padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom); }
 }
-/* safe-area handled via .bnav-inset spacer — no standalone overrides needed */
+/* safe-area handled via .bnav-inset spacer */
+/* Topbar standalone : priorité à env() sinon --sat-override */
+:root{ --sat: env(safe-area-inset-top,0px); }
+body.pwa-standalone .topbar{
+  height:calc(52px + max(env(safe-area-inset-top,0px),var(--sat-override,0px))) !important;
+  padding-top:calc(8px + max(env(safe-area-inset-top,0px),var(--sat-override,0px))) !important;
+}
+body.pwa-standalone .page-content{
+  padding-bottom:calc(60px + max(env(safe-area-inset-bottom,0px),20px)) !important;
+}
 `;
 
 // ═══════════════════════════════════════════════════════════
@@ -907,10 +916,25 @@ function useFavicon() {
       const isStandalone =
         window.navigator.standalone === true ||
         window.matchMedia('(display-mode: standalone)').matches;
+      document.documentElement.classList.toggle('pwa-standalone', isStandalone);
       document.body.classList.toggle('pwa-standalone', isStandalone);
+      // Forcer --sat CSS variable pour topbar quand env() n'est pas disponible
+      if(isStandalone){
+        // Lire la vraie safe-area via CSS (disponible après le 1er paint)
+        const sat = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sat')||'0')||0;
+        if(!sat){
+          // Fallback heuristique : iPhone standard = 44px, iPhone mini = 50px, plus vieilles = 20px
+          const h = window.screen.height;
+          const guess = h >= 812 ? 47 : 20;
+          document.documentElement.style.setProperty('--sat-override', guess+'px');
+        }
+      } else {
+        document.documentElement.style.removeProperty('--sat-override');
+      }
     };
     checkStandalone();
-    window.matchMedia('(display-mode: standalone)').addEventListener('change', checkStandalone);
+    setTimeout(checkStandalone, 200);
+    try { window.matchMedia('(display-mode: standalone)').addEventListener('change', checkStandalone); } catch(e){}
   }, []);
 }
 
@@ -4557,22 +4581,26 @@ function FuelMapLeaflet({ stations, userLat, userLng }) {
       stations.forEach(s=>{
         if(!s.lat||!s.lng) return;
         const brand=detectBrand(s.nom,s.enseignes,s.adresse)||{abbr:"⛽",bg:"#374151",fg:"#fff"};
+        const resolved=resolveNom(s);
+        const nomDisplay=resolved.nom;
         const dist=(userLat&&userLng)?fmtKm(haversineKm(userLat,userLng,s.lat,s.lng)):null;
-        const fuels=['gazole','sp95','e10','sp98'].filter(k=>s[k]!=null)
-          .map(k=>`<span style="background:#1e293b;color:#e2e8f0;padding:2px 6px;border-radius:5px;font-size:11px;margin:2px">${k.toUpperCase()} ${s[k].toFixed(3)}€</span>`).join("");
-        const icon=L.divIcon({
-          html:`<div style="background:${brand.bg};color:${brand.fg};width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;font-family:Outfit,sans-serif;border:2.5px solid rgba(255,255,255,0.9);box-shadow:0 4px 12px rgba(0,0,0,0.4)">${brand.abbr}</div>`,
-          className:"",iconSize:[38,38],iconAnchor:[19,19]
-        });
-        L.marker([s.lat,s.lng],{icon}).addTo(map).bindPopup(L.popup({maxWidth:270}).setContent(`
-          <div style="font-family:Outfit,sans-serif;padding:4px">
-            <div style="font-weight:900;font-size:14px;text-transform:uppercase;margin-bottom:2px">${(s.nom||"Station").slice(0,28)}</div>
-            <div style="font-size:11px;color:#64748b;margin-bottom:6px">${s.adresse||""}${s.ville?" · "+s.ville:""}</div>
-            ${dist?`<div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px">📍 ${dist}</div>`:""}
-            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:2px">${fuels}</div>
-            <a href="maps://?daddr=${s.lat},${s.lng}&dirflg=d" target="_blank"
-              style="display:block;text-align:center;background:linear-gradient(135deg,#a78bfa,#f472b6);color:#fff;padding:9px;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px">🗺️ Démarrer</a>
-          </div>`));
+        const fuels=['gazole','sp95','e10','sp98'].filter(k=>s[k]!=null);
+        const fuelsHtml=fuels.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;margin:2px 0;background:#1a1035;border-radius:8px;border-left:3px solid ${FUEL_COLORS[k]||'#a78bfa'}"><span style="font-size:10px;font-weight:700;color:${FUEL_COLORS[k]||'#fff'}">${k.toUpperCase()}</span><span style="font-size:13px;font-weight:900;color:#fff;font-family:'Fraunces',serif">${s[k].toFixed(3)} €</span></div>`).join("");
+        const mapsUrl=`maps://?daddr=${s.lat},${s.lng}&dirflg=d`;
+        // Icône : fond coloré marque + abréviation
+        const iconSize=44;
+        const iconHtml=`<div style="width:${iconSize}px;height:${iconSize}px;border-radius:13px;background:${brand.bg};color:${brand.fg};display:flex;align-items:center;justify-content:center;font-size:${brand.abbr&&brand.abbr.length>2?10:14}px;font-weight:900;font-family:Outfit,sans-serif;border:2.5px solid rgba(255,255,255,0.95);box-shadow:0 4px 14px rgba(0,0,0,0.5),0 0 0 1px rgba(0,0,0,0.2);letter-spacing:-0.5px;line-height:1.1;text-align:center">${brand.abbr}</div>`;
+        const icon=L.divIcon({html:iconHtml,className:"",iconSize:[iconSize,iconSize],iconAnchor:[iconSize/2,iconSize/2]});
+        const distHtml=dist?`<div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:8px">📍 ${dist}</div>`:"";
+        const adresseHtml=[s.adresse,s.ville].filter(Boolean).join(" · ");
+        const popupHtml=`<div style="font-family:Outfit,sans-serif;padding:6px 4px;min-width:220px">
+          <div style="font-weight:900;font-size:14px;color:#0f172a;margin-bottom:3px">${nomDisplay}</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px">${adresseHtml}</div>
+          ${distHtml}
+          <div style="margin-bottom:10px">${fuelsHtml}</div>
+          <a href="${mapsUrl}" style="display:block;text-align:center;background:linear-gradient(135deg,#a78bfa,#f472b6);color:#fff;padding:11px;border-radius:12px;text-decoration:none;font-weight:800;font-size:13px;letter-spacing:.3px">🗺️ Itinéraire avec Plans</a>
+        </div>`;
+        L.marker([s.lat,s.lng],{icon}).addTo(map).bindPopup(L.popup({maxWidth:280,className:"fuel-popup"}).setContent(popupHtml));
       });
     };
     if(!window.L){
@@ -4880,7 +4908,7 @@ function EssencePage() {
               const dist=best._dist!=null?fmtKm(best._dist):null;
               return (
                 <div key={k}
-                  onClick={()=>{if(best.lat){window.open(`maps://?daddr=${best.lat},${best.lng}&dirflg=d`,'_blank');}}}
+                  onClick={()=>{if(best.lat){window.location.href=`maps://?daddr=${best.lat},${best.lng}&dirflg=d`;}}}
                   style={{
                     background:`linear-gradient(160deg,${meta.color}18,${meta.color}06)`,
                     border:`1.5px solid ${meta.color}35`,borderRadius:20,
@@ -4898,7 +4926,7 @@ function EssencePage() {
                     </div>
                     {/* Bouton navigation haut droite */}
                     <button
-                      onClick={e=>{e.stopPropagation();if(best.lat){window.open(`maps://?daddr=${best.lat},${best.lng}&dirflg=d`,'_blank');}}}
+                      onClick={e=>{e.stopPropagation();if(best.lat){window.location.href=`maps://?daddr=${best.lat},${best.lng}&dirflg=d`;}}}
                       style={{width:30,height:30,borderRadius:8,border:`1px solid ${meta.color}35`,
                         background:`${meta.color}15`,color:meta.color,cursor:"pointer",fontSize:14,
                         display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
@@ -4967,7 +4995,12 @@ function EssencePage() {
               {stationsWithDist.map((s,i)=>{
                 const brand=detectBrand(s.nom,s.enseignes,s.adresse);
                 const fuelsAvail=Object.entries(FUEL_META).filter(([k])=>s[k]!=null);
-                const cheapestKey=fuelsAvail.reduce((acc,[k])=>(!acc||s[k]<s[acc])?k:acc,null);
+                // isBest[k] = vrai si cette station est la moins chère pour ce carburant
+                const isBestFor=(k)=>{
+                  if(!s[k]||!bestStation[k]) return false;
+                  const b=bestStation[k];
+                  return b.lat===s.lat&&b.lng===s.lng&&b[k]===s[k];
+                };
                 const mapsUrl=s.lat?`maps://?daddr=${s.lat},${s.lng}&dirflg=d`:null;
                 return (
                   <div key={s.id||i}
@@ -5004,14 +5037,16 @@ function EssencePage() {
 
                       {/* Infos station */}
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:800,fontSize:13,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:.3}}>
-                          {(s.nom||"Station").toUpperCase()}
+                        {/* Nom établissement en blanc, en gras */}
+                        <div style={{fontWeight:900,fontSize:13.5,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:.2}}>
+                          {(()=>{const r=resolveNom(s);return r.nom;})()}
                         </div>
-                        <div style={{fontSize:11,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>
-                          {[s.adresse,s.ville].filter(Boolean).join(" · ")}
+                        {/* Adresse en gris clair */}
+                        <div style={{fontSize:11,color:"rgba(255,255,255,0.38)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>
+                          {s.adresse&&s.ville?`${s.adresse} — ${s.ville}`:s.adresse||s.ville||""}
                         </div>
-                        <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
-                          {s.cp&&<span style={{fontSize:9,color:"var(--text3)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:5,padding:"1px 5px",fontWeight:700}}>📮 {s.cp}</span>}
+                        <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
+                          {s.cp&&<span style={{fontSize:9,color:"rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.05)",borderRadius:5,padding:"1px 5px",fontWeight:600}}>📮 {s.cp}</span>}
                           {s._dist!=null&&<span style={{fontSize:9,fontWeight:800,color:"var(--purple)",background:"rgba(167,139,250,0.12)",border:"1px solid rgba(167,139,250,0.25)",borderRadius:10,padding:"1px 7px"}}>📍 {fmtKm(s._dist)}</span>}
                         </div>
                       </div>
@@ -5019,7 +5054,7 @@ function EssencePage() {
                       {/* Bouton Maps */}
                       {mapsUrl&&(
                         <button
-                          onClick={e=>{e.stopPropagation();window.open(mapsUrl,'_blank');}}
+                          onClick={e=>{e.stopPropagation();window.location.href=mapsUrl;}}
                           style={{
                             width:42,height:42,borderRadius:12,flexShrink:0,
                             background:"rgba(167,139,250,0.12)",
@@ -5043,7 +5078,7 @@ function EssencePage() {
                       background:"rgba(0,0,0,0.15)",
                     }}>
                       {Object.entries(FUEL_META).map(([k,m])=>{
-                        const isBest=k===cheapestKey&&fuelsAvail.length>1;
+                        const isBest=isBestFor(k);
                         const hasPrice=s[k]!=null;
                         return (
                           <div key={k} style={{
