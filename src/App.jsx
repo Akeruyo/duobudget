@@ -51,12 +51,15 @@ const generateInviteCode = () => {
 
 const saveInviteCode = async (uid, code) => {
   const normalized = code.toUpperCase();
-  // Ecriture dans userMeta/{uid} — l'utilisateur a accès garanti à son propre doc
+  // Écriture dans userMeta/{uid} (l'utilisateur a accès garanti à son propre doc)
   try { await setDoc(getUserMetaRef(uid), { inviteCode: normalized, inviteCreatedAt: Date.now() }, { merge: true }); }
   catch { return false; }
-  // Tentative supplémentaire sur inviteCodes (lookup direct) — non bloquant si les règles Firestore le refusent
+  // Écriture dans inviteCodes/{code} pour lookup direct (tentative non bloquante)
   try { await setDoc(getInviteRef(normalized), { ownerUID: uid, createdAt: Date.now() }); }
-  catch { /* règles Firestore trop strictes sur inviteCodes — le fallback query sur userMeta prend le relais */ }
+  catch { /* règles Firestore trop strictes — fallbacks actifs */ }
+  // Écriture du code en champ top-level dans budgets/{uid} pour le 3e fallback
+  try { await setDoc(getDocRef(uid), { inviteCode: normalized }, { merge: true }); }
+  catch { /* non bloquant */ }
   return true;
 };
 
@@ -74,14 +77,20 @@ const setLinkedUID = async (uid, linkedUID) => {
 
 const resolveInviteCode = async (code) => {
   const normalized = code.trim().toUpperCase();
-  // Méthode 1 : lookup direct dans inviteCodes (rapide, si les règles Firestore le permettent)
+  // Méthode 1 : lookup direct dans inviteCodes/{code} (nécessite auth ou règles publiques)
   try {
     const snap = await getDoc(getInviteRef(normalized));
     if (snap.exists()) return snap.data().ownerUID;
   } catch {}
-  // Méthode 2 : fallback — chercher dans userMeta où inviteCode == code (fonctionne toujours)
+  // Méthode 2 : query sur userMeta où inviteCode == code
   try {
     const q = query(collection(db, "userMeta"), where("inviteCode", "==", normalized));
+    const qs = await getDocs(q);
+    if (!qs.empty) return qs.docs[0].id;
+  } catch {}
+  // Méthode 3 : fallback sur budgets — le code est aussi sauvé dans le champ top-level inviteCode
+  try {
+    const q = query(collection(db, "budgets"), where("inviteCode", "==", normalized));
     const qs = await getDocs(q);
     if (!qs.empty) return qs.docs[0].id;
   } catch {}
@@ -282,56 +291,96 @@ html,body{
 .auth-shell{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;
   padding-top:calc(20px + env(safe-area-inset-top));
   padding-bottom:calc(20px + env(safe-area-inset-bottom));
-  background:radial-gradient(ellipse 90% 70% at 30% 20%,rgba(167,139,250,0.25),transparent 60%),
-             radial-gradient(ellipse 70% 50% at 80% 80%,rgba(244,114,182,0.2),transparent 55%),
-             radial-gradient(ellipse 50% 40% at 60% 50%,rgba(96,165,250,0.12),transparent 60%),
-             var(--bg);
+  background:#07060f;
   overflow:hidden;}
-/* Orbes animées derrière la card */
-.auth-shell::before,.auth-shell::after{
-  content:''; position:absolute; border-radius:50%; filter:blur(80px); pointer-events:none; opacity:.55;
-}
+
+/* Fond vivant — 3 orbes colorées */
+.auth-orb{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none;}
+.auth-orb-1{width:560px;height:560px;background:radial-gradient(circle,rgba(167,139,250,0.28) 0%,transparent 70%);top:-160px;left:-140px;animation:orbFloat1 9s ease-in-out infinite;}
+.auth-orb-2{width:440px;height:440px;background:radial-gradient(circle,rgba(244,114,182,0.22) 0%,transparent 70%);bottom:-130px;right:-90px;animation:orbFloat2 11s ease-in-out infinite;}
+.auth-orb-3{width:300px;height:300px;background:radial-gradient(circle,rgba(96,165,250,0.15) 0%,transparent 70%);top:50%;left:60%;animation:orbFloat1 7s ease-in-out infinite reverse;}
+
+/* Grille de points subtile */
 .auth-shell::before{
-  width:500px;height:500px; background:rgba(167,139,250,0.25); top:-150px; left:-100px;
-  animation:orbFloat1 8s ease-in-out infinite;
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(circle,rgba(167,139,250,0.12) 1px,transparent 1px);
+  background-size:28px 28px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 40%,transparent 100%);
 }
-.auth-shell::after{
-  width:400px;height:400px; background:rgba(244,114,182,0.2); bottom:-120px; right:-80px;
-  animation:orbFloat2 10s ease-in-out infinite;
-}
-@keyframes orbFloat1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
-@keyframes orbFloat2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,-30px)}}
+
+@keyframes orbFloat1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(55px,35px) scale(1.05)}}
+@keyframes orbFloat2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-45px,-28px) scale(1.04)}}
+
 .auth-card{
-  background:linear-gradient(145deg,rgba(15,12,32,0.92),rgba(22,18,50,0.92));
-  border:1px solid rgba(167,139,250,0.2);border-radius:32px;padding:40px;width:100%;max-width:440px;
-  box-shadow:0 40px 100px rgba(0,0,0,0.7),0 0 0 1px rgba(167,139,250,0.12),inset 0 1px 0 rgba(255,255,255,0.07);
-  backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);
+  background:linear-gradient(155deg,rgba(16,13,36,0.96),rgba(20,16,44,0.96));
+  border:1px solid rgba(255,255,255,0.1);border-radius:30px;
+  padding:36px 36px 32px;width:100%;max-width:440px;
+  box-shadow:0 40px 100px rgba(0,0,0,0.7),0 0 0 1px rgba(167,139,250,0.1),inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);
   position:relative;z-index:1;}
 
 /* ── AUTH INPUT FIELD ── */
 .auth-field{position:relative;margin-bottom:14px;}
-.auth-field label{font-size:11px;color:var(--text3);font-weight:700;letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:7px;}
-.auth-field input{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:14px;color:var(--text);padding:14px 16px 14px 46px;font-size:14px;width:100%;outline:none;transition:all .25s;font-family:'Outfit',sans-serif;box-shadow:inset 0 2px 4px rgba(0,0,0,0.2);}
-.auth-field input:focus{border-color:rgba(167,139,250,0.7);box-shadow:0 0 0 4px rgba(167,139,250,0.14),inset 0 1px 0 rgba(255,255,255,0.07);}
+.auth-field label{font-size:11px;color:rgba(237,233,248,0.4);font-weight:700;letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:7px;}
+.auth-field input{background:rgba(255,255,255,0.055);border:1px solid rgba(255,255,255,0.1);border-radius:14px;color:var(--text);padding:14px 16px 14px 46px;font-size:14px;width:100%;outline:none;transition:all .25s;font-family:'Outfit',sans-serif;box-shadow:inset 0 2px 4px rgba(0,0,0,0.25);}
+.auth-field input:focus{border-color:rgba(167,139,250,0.6);background:rgba(167,139,250,0.06);box-shadow:0 0 0 3px rgba(167,139,250,0.12),inset 0 1px 0 rgba(255,255,255,0.06);}
 .auth-field .field-icon{position:absolute;left:15px;bottom:14px;font-size:17px;pointer-events:none;}
-.auth-field .eye-btn{position:absolute;right:12px;bottom:10px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:18px;padding:3px;transition:color .2s;line-height:1;}
+.auth-field .eye-btn{position:absolute;right:12px;bottom:10px;background:none;border:none;cursor:pointer;color:rgba(237,233,248,0.3);font-size:18px;padding:3px;transition:color .2s;line-height:1;}
 .auth-field .eye-btn:hover{color:var(--text2);}
+
+/* Code d'invitation — champ spécial */
+.invite-code-field{
+  display:flex;gap:8px;justify-content:center;margin:6px 0 16px;
+}
+.invite-code-box{
+  width:44px;height:56px;
+  background:rgba(167,139,250,0.08);
+  border:1.5px solid rgba(167,139,250,0.25);
+  border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif;font-size:22px;font-weight:900;
+  color:var(--purple);
+  transition:all .2s;
+  letter-spacing:0;
+}
+.invite-code-box.filled{
+  background:rgba(167,139,250,0.15);
+  border-color:rgba(167,139,250,0.6);
+  box-shadow:0 0 16px rgba(167,139,250,0.2);
+}
+.invite-code-box.empty{
+  color:rgba(167,139,250,0.2);
+}
 
 /* ── AUTH STRENGTH BAR ── */
 .pwd-strength{display:flex;gap:4px;margin-top:8px;}
 .pwd-strength-bar{flex:1;height:3px;border-radius:2px;transition:background .3s;}
 
 /* ── AUTH DIVIDER ── */
-.auth-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--text3);font-size:11px;font-weight:600;letter-spacing:.5px;}
-.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:22px 0 16px;color:rgba(237,233,248,0.25);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.07);}
 
 /* ── FEATURE PILLS ── */
-.auth-features{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:20px;}
-.auth-feature-pill{display:flex;align-items:center;gap:6px;background:rgba(167,139,250,0.07);border:1px solid rgba(167,139,250,0.18);border-radius:20px;padding:6px 12px;font-size:11px;color:rgba(237,233,248,0.7);font-weight:600;transition:all .2s;}
-.auth-feature-pill:hover{background:rgba(167,139,250,0.14);}
+.auth-features{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:0;}
+.auth-feature-pill{
+  display:flex;align-items:center;gap:9px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:14px;padding:10px 13px;
+  font-size:12px;color:rgba(237,233,248,0.55);font-weight:600;
+  transition:all .2s;
+}
+.auth-feature-pill .pill-icon{
+  width:30px;height:30px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0;
+}
+.auth-feature-pill .pill-text{display:flex;flex-direction:column;gap:1px;}
+.auth-feature-pill .pill-label{font-size:12px;font-weight:800;color:rgba(237,233,248,0.75);}
+.auth-feature-pill .pill-sub{font-size:10px;color:rgba(237,233,248,0.35);font-weight:500;}
 
 /* ── RESET VIEW ── */
-.reset-back-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;transition:color .2s;margin-bottom:24px;}
+.reset-back-btn{background:none;border:none;color:rgba(237,233,248,0.35);cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;padding:0;transition:color .2s;margin-bottom:24px;}
 .reset-back-btn:hover{color:var(--text);}
 @keyframes checkDraw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
 .check-anim{animation:checkDraw .5s ease .1s both;stroke-dasharray:100;stroke-dashoffset:0;}
@@ -1128,9 +1177,17 @@ function AuthScreen({ onLinked }) {
         await createUserWithEmailAndPassword(auth, email, password);
       } else if (view === "join") {
         if (!inviteCode.trim()) { setError("Veuillez saisir le code de votre partenaire."); setLoading(false); return; }
-        const ownerUID = await resolveInviteCode(inviteCode);
-        if (!ownerUID) { setError("Code invalide ou expiré. Vérifiez avec votre partenaire."); setLoading(false); return; }
+        // ⚠️  ORDRE CRITIQUE : créer le compte EN PREMIER pour que l'utilisateur soit
+        //     authentifié lorsque resolveInviteCode lit Firestore.
+        //     Les règles Firestore exigent request.auth != null → lecture impossible avant auth.
         const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const ownerUID = await resolveInviteCode(inviteCode);
+        if (!ownerUID) {
+          // Code invalide — supprimer le compte fraîchement créé pour ne pas laisser un orphelin
+          try { await deleteUser(cred.user); } catch {}
+          setError("Code invalide ou introuvable. Demandez à votre partenaire d'en générer un nouveau depuis Réglages → Espace partagé.");
+          setLoading(false); return;
+        }
         await setLinkedUID(cred.user.uid, ownerUID);
         if (onLinked) onLinked(ownerUID);
       }
@@ -1204,105 +1261,240 @@ function AuthScreen({ onLinked }) {
 
   const tabs = [
     { id:"login",    icon:"🔑", label:"Connexion" },
-    { id:"register", icon:"✨", label:"Créer un compte" },
+    { id:"register", icon:"✨", label:"Créer" },
     { id:"join",     icon:"💑", label:"Rejoindre" },
   ];
 
+  // Visual code display for join tab
+  const codeChars = inviteCode.padEnd(6, " ").split("");
+
   return (
-    <div className="auth-shell"><style>{CSS}</style>
+    <div className="auth-shell">
+      <style>{CSS}</style>
+      {/* Orbes animées */}
+      <div className="auth-orb auth-orb-1"/>
+      <div className="auth-orb auth-orb-2"/>
+      <div className="auth-orb auth-orb-3"/>
+
       <div className="auth-card scale-in">
+
         {/* Header */}
-        <div style={{ textAlign:"center",marginBottom:26 }}>
-          <div style={{ width:72,height:72,borderRadius:22,margin:"0 auto 16px",background:"var(--grad-main)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:"0 8px 32px rgba(167,139,250,0.4),0 0 0 1px rgba(255,255,255,0.08)",animation:"float 3s ease-in-out infinite" }}>💑</div>
-          <div className="glow-text" style={{ fontFamily:"'Fraunces',serif",fontSize:32,fontWeight:700,lineHeight:1 }}>DuoBudget</div>
-          <div style={{ fontSize:11,color:"var(--text3)",marginTop:5,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600 }}>Finance à deux</div>
+        <div style={{ textAlign:"center",marginBottom:24 }}>
+          <div style={{
+            width:68,height:68,borderRadius:20,margin:"0 auto 14px",
+            background:"linear-gradient(135deg,#a78bfa,#f472b6)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:30,boxShadow:"0 10px 36px rgba(167,139,250,0.45),0 0 0 1px rgba(255,255,255,0.1)",
+            animation:"float 4s ease-in-out infinite"
+          }}>💑</div>
+          <div style={{ fontFamily:"'Fraunces',serif",fontSize:28,fontWeight:700,lineHeight:1,
+            background:"linear-gradient(135deg,#e2d9ff,#f9a8d4)",
+            WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent" }}>DuoBudget</div>
+          <div style={{ fontSize:11,color:"rgba(237,233,248,0.3)",marginTop:5,letterSpacing:1.5,
+            textTransform:"uppercase",fontWeight:600 }}>Gérer ses finances à deux</div>
         </div>
 
-        {/* Tab bar */}
-        <div style={{ display:"flex",gap:3,marginBottom:24,background:"rgba(255,255,255,0.04)",borderRadius:14,padding:4 }}>
+        {/* Tabs */}
+        <div style={{ display:"flex",gap:3,marginBottom:22,background:"rgba(0,0,0,0.25)",
+          borderRadius:16,padding:4,border:"1px solid rgba(255,255,255,0.06)" }}>
           {tabs.map(({ id,icon,label }) => (
-            <button key={id} onClick={() => switchView(id)} style={{ flex:1,padding:"9px 6px",borderRadius:11,border:"none",cursor:"pointer",background:view===id?"var(--grad-main)":"transparent",color:view===id?"white":"var(--text3)",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:11,transition:"all .25s",display:"flex",alignItems:"center",justifyContent:"center",gap:4,boxShadow:view===id?"0 4px 14px rgba(167,139,250,0.35)":"none" }}>
-              <span style={{ fontSize:14 }}>{icon}</span>
+            <button key={id} onClick={() => switchView(id)} style={{
+              flex:1,padding:"9px 4px",borderRadius:12,border:"none",cursor:"pointer",
+              background:view===id
+                ? id==="join"
+                  ? "linear-gradient(135deg,rgba(167,139,250,0.4),rgba(244,114,182,0.3))"
+                  : "linear-gradient(135deg,#a78bfa,#f472b6)"
+                : "transparent",
+              color:view===id?"white":"rgba(237,233,248,0.35)",
+              fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:11,
+              transition:"all .25s",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:4,
+              boxShadow:view===id?"0 4px 16px rgba(167,139,250,0.3)":"none",
+              letterSpacing:.3,
+            }}>
+              <span style={{ fontSize:13 }}>{icon}</span>
               <span style={{ whiteSpace:"nowrap" }}>{label}</span>
             </button>
           ))}
         </div>
 
-        {/* Join explanation */}
+        {/* ── Vue REJOINDRE : explication + champ code stylisé ── */}
         {view === "join" && (
-          <div style={{ background:"rgba(167,139,250,0.07)",border:"1px solid rgba(167,139,250,0.2)",borderRadius:14,padding:"12px 16px",marginBottom:18,fontSize:12,color:"var(--text2)",lineHeight:1.6 }}>
-            💑 <strong style={{ color:"var(--purple)" }}>Rejoindre un espace partagé</strong><br/>
-            Votre partenaire doit partager son <strong>code d'invitation</strong> depuis Réglages → Compte. Entrez-le ci-dessous pour accéder aux mêmes données.
+          <div style={{ marginBottom:18 }}>
+            {/* Étapes illustrées */}
+            <div style={{
+              background:"linear-gradient(135deg,rgba(167,139,250,0.08),rgba(244,114,182,0.06))",
+              border:"1px solid rgba(167,139,250,0.2)",borderRadius:18,
+              padding:"14px 16px",marginBottom:16,
+            }}>
+              <div style={{ fontSize:11,fontWeight:900,color:"var(--purple)",letterSpacing:.8,
+                textTransform:"uppercase",marginBottom:10 }}>Comment ça marche ?</div>
+              {[
+                { n:"1", text:"Votre partenaire génère un code dans", accent:"Réglages → Espace partagé" },
+                { n:"2", text:"Il vous partage le code à 6 caractères" },
+                { n:"3", text:"Entrez ce code ci-dessous et créez votre compte" },
+              ].map(({ n, text, accent }) => (
+                <div key={n} style={{ display:"flex",alignItems:"flex-start",gap:10,marginBottom:n==="3"?0:8 }}>
+                  <div style={{
+                    width:20,height:20,borderRadius:6,flexShrink:0,marginTop:1,
+                    background:"linear-gradient(135deg,#a78bfa,#f472b6)",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:10,fontWeight:900,color:"#fff",
+                  }}>{n}</div>
+                  <div style={{ fontSize:12,color:"rgba(237,233,248,0.6)",lineHeight:1.5 }}>
+                    {text}{accent && <> — <strong style={{ color:"var(--purple)" }}>{accent}</strong></>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Affichage visuel du code saisi */}
+            <div style={{ fontSize:10,color:"rgba(237,233,248,0.4)",fontWeight:700,
+              letterSpacing:.8,textTransform:"uppercase",marginBottom:8 }}>
+              Code d'invitation partenaire
+            </div>
+            <div className="invite-code-field">
+              {codeChars.map((ch, i) => (
+                <div key={i} className={`invite-code-box ${ch.trim() ? "filled" : "empty"}`}>
+                  {ch.trim() || "·"}
+                </div>
+              ))}
+            </div>
+            <input
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value.toUpperCase().slice(0,6))}
+              placeholder="Saisissez le code ici…"
+              maxLength={6}
+              onKeyDown={e => e.key==="Enter" && submit()}
+              style={{
+                width:"100%",background:"rgba(255,255,255,0.05)",
+                border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,
+                padding:"10px 14px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",
+                fontSize:13,fontWeight:700,textAlign:"center",letterSpacing:4,
+                textTransform:"uppercase",outline:"none",marginBottom:2,
+                transition:"border-color .2s",
+              }}
+            />
           </div>
         )}
 
-        {/* Email field */}
+        {/* Email */}
         <div className="auth-field">
-          <label>{view==="join"?"Votre adresse email":"Adresse email"}</label>
+          <label>{view==="join"?"Votre adresse email":"Email"}</label>
           <span className="field-icon">✉️</span>
-          <input ref={emailRef} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@email.com" autoComplete="email" onKeyDown={e => e.key==="Enter" && submit()}/>
+          <input ref={emailRef} type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="vous@email.com" autoComplete="email"
+            onKeyDown={e => e.key==="Enter" && submit()}/>
         </div>
 
-        {/* Password field */}
+        {/* Password */}
         <div className="auth-field" style={{ marginBottom:view!=="login"?6:4 }}>
-          <label>Mot de passe</label><span className="field-icon">🔒</span>
-          <input type={showPwd?"text":"password"} value={password} onChange={e => setPassword(e.target.value)} placeholder={view==="login"?"••••••••":"Minimum 6 caractères"} autoComplete={view==="login"?"current-password":"new-password"} onKeyDown={e => e.key==="Enter" && submit()} style={{ paddingRight:44 }}/>
-          <button className="eye-btn" onClick={() => setShowPwd(v => !v)} type="button" tabIndex={-1}>{showPwd?"🙈":"👁️"}</button>
+          <label>Mot de passe</label>
+          <span className="field-icon">🔒</span>
+          <input type={showPwd?"text":"password"} value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder={view==="login"?"••••••••":"Minimum 6 caractères"}
+            autoComplete={view==="login"?"current-password":"new-password"}
+            onKeyDown={e => e.key==="Enter" && submit()}
+            style={{ paddingRight:44 }}/>
+          <button className="eye-btn" onClick={() => setShowPwd(v => !v)} type="button" tabIndex={-1}>
+            {showPwd?"🙈":"👁️"}
+          </button>
         </div>
 
         {/* Password strength */}
         {view !== "login" && password.length>0 && (
           <div style={{ marginBottom:14 }}>
-            <div className="pwd-strength">{[1,2,3,4,5].map(i => <div key={i} className="pwd-strength-bar" style={{ background:i<=pwdStrength.score?pwdStrength.color:"rgba(255,255,255,0.07)" }}/>)}</div>
-            {pwdStrength.label && <div style={{ fontSize:11,color:pwdStrength.color,marginTop:4,fontWeight:600,textAlign:"right" }}>{pwdStrength.label}</div>}
-          </div>
-        )}
-
-        {/* Invite code for join */}
-        {view === "join" && (
-          <div className="auth-field">
-            <label>Code d'invitation partenaire</label>
-            <span className="field-icon">🔗</span>
-            <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())} placeholder="Ex: AB3XK7" maxLength={6} style={{ letterSpacing:4,fontWeight:800,fontSize:18,textAlign:"center",textTransform:"uppercase" }} onKeyDown={e => e.key==="Enter" && submit()}/>
+            <div className="pwd-strength">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="pwd-strength-bar"
+                  style={{ background:i<=pwdStrength.score?pwdStrength.color:"rgba(255,255,255,0.07)" }}/>
+              ))}
+            </div>
+            {pwdStrength.label && (
+              <div style={{ fontSize:11,color:pwdStrength.color,marginTop:4,fontWeight:600,textAlign:"right" }}>
+                {pwdStrength.label}
+              </div>
+            )}
           </div>
         )}
 
         {/* Forgot password */}
-        {view==="login" && <div style={{ textAlign:"right",marginBottom:18,marginTop:4 }}><button onClick={() => switchView("reset")} style={{ background:"none",border:"none",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,padding:0 }}>Mot de passe oublié ?</button></div>}
+        {view==="login" && (
+          <div style={{ textAlign:"right",marginBottom:16,marginTop:2 }}>
+            <button onClick={() => switchView("reset")} style={{
+              background:"none",border:"none",color:"rgba(167,139,250,0.7)",cursor:"pointer",
+              fontFamily:"'Outfit',sans-serif",fontSize:12,fontWeight:600,padding:0,transition:"color .2s"
+            }}>Mot de passe oublié ?</button>
+          </div>
+        )}
 
-        {/* Errors/Info */}
+        {/* Errors */}
         {error === "already-in-use" ? (
-          <div style={{ marginBottom:14,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:13,padding:"14px 16px" }}>
-            <div style={{ fontWeight:800,color:"var(--yellow)",fontSize:13,marginBottom:8 }}>⚠️ Cette adresse est déjà associée à un compte</div>
+          <div style={{ marginBottom:14,background:"rgba(251,191,36,0.07)",
+            border:"1px solid rgba(251,191,36,0.25)",borderRadius:14,padding:"14px 16px" }}>
+            <div style={{ fontWeight:800,color:"var(--yellow)",fontSize:13,marginBottom:8 }}>
+              ⚠️ Cette adresse est déjà associée à un compte
+            </div>
             <div style={{ fontSize:12,color:"var(--text2)",lineHeight:1.6,marginBottom:12 }}>
-              Un compte existe déjà avec <strong>{email}</strong>. Connectez-vous directement, ou réinitialisez votre mot de passe si vous l'avez oublié.
+              Un compte existe déjà avec <strong>{email}</strong>.
             </div>
             <div style={{ display:"flex",gap:8 }}>
-              <button onClick={() => switchView("login")} style={{ flex:1,padding:"9px 10px",borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.12)",color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
+              <button onClick={() => switchView("login")} style={{ flex:1,padding:"9px 10px",borderRadius:10,
+                border:"1px solid rgba(167,139,250,0.3)",background:"rgba(167,139,250,0.1)",
+                color:"var(--purple)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
                 🔑 Se connecter
               </button>
-              <button onClick={() => switchView("reset")} style={{ flex:1,padding:"9px 10px",borderRadius:10,border:"1px solid rgba(251,191,36,0.3)",background:"rgba(251,191,36,0.08)",color:"var(--yellow)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
+              <button onClick={() => switchView("reset")} style={{ flex:1,padding:"9px 10px",borderRadius:10,
+                border:"1px solid rgba(251,191,36,0.25)",background:"rgba(251,191,36,0.07)",
+                color:"var(--yellow)",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:12 }}>
                 🔐 Mot de passe oublié
               </button>
             </div>
           </div>
         ) : error ? (
-          <div className="alert-banner alert-danger" style={{ marginBottom:14 }}>⚠️ {error}</div>
+          <div style={{ marginBottom:14,background:"rgba(248,113,113,0.07)",
+            border:"1px solid rgba(248,113,113,0.25)",borderRadius:12,
+            padding:"10px 14px",fontSize:12,fontWeight:700,color:"var(--red)",
+            display:"flex",alignItems:"flex-start",gap:8 }}>
+            <span style={{ fontSize:16,flexShrink:0 }}>⚠️</span>{error}
+          </div>
         ) : null}
-        {info  && <div className="alert-banner alert-success" style={{ marginBottom:14 }}>✅ {info}</div>}
+        {info && (
+          <div style={{ marginBottom:14,background:"rgba(74,222,128,0.07)",
+            border:"1px solid rgba(74,222,128,0.25)",borderRadius:12,
+            padding:"10px 14px",fontSize:12,fontWeight:700,color:"var(--green)" }}>
+            ✅ {info}
+          </div>
+        )}
 
         {/* Submit */}
-        <button className="btn btn-primary" onClick={submit} disabled={loading||!email||!password||(view!=="login"&&pwdStrength.score<1)} style={{ width:"100%",justifyContent:"center",padding:"14px",fontSize:15 }}>
-          {loading ? <><span className="spin" style={{ display:"inline-block",fontSize:16 }}>⟳</span> En cours…</> :
-            view==="login"  ? "🔑 Se connecter" :
-            view==="join"   ? "🤝 Rejoindre l'espace" :
-            "🚀 Créer mon compte"}
+        <button className="btn btn-primary" onClick={submit}
+          disabled={loading||!email||!password||(view==="join"&&inviteCode.length<6)||(view!=="login"&&pwdStrength.score<1)}
+          style={{ width:"100%",justifyContent:"center",padding:"14px",fontSize:15,marginTop:4 }}>
+          {loading
+            ? <><span className="spin" style={{ display:"inline-block",fontSize:16 }}>⟳</span> En cours…</>
+            : view==="login"    ? "🔑 Se connecter"
+            : view==="join"     ? "🤝 Rejoindre l'espace partagé"
+            : "🚀 Créer mon compte"}
         </button>
 
-        <div className="auth-divider">Sécurisé par Firebase</div>
+        {/* Divider + feature grid */}
+        <div className="auth-divider">Inclus dans DuoBudget</div>
         <div className="auth-features">
-          {[["🔒","Chiffrement E2E"],["☁️","Sync temps réel"],["📱","PC & Mobile"],["💑","Espace partagé"]].map(([icon,label]) => (
-            <div key={label} className="auth-feature-pill"><span>{icon}</span>{label}</div>
+          {[
+            { icon:"💑", bg:"rgba(244,114,182,0.15)", label:"Espace partagé", sub:"Données synchronisées" },
+            { icon:"☁️", bg:"rgba(96,165,250,0.12)",  label:"Sync temps réel", sub:"Multi-appareils" },
+            { icon:"⛽", bg:"rgba(251,191,36,0.12)",  label:"Prix carburants", sub:"API officielle" },
+            { icon:"🌤️", bg:"rgba(96,165,250,0.12)", label:"Météo locale",    sub:"Open-Meteo" },
+          ].map(({ icon, bg, label, sub }) => (
+            <div key={label} className="auth-feature-pill">
+              <div className="pill-icon" style={{ background:bg }}>{icon}</div>
+              <div className="pill-text">
+                <div className="pill-label">{label}</div>
+                <div className="pill-sub">{sub}</div>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -4251,16 +4443,16 @@ function SettingsPage({ data, update, setModal, user, activeUID }) {
     setCodeLoading(true); setCodeError("");
     try {
       const code = generateInviteCode();
-      const uid = user?.uid; // toujours propre UID
+      const uid = user?.uid;
       if (!uid) { setCodeError("Utilisateur non connecté."); setCodeLoading(false); return; }
-      // update() utilise la connexion Firestore temps-réel déjà établie
-      // → jamais bloqué par extension navigateur ou règles Firestore
+      // Sauvegarde dans budget (sync Firestore temps-réel)
       update(d => { d.inviteCode = code; });
       setInviteCode(code);
-      // Tentatives silencieuses vers collections publiques (non-bloquantes)
-      Promise.all([
-        setDoc(getUserMetaRef(uid), { inviteCode: code, inviteCreatedAt: Date.now() }, { merge: true }).catch(()=>{}),
-        setDoc(getInviteRef(code), { ownerUID: uid, createdAt: Date.now() }).catch(()=>{}),
+      // Écritures vers les collections publiques + champ top-level budgets (triple fallback)
+      await Promise.allSettled([
+        setDoc(getUserMetaRef(uid), { inviteCode: code, inviteCreatedAt: Date.now() }, { merge: true }),
+        setDoc(getInviteRef(code), { ownerUID: uid, createdAt: Date.now() }),
+        setDoc(getDocRef(uid), { inviteCode: code }, { merge: true }),
       ]);
     } catch(e) {
       setCodeError("Erreur inattendue : " + (e.message || "Réessayez."));
