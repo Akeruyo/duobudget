@@ -298,7 +298,7 @@ html,body,#root{font-family:'Outfit',sans-serif;background:var(--bg);color:var(-
   background:rgba(7,6,15,0.94);backdrop-filter:blur(32px);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;z-index:200;}
-.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:hidden;min-height:0;-webkit-overflow-scrolling:touch;}
+.page-content{flex:1;padding:24px;overflow-y:auto;overflow-x:hidden;min-height:0;overscroll-behavior-y:contain;}
 
 /* ── TOPBAR RIGHT WIDGET ── */
 .topbar-clock{display:flex;align-items:center;gap:0;background:linear-gradient(135deg,rgba(167,139,250,0.14),rgba(244,114,182,0.09));border:1px solid rgba(167,139,250,0.25);border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1);flex-shrink:0;}
@@ -2458,7 +2458,8 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                   </div>
                 )}
 
-                <div style={{ background:"var(--glass)",border:"1px solid var(--border)",borderRadius:18,overflow:"visible",boxShadow:"0 2px 20px rgba(0,0,0,0.2)",position:"relative" }}>
+                <div style={{ background:"var(--glass)",border:"1px solid var(--border)",borderRadius:18,overflow:"hidden",boxShadow:"0 2px 20px rgba(0,0,0,0.2)",position:"relative",
+                  touchAction:"pan-y",overscrollBehavior:"contain" }}>
                   {group.items.map((tx, idx) => {
                     const cat  = catMap[tx.categoryId]||{ icon:"❓",color:"#888",name:"Autre" };
                     const prof = profMap[tx.profileId]||{ avatar:"❓",name:"?",color:"#888" };
@@ -2508,27 +2509,24 @@ function Expenses({ data, update, selMonth, mdata, setModal }) {
                                 -{fmt(tx.amount)}
                               </div>
                             </div>
-                            {/* Row 2: action buttons — height fixe pour éviter le décalage iOS */}
+                            {/* Row 2: action buttons */}
                             <div style={{ display:"flex",gap:6 }}>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
-                                onClick={e => { e.stopPropagation(); setModal({ type:"editTransaction",tx,selMonth }); }}
-                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                onClick={() => setModal({ type:"editTransaction",tx,selMonth })}
+                                style={{ flex:1,height:44,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(167,139,250,0.4)",background:"rgba(167,139,250,0.1)",color:"var(--purple)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 ✏️ Modifier
                               </button>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); duplicate(tx); }}
-                                onClick={e => { e.stopPropagation(); duplicate(tx); }}
-                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                onClick={() => duplicate(tx)}
+                                style={{ flex:1,height:44,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(96,165,250,0.4)",background:"rgba(96,165,250,0.1)",color:"#60a5fa",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 📋 Dupliquer
                               </button>
                               <button
                                 type="button"
-                                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); del(tx.id); }}
-                                onClick={e => { e.stopPropagation(); del(tx.id); }}
-                                style={{ flex:1,height:40,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
+                                onClick={() => del(tx.id)}
+                                style={{ flex:1,height:44,display:"flex",alignItems:"center",justifyContent:"center",gap:4,borderRadius:10,border:"1px solid rgba(248,113,113,0.4)",background:"rgba(248,113,113,0.1)",color:"var(--red)",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'Outfit',sans-serif",touchAction:"manipulation",WebkitTapHighlightColor:"transparent",userSelect:"none" }}>
                                 🗑 Suppr.
                               </button>
                             </div>
