@@ -5012,9 +5012,12 @@ const BRAND_DATA = {
 };
 
 const STATION_ADDRESS_HINTS = [
-  { pattern:/rue\s+des\s+loyes.*saint-?dizier|saint-?dizier.*rue\s+des\s+loyes/i, brandKey:"leclerc", displayName:"Leclerc Sodibrag" },
-  { pattern:/avenue\s+l[ée]on\s+blum.*saint-?dizier|saint-?dizier.*avenue\s+l[ée]on\s+blum/i, brandKey:"intermarche", displayName:"Intermarché Saint-Dizier" },
-  { pattern:/route\s+de\s+vitry.*saint-?dizier|saint-?dizier.*route\s+de\s+vitry/i, brandKey:"esso", displayName:"Esso Aerodrome" },
+  { pattern:/(rue\s+des\s+loyes.*saint-?dizier|saint-?dizier.*rue\s+des\s+loyes)/i, brandKey:"leclerc", displayName:"E.Leclerc" },
+  { pattern:/(avenue\s+l[ée]on\s+blum.*saint-?dizier|saint-?dizier.*avenue\s+l[ée]on\s+blum)/i, brandKey:"intermarche", displayName:"Intermarché" },
+  { pattern:/(route\s+de\s+vitry.*saint-?dizier|saint-?dizier.*route\s+de\s+vitry)/i, brandKey:"esso", displayName:"Esso" },
+  { pattern:/(rue\s+des\s+loyes)/i, brandKey:"leclerc", displayName:"E.Leclerc" },
+  { pattern:/(avenue\s+l[ée]on\s+blum)/i, brandKey:"intermarche", displayName:"Intermarché" },
+  { pattern:/(route\s+de\s+vitry)/i, brandKey:"esso", displayName:"Esso" },
 ];
 
 const getAddressBrandHint = (adresse="", ville="", cp="") => {
@@ -5810,10 +5813,15 @@ function EssencePage() {
     const geo=r.geom?.coordinates||r.coordonnees?.coordinates;
     const lat=geo?geo[1]:null, lng=geo?geo[0]:null;
     const adresse=(r.adresse||"").trim();
-    const {nom,nomIsAdresse}=resolveNom(r);
+    let enseignes = r.enseignes || r.enseigne || r.marque || r.brand || "";
+    const lowerAddr = adresse.toLowerCase();
+    if(!enseignes && /rue\s+des\s+loyes/.test(lowerAddr)) enseignes = "E.Leclerc";
+    if(!enseignes && /avenue\s+l[ée]on\s+blum/.test(lowerAddr)) enseignes = "Intermarché";
+    if(!enseignes && /route\s+de\s+vitry/.test(lowerAddr)) enseignes = "Esso";
+    const {nom,nomIsAdresse}=resolveNom({ ...r, enseignes, adresse, ville:r.ville||city, cp:r.cp||"" });
     return {
       id:r.id||adresse, nom, nomIsAdresse,
-      enseignes:r.enseignes||"", adresse,
+      enseignes, adresse,
       ville:r.ville||city, cp:r.cp||"",
       lat,lng, ...fuels,
     };
@@ -5848,7 +5856,7 @@ function EssencePage() {
             let best=null,bestDist=300;
             osmNodes.forEach(n=>{const d=haverM(s.lat,s.lng,n.lat,n.lng);if(d<bestDist){bestDist=d;best=n;}});
             if(!best) return s;
-            return{...s,nom:best.name,enseignes:best.name,nomIsAdresse:false};
+            return { ...s, nom: (s.nomIsAdresse || !s.nom ? best.name : s.nom), enseignes: s.enseignes || best.name, nomIsAdresse:false };
           });
         }
       }catch{}
@@ -6574,9 +6582,10 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
   });
   const bestS  = sortedStations[0] || null;
   const secondBestS = sortedStations[1] || null;
-  const selectedStation  = stationId === "__best__"
-    ? bestS
-    : (eligibleStations.find(s => s.id === stationId) ?? bestS);
+  const selectedFromMenu = stationId !== "__best__"
+    ? (eligibleStations.find(s => s.id === stationId) || null)
+    : null;
+  const selectedStation = selectedFromMenu || bestS;
   const price  = selectedStation ? selectedStation[fuel] : null;
   const total  = price != null ? price * liters : null;
   const per100 = price != null ? price * effectiveConso : null;
@@ -6598,10 +6607,10 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
     ? (annualKm / 100) * effectiveConso * (worstS[fuel] - price) : null;
   const annualSavingVsAvg = avgPrice != null && price != null
     ? (annualKm / 100) * effectiveConso * (avgPrice - price) : null;
-  const comparisonOther = selectedStation && bestS && selectedStation.id !== bestS.id ? selectedStation : secondBestS;
+  const comparisonOther = selectedFromMenu ? selectedFromMenu : secondBestS;
   const comparisonGapPerLiter = bestS && comparisonOther ? Math.max(0, (comparisonOther[fuel] ?? 0) - (bestS[fuel] ?? 0)) : null;
   const comparisonGapOnFill = comparisonGapPerLiter != null ? comparisonGapPerLiter * liters : null;
-  const comparisonLabel = selectedStation && bestS && selectedStation.id !== bestS.id ? "station sélectionnée" : "2e moins chère";
+  const comparisonLabel = selectedFromMenu ? "station sélectionnée" : "2e moins chère";
 
   return (
     <div style={{ borderRadius:20,overflow:"hidden",border:`1.5px solid ${m.color||"#a78bfa"}22`,marginBottom:14,
