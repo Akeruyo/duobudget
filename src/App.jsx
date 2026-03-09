@@ -5011,6 +5011,38 @@ const BRAND_DATA = {
   "dyneff":  { label:"Dyneff",  abbr:"DY", bg:"#FF6600", fg:"#fff", patterns:[/dyneff/i], logo:null },
 };
 
+const BRAND_ALIASES = {
+  "e leclerc":"leclerc", "eleclerc":"leclerc", "leclerc":"leclerc", "leclerc auto":"leclerc",
+  "intermarche":"intermarche", "intermarché":"intermarche", "intermarche contact":"intermarche", "intermarche super":"intermarche",
+  "carrefour":"carrefour", "carrefour market":"carrefour", "carrefour contact":"carrefour", "carrefour express":"carrefour",
+  "super u":"superu", "u express":"superu", "hyper u":"superu", "utile":"superu", "systeme u":"superu", "système u":"superu",
+  "total":"total", "totalenergies":"total", "total energies":"total", "access":"total",
+  "esso":"esso", "esso express":"esso",
+  "bp":"bp", "bp express":"bp",
+  "auchan":"auchan", "auchan drive":"auchan",
+  "geant casino":"casino", "géant casino":"casino", "casino":"casino",
+  "lidl":"lidl", "netto":"netto", "colruyt":"colruyt", "avia":"avia", "dyneff":"dyneff",
+  "elan":"elan", "élan":"elan", "vito":"vito", "relais":"relais", "shell":"shell",
+  "cora":"cora", "match":"match", "sodibrag":"leclerc"
+};
+
+const normalizeBrandText = (s="") => (s||"")
+  .toLowerCase()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .replace(/[^a-z0-9]+/g," ")
+  .replace(/(station|service|services|sas|sarl|sa|snc|eurl)/g," ")
+  .replace(/\s+/g," ")
+  .trim();
+
+const resolveBrandAliasKey = (...parts) => {
+  const src = normalizeBrandText(parts.filter(Boolean).join(" "));
+  if(!src) return null;
+  for (const [alias, key] of Object.entries(BRAND_ALIASES)) {
+    if (src.includes(alias)) return key;
+  }
+  return null;
+};
+
 const STATION_ADDRESS_HINTS = [
   { pattern:/rue\s+des\s+loyes.*saint-?dizier|saint-?dizier.*rue\s+des\s+loyes/i, brandKey:"leclerc", displayName:"Leclerc Sodibrag" },
   { pattern:/avenue\s+l[ée]on\s+blum.*saint-?dizier|saint-?dizier.*avenue\s+l[ée]on\s+blum/i, brandKey:"intermarche", displayName:"Intermarché Saint-Dizier" },
@@ -5029,7 +5061,12 @@ const getAddressBrandHint = (adresse="", ville="", cp="") => {
 const detectBrand = (nom, enseignes, adresse, ville="", cp="") => {
   const hinted = getAddressBrandHint(adresse, ville, cp);
   if(hinted) return hinted;
-  const src = `${nom||""} ${Array.isArray(enseignes)?enseignes.join(" "):(enseignes||"")} ${adresse||""} ${ville||""} ${cp||""}`.toLowerCase();
+
+  const ensText = Array.isArray(enseignes) ? enseignes.join(" ") : (enseignes||"");
+  const aliasKey = resolveBrandAliasKey(nom, ensText, adresse, ville, cp);
+  if(aliasKey && BRAND_DATA[aliasKey]) return { ...BRAND_DATA[aliasKey], key: aliasKey };
+
+  const src = `${nom||""} ${ensText} ${adresse||""} ${ville||""} ${cp||""}`.toLowerCase();
   for(const [key, b] of Object.entries(BRAND_DATA)){
     if(b.patterns.some(re=>re.test(src))) return {...b, key};
   }
@@ -5813,8 +5850,8 @@ function EssencePage() {
     const geo=r.geom?.coordinates||r.coordonnees?.coordinates;
     const lat=geo?geo[1]:null, lng=geo?geo[0]:null;
     const adresse=(r.adresse||"").trim();
-    const rawEnseignes = r.enseignes || r.marque || r.enseigne || r.enseigne_nom || r.brand || "";
-    const baseRow = { ...r, enseignes: rawEnseignes };
+    const rawEnseignes = r.enseignes || r.marque || r.enseigne || r.enseigne_nom || r.brand || r.operator || r.operateur || "";
+    const baseRow = { ...r, enseignes: rawEnseignes, nom: r.nom || r.name || "" };
     const {nom,nomIsAdresse}=resolveNom(baseRow);
     return {
       id:r.id||adresse, nom, nomIsAdresse,
