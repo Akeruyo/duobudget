@@ -5043,6 +5043,45 @@ const resolveBrandAliasKey = (...parts) => {
   return null;
 };
 
+
+const stationStableKey = (s) => {
+  if (!s) return "";
+  return [
+    s.cp || "",
+    s.ville || "",
+    s.adresse || "",
+    s.nom || "",
+    s.lat ?? "",
+    s.lng ?? "",
+  ].join("|").toLowerCase();
+};
+
+const DEFAULT_STATION_ICON_SET = ["⛽","📍","🧭","🛣️","🗺️","🚗","🏙️","🌐","🔹","⭐","🧿","🌀"];
+const DEFAULT_STATION_GRADIENTS = [
+  ["#1d4ed8","#2563eb"],
+  ["#0f766e","#14b8a6"],
+  ["#7c3aed","#a78bfa"],
+  ["#be185d","#f472b6"],
+  ["#b45309","#f59e0b"],
+  ["#475569","#64748b"],
+  ["#0f766e","#22c55e"],
+  ["#4338ca","#60a5fa"],
+  ["#92400e","#fb923c"],
+  ["#9f1239","#fb7185"],
+  ["#155e75","#06b6d4"],
+  ["#312e81","#818cf8"],
+];
+const hashStationVisual = (seed="") => {
+  const src = String(seed || "station");
+  let h = 0;
+  for (let i = 0; i < src.length; i++) h = ((h << 5) - h + src.charCodeAt(i)) | 0;
+  const n = Math.abs(h);
+  return {
+    icon: DEFAULT_STATION_ICON_SET[n % DEFAULT_STATION_ICON_SET.length],
+    colors: DEFAULT_STATION_GRADIENTS[n % DEFAULT_STATION_GRADIENTS.length],
+  };
+};
+
 const STATION_ADDRESS_HINTS = [
   { pattern:/rue\s+des\s+loyes.*saint-?dizier|saint-?dizier.*rue\s+des\s+loyes/i, brandKey:"leclerc", displayName:"Leclerc Sodibrag" },
   { pattern:/avenue\s+l[ée]on\s+blum.*saint-?dizier|saint-?dizier.*avenue\s+l[ée]on\s+blum/i, brandKey:"intermarche", displayName:"Intermarché Saint-Dizier" },
@@ -5087,20 +5126,21 @@ function BrandIcon({ nom, enseignes, adresse, ville, cp, size=44 }) {
     );
   }
 
-  // Badge générique avec initiales
-  const b = brand || {
-    abbr: (nom||"?").split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase().slice(0,2)||"⛽",
-    bg:"#1e293b", fg:"rgba(255,255,255,0.8)"
-  };
+  const seed = stationStableKey({ nom, enseignes:Array.isArray(enseignes)?enseignes.join(" "):enseignes, adresse, ville, cp });
+  const fallback = hashStationVisual(seed);
   return (
     <div style={{
       width:size,height:size,borderRadius:r,flexShrink:0,
-      background:b.bg, color:b.fg,
-      boxShadow:`0 3px 12px ${b.bg === "#1e293b" ? "rgba(0,0,0,0.4)" : b.bg+"60"}`,
+      background:`linear-gradient(135deg,${fallback.colors[0]},${fallback.colors[1]})`,
+      color:"#fff",
+      boxShadow:`0 3px 12px ${fallback.colors[0]}66`,
       display:"flex",alignItems:"center",justifyContent:"center",
-      fontSize:Math.round(size*0.31),fontWeight:900,
+      fontSize:Math.round(size*0.34),fontWeight:900,
       fontFamily:"'Outfit',sans-serif",letterSpacing:-0.5,
-    }}>{b.abbr}</div>
+      border:"1px solid rgba(255,255,255,0.14)"
+    }} aria-label="Station">
+      <span style={{filter:"drop-shadow(0 1px 2px rgba(0,0,0,0.35))"}}>{fallback.icon}</span>
+    </div>
   );
 }
 
@@ -6003,18 +6043,18 @@ function EssencePage() {
   // ── Résolution icône de lieu basée sur le type de voie ──
   const resolveLocationIcon = (s) => {
     const src = ((s.adresse||"")+" "+(s.nom||"")+" "+(s.enseignes||"")).toUpperCase();
-    if(/AUTOROUTE|RD \d{3}A|A\d{1,2}|AIRE DE/.test(src)) return "🛤️";
-    if(/RN\d|D\d{3,4}|NATIONALE|ROUTE NATIONALE/.test(src)) return "🛣️";
-    if(/LECLERC|INTERMARCHE|INTERMARCHÉ|AUCHAN|LECLERC/.test(src)) return "🏪";
-    if(/ZI|ZONE IND|INDUSTRIEL/.test(src)) return "🏭";
+    if(/AUTOROUTE|AIRE DE|A\d{1,2}\b|RD\s*\d{2,4}/.test(src)) return "🛤️";
+    if(/\bRN\d|\bD\d{3,4}\b|NATIONALE|ROUTE NATIONALE/.test(src)) return "🛣️";
+    if(/LECLERC|INTERMARCHE|INTERMARCHÉ|AUCHAN|CARREFOUR|SUPER U|U EXPRESS|TOTAL|ESSO/.test(src)) return "🏪";
+    if(/ZI\b|ZONE IND|INDUSTRIEL/.test(src)) return "🏭";
     if(/VILLAGE|HAMEAU|LIEU[- ]DIT/.test(src)) return "🏘️";
-    if(/AVENUE|BOUL[EV]+ARD|BD/.test(src)) return "🏙️";
-    if(/RUE|PLACE|SQUARE/.test(src)) return "📍";
+    if(/AVENUE|BOUL(?:EV)?ARD|\bBD\b/.test(src)) return "🏙️";
+    if(/RUE\b|PLACE\b|SQUARE/.test(src)) return "📍";
     if(/GARE|STATION/.test(src)) return "🚉";
-    return "⛽";
+    return hashStationVisual(stationStableKey(s)).icon;
   };
 
-  const stationsWithDist=useMemo(()=>{
+    const stationsWithDist=useMemo(()=>{
     const base = deduplicatedStations;
     if(!userLat||!userLng) return base;
     return [...base].map(s=>({...s,_dist:(s.lat&&s.lng)?haversineKm(userLat,userLng,s.lat,s.lng):null})).sort((a,b)=>(a._dist??9999)-(b._dist??9999));
@@ -6223,9 +6263,9 @@ function EssencePage() {
                 return (
                   <div key={s.id||i}
                     style={{
-                      background: simSelectedStationId === s.id
+                      background: simSelectedStationId === stationStableKey(s)
                         ? "rgba(167,139,250,0.07)" : "rgba(255,255,255,0.03)",
-                      border: simSelectedStationId === s.id
+                      border: simSelectedStationId === stationStableKey(s)
                         ? "1.5px solid rgba(167,139,250,0.45)" : "1px solid rgba(255,255,255,0.08)",
                       borderRadius:16,overflow:"hidden",
                       cursor:"default",
@@ -6277,7 +6317,7 @@ function EssencePage() {
                       <div style={{display:"flex",gap:6,flexShrink:0}}>
                         {/* Bouton Simuler */}
                         <button
-                          onClick={e=>{e.stopPropagation(); setSimSelectedStationId(s.id); setTimeout(()=>simRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);}}
+                          onClick={e=>{e.stopPropagation(); setSimSelectedStationId(stationStableKey(s)); setTimeout(()=>simRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);}}
                           style={{
                             width:44,height:44,borderRadius:13,flexShrink:0,
                             background:simSelectedStationId===s.id
@@ -6620,7 +6660,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
   const bestS  = sortedStations[0] || null;
   const secondBestS = sortedStations[1] || null;
   const selectedStationFromMenu = stationId !== "__best__"
-    ? (eligibleStations.find(s => s.id === stationId) || null)
+    ? (eligibleStations.find(s => stationStableKey(s) === stationId) || null)
     : null;
   const selectedStation  = selectedStationFromMenu || bestS;
   const price  = selectedStation ? selectedStation[fuel] : null;
@@ -6644,9 +6684,10 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
     ? (annualKm / 100) * effectiveConso * (worstS[fuel] - price) : null;
   const annualSavingVsAvg = avgPrice != null && price != null
     ? (annualKm / 100) * effectiveConso * (avgPrice - price) : null;
-  const comparisonOther = stationId !== "__best__"
-    ? selectedStationFromMenu
-    : secondBestS;
+  const comparisonOther =
+    stationId !== "__best__"
+      ? (selectedStationFromMenu && bestS && stationStableKey(selectedStationFromMenu) !== stationStableKey(bestS) ? selectedStationFromMenu : secondBestS)
+      : secondBestS;
   const comparisonGapPerLiter = bestS && comparisonOther ? Math.max(0, (comparisonOther[fuel] ?? 0) - (bestS[fuel] ?? 0)) : null;
   const comparisonGapOnFill = comparisonGapPerLiter != null ? comparisonGapPerLiter * liters : null;
   const comparisonLabel = stationId !== "__best__" ? "station sélectionnée" : "2e moins chère";
@@ -6717,7 +6758,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
               <option value="__best__">⭐ {bestS ? (() => { const {nom} = resolveNom(bestS); return `${nom} · ${bestS[fuel]?.toFixed(3)}€/L (moins chère)`; })() : "Meilleure station"}</option>
               {eligibleStations.map(s => {
                 const {nom:n}=resolveNom(s);
-                return <option key={s.id} value={s.id}>{n} · {s[fuel]?.toFixed(3)}€</option>;
+                return <option key={stationStableKey(s)} value={stationStableKey(s)}>{n} · {s[fuel]?.toFixed(3)}€</option>;
               })}
             </select>
             {bestS && (
@@ -6820,7 +6861,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
                 {[
                   { icon:"⛽", label:"Prix / L", val:`${price.toFixed(3)}€`,
-                    sub:stationId==="__best__"?"moins chère":(resolveNom(selectedStation).nom||"Station").slice(0,16),
+                    sub:stationId==="__best__"?"moins chère":((selectedStationFromMenu ? resolveNom(selectedStationFromMenu).nom : resolveNom(selectedStation).nom)||"Station").slice(0,16),
                     color:m.color, highlight:true },
                   { icon:"🛣️", label:"/ 100 km", val:`${per100?.toFixed(2)}€`, sub:`conso ${effectiveConso}L/100`, color:m.color },
                   ...(distancePossible?[{ icon:"📍", label:"Autonomie", val:`≈${distancePossible}km`, sub:`avec ${liters}L`, color:"#60a5fa" }]:[]),
