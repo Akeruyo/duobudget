@@ -5036,21 +5036,6 @@ const detectBrand = (nom, enseignes, adresse, ville="", cp="") => {
   return null;
 };
 
-const FALLBACK_STATION_ICONS = ["⛽","📍","🛣️","🚗","🧭","🏪","✨","🚦","🗺️","🔷","🔶","🛞"];
-const getStationVisual = (nom="", adresse="", ville="", cp="") => {
-  const src = `${nom}|${adresse}|${ville}|${cp}`.toLowerCase().trim();
-  let hash = 0;
-  for (let i = 0; i < src.length; i++) hash = ((hash << 5) - hash + src.charCodeAt(i)) | 0;
-  const idx = Math.abs(hash) % FALLBACK_STATION_ICONS.length;
-  const palettes = [
-    ["#60a5fa", "#2563eb"], ["#a78bfa", "#7c3aed"], ["#f472b6", "#db2777"],
-    ["#4ade80", "#16a34a"], ["#fbbf24", "#d97706"], ["#fb923c", "#ea580c"],
-    ["#2dd4bf", "#0f766e"], ["#38bdf8", "#0369a1"]
-  ];
-  const [c1, c2] = palettes[Math.abs(hash) % palettes.length];
-  return { icon: FALLBACK_STATION_ICONS[idx], c1, c2 };
-};
-
 // ── Composant icône de marque ──
 function BrandIcon({ nom, enseignes, adresse, ville, cp, size=44 }) {
   const brand = detectBrand(nom, enseignes, adresse, ville, cp);
@@ -5065,16 +5050,20 @@ function BrandIcon({ nom, enseignes, adresse, ville, cp, size=44 }) {
     );
   }
 
-  const visual = getStationVisual(nom, adresse, ville, cp);
+  // Badge générique avec initiales
+  const b = brand || {
+    abbr: (nom||"?").split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase().slice(0,2)||"⛽",
+    bg:"#1e293b", fg:"rgba(255,255,255,0.8)"
+  };
   return (
     <div style={{
       width:size,height:size,borderRadius:r,flexShrink:0,
-      background:`linear-gradient(145deg,${visual.c1},${visual.c2})`, color:"#fff",
-      boxShadow:`0 6px 16px ${visual.c1}55`,
+      background:b.bg, color:b.fg,
+      boxShadow:`0 3px 12px ${b.bg === "#1e293b" ? "rgba(0,0,0,0.4)" : b.bg+"60"}`,
       display:"flex",alignItems:"center",justifyContent:"center",
-      fontSize:Math.round(size*0.42),fontWeight:900,
+      fontSize:Math.round(size*0.31),fontWeight:900,
       fontFamily:"'Outfit',sans-serif",letterSpacing:-0.5,
-    }}>{visual.icon}</div>
+    }}>{b.abbr}</div>
   );
 }
 
@@ -5193,53 +5182,110 @@ function NavModal({ station, userLat, userLng, onClose }) {
 }
 
 // ── Carte Leaflet ──
-function FuelMapLeaflet({ stations, userLat, userLng }) {
-  const mapRef=useRef(null), instRef=useRef(null);
+function FuelMapLeaflet({ stations, userLat, userLng, selectedStationId, onPickStation }) {
+  const mapRef=useRef(null), instRef=useRef(null), markersRef=useRef({}), routeRef=useRef(null), userMarkerRef=useRef(null);
+  const stationKey = useCallback((s)=>s?.id || [s?.adresse||"",s?.ville||"",s?.cp||"",s?.lat||"",s?.lng||""].join("|") , []);
+
+  const drawRouteToStation = useCallback(async (map, station) => {
+    if(!map || !userLat || !userLng || !station?.lat || !station?.lng || !window.L) return;
+    if(routeRef.current){ try{ map.removeLayer(routeRef.current); }catch{} routeRef.current=null; }
+    try{
+      const url = `https://router.project-osrm.org/route/v1/driving/${userLng},${userLat};${station.lng},${station.lat}?overview=full&geometries=geojson`;
+      const res = await fetch(url);
+      if(!res.ok) return;
+      const json = await res.json();
+      const coords = json?.routes?.[0]?.geometry?.coordinates;
+      if(!coords?.length) return;
+      const latlngs = coords.map(([lng,lat])=>[lat,lng]);
+      const L = window.L;
+      routeRef.current = L.polyline(latlngs, {
+        color:'#fbbf24', weight:5, opacity:0.92, lineCap:'round', lineJoin:'round', dashArray:'10 8'
+      }).addTo(map);
+      try{ map.fitBounds(routeRef.current.getBounds(), { padding:[42,42], maxZoom:14 }); }catch{}
+    }catch{}
+  }, [userLat, userLng]);
+
   useEffect(()=>{
     if(!mapRef.current) return;
     const init=()=>{
       if(instRef.current){instRef.current.remove();instRef.current=null;}
+      markersRef.current={};
+      if(routeRef.current){routeRef.current=null;}
       const L=window.L;
       const center=userLat&&userLng?[userLat,userLng]:[48.638,4.946];
-      const map=L.map(mapRef.current,{zoomControl:true}).setView(center,userLat?13:10);
+      const map=L.map(mapRef.current,{zoomControl:true,scrollWheelZoom:true}).setView(center,userLat?13:10);
       instRef.current=map;
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(map);
+      const bounds=[];
       if(userLat&&userLng){
-        const ui=L.divIcon({html:`<div style="width:20px;height:20px;background:#a78bfa;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 5px rgba(167,139,250,0.25)"></div>`,className:"",iconSize:[20,20],iconAnchor:[10,10]});
-        L.marker([userLat,userLng],{icon:ui}).addTo(map).bindPopup("<b>📍 Vous êtes ici</b>");
+        bounds.push([userLat,userLng]);
+        const ui=L.divIcon({html:`<div style="width:24px;height:24px;background:linear-gradient(135deg,#a78bfa,#60a5fa);border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(167,139,250,0.18),0 4px 14px rgba(0,0,0,0.35)"></div>`,className:"",iconSize:[24,24],iconAnchor:[12,12]});
+        userMarkerRef.current = L.marker([userLat,userLng],{icon:ui}).addTo(map).bindPopup("<b>📍 Vous êtes ici</b>");
+        L.circle([userLat,userLng],{radius:900,color:'#a78bfa',weight:1.2,fillColor:'#a78bfa',fillOpacity:0.08,dashArray:'4 6'}).addTo(map);
       }
+      const nearest = userLat && userLng ? [...stations].filter(s=>s.lat&&s.lng).sort((a,b)=>(a._dist ?? a.distance ?? 999)-(b._dist ?? b.distance ?? 999))[0] : null;
       stations.forEach(s=>{
         if(!s.lat||!s.lng) return;
+        bounds.push([s.lat,s.lng]);
         const brand=detectBrand(s.nom,s.enseignes,s.adresse,s.ville,s.cp)||{abbr:"⛽",bg:"#374151",fg:"#fff"};
         const {nom:nomDisplay}=resolveNom(s);
         const dist=(userLat&&userLng)?fmtKm(haversineKm(userLat,userLng,s.lat,s.lng)):null;
         const fuels=['gazole','sp95','e10','sp98'].filter(k=>s[k]!=null);
         const fuelsHtml=fuels.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;margin:2px 0;background:#1a1035;border-radius:8px;border-left:3px solid ${FUEL_COLORS[k]||'#a78bfa'}"><span style="font-size:10px;font-weight:700;color:${FUEL_COLORS[k]||'#fff'}">${k.toUpperCase()}</span><span style="font-size:13px;font-weight:900;color:#fff;font-family:'Fraunces',serif">${s[k].toFixed(3)} €</span></div>`).join("");
-        const mapsUrl=`maps://?daddr=${s.lat},${s.lng}&dirflg=d`;
-        // Icône : fond coloré marque + abréviation
-        const iconSize=44;
-        const iconHtml=`<div style="width:${iconSize}px;height:${iconSize}px;border-radius:13px;background:${brand.bg};color:${brand.fg};display:flex;align-items:center;justify-content:center;font-size:${brand.abbr&&brand.abbr.length>2?10:14}px;font-weight:900;font-family:Outfit,sans-serif;border:2.5px solid rgba(255,255,255,0.95);box-shadow:0 4px 14px rgba(0,0,0,0.5),0 0 0 1px rgba(0,0,0,0.2);letter-spacing:-0.5px;line-height:1.1;text-align:center">${brand.abbr}</div>`;
+        const appleUrl=`https://maps.apple.com/?daddr=${s.lat},${s.lng}&dirflg=d`;
+        const googleUrl=`https://maps.google.com/maps?daddr=${s.lat},${s.lng}&dirflg=d`;
+        const wazeUrl=`https://waze.com/ul?ll=${s.lat},${s.lng}&navigate=yes`;
+        const iconSize=54;
+        const isSelected = selectedStationId && selectedStationId === stationKey(s);
+        const isNearest = nearest && stationKey(nearest) === stationKey(s);
+        const iconHtml=`<div style="width:${iconSize}px;height:${iconSize}px;border-radius:17px;background:${brand.bg};color:${brand.fg};display:flex;align-items:center;justify-content:center;font-size:${brand.abbr&&brand.abbr.length>2?10:16}px;font-weight:900;font-family:Outfit,sans-serif;border:${isSelected?4:isNearest?3:2.5}px solid ${isSelected?'#fbbf24':isNearest?'#60a5fa':'rgba(255,255,255,0.95)'};box-shadow:${isSelected?'0 0 0 8px rgba(251,191,36,0.18),0 8px 20px rgba(0,0,0,0.55)':isNearest?'0 0 0 7px rgba(96,165,250,0.16),0 8px 18px rgba(0,0,0,0.45)':'0 4px 14px rgba(0,0,0,0.5),0 0 0 1px rgba(0,0,0,0.2)'};letter-spacing:-0.5px;line-height:1.1;text-align:center;position:relative">${brand.abbr}${isSelected?'<div style="position:absolute;top:-7px;right:-6px;background:#fbbf24;color:#111827;font-size:10px;border-radius:999px;padding:1px 5px;font-weight:900">★</div>':''}${isNearest&&!isSelected?'<div style="position:absolute;top:-7px;right:-6px;background:#60a5fa;color:#fff;font-size:10px;border-radius:999px;padding:1px 5px;font-weight:900">📍</div>':''}</div>`;
         const icon=L.divIcon({html:iconHtml,className:"",iconSize:[iconSize,iconSize],iconAnchor:[iconSize/2,iconSize/2]});
         const distHtml=dist?`<div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:8px">📍 ${dist}</div>`:"";
         const adresseHtml=[s.adresse,s.ville].filter(Boolean).join(" · ");
-        const popupHtml=`<div style="font-family:Outfit,sans-serif;padding:6px 4px;min-width:220px">
+        const popupHtml=`<div style="font-family:Outfit,sans-serif;padding:6px 4px;min-width:248px">
           <div style="font-weight:900;font-size:14px;color:#0f172a;margin-bottom:3px">${nomDisplay}</div>
           <div style="font-size:11px;color:#64748b;margin-bottom:8px">${adresseHtml}</div>
           ${distHtml}
           <div style="margin-bottom:10px">${fuelsHtml}</div>
-          <a href="${mapsUrl}" style="display:block;text-align:center;background:linear-gradient(135deg,#a78bfa,#f472b6);color:#fff;padding:11px;border-radius:12px;text-decoration:none;font-weight:800;font-size:13px;letter-spacing:.3px">🗺️ Itinéraire avec Plans</a>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <a href="${appleUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;background:linear-gradient(135deg,#a78bfa,#f472b6);color:#fff;padding:10px;border-radius:12px;text-decoration:none;font-weight:800;font-size:12px">🍎 Plans</a>
+            <a href="${googleUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;background:linear-gradient(135deg,#60a5fa,#22d3ee);color:#fff;padding:10px;border-radius:12px;text-decoration:none;font-weight:800;font-size:12px">🗺️ Google</a>
+            <a href="${wazeUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;background:rgba(15,23,42,0.92);color:#fff;padding:10px;border-radius:12px;text-decoration:none;font-weight:800;font-size:12px">🔵 Waze</a>
+            <button data-station-key="${stationKey(s)}" style="display:block;text-align:center;background:linear-gradient(135deg,#fbbf24,#fb923c);color:#111827;padding:10px;border-radius:12px;text-decoration:none;font-weight:900;font-size:12px;border:none;cursor:pointer">🧭 Tracer l'itinéraire</button>
+          </div>
+          <div style="font-size:10px;color:#64748b;text-align:center">Touchez un marqueur pour le sélectionner dans le simulateur</div>
         </div>`;
-        L.marker([s.lat,s.lng],{icon}).addTo(map).bindPopup(L.popup({maxWidth:280,className:"fuel-popup"}).setContent(popupHtml));
+        const marker=L.marker([s.lat,s.lng],{icon}).addTo(map).bindPopup(L.popup({maxWidth:320,className:"fuel-popup"}).setContent(popupHtml));
+        marker.on('click',()=>{ if(onPickStation) onPickStation(stationKey(s)); });
+        marker.on('popupopen', (ev)=>{
+          const btn = ev.popup.getElement()?.querySelector(`[data-station-key="${stationKey(s)}"]`);
+          if(btn){ btn.onclick = ()=> drawRouteToStation(map, s); }
+        });
+        markersRef.current[stationKey(s)] = marker;
       });
+      if(bounds.length>1){
+        map.fitBounds(bounds,{padding:[36,36],maxZoom:userLat?14:13});
+      }
     };
     if(!window.L){
       if(!document.querySelector("#lf-css")){const l=document.createElement("link");l.id="lf-css";l.rel="stylesheet";l.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(l);}
       if(!document.querySelector("#lf-js")){const s=document.createElement("script");s.id="lf-js";s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";s.onload=init;document.head.appendChild(s);}
       else{setTimeout(init,100);}
     } else{init();}
-    return()=>{if(instRef.current){instRef.current.remove();instRef.current=null;}};
-  },[stations,userLat,userLng]);
-  return <div ref={mapRef} style={{width:"100%",height:520,borderRadius:18,overflow:"hidden",border:"1px solid var(--border)",boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}/>;
+    return()=>{if(instRef.current){instRef.current.remove();instRef.current=null;} routeRef.current=null;};
+  },[stations,userLat,userLng,selectedStationId,onPickStation,stationKey,drawRouteToStation]);
+
+  useEffect(()=>{
+    if(!instRef.current || !selectedStationId || !markersRef.current[selectedStationId]) return;
+    const marker = markersRef.current[selectedStationId];
+    const latlng = marker.getLatLng();
+    instRef.current.flyTo(latlng, Math.max(instRef.current.getZoom(), 13), {duration:0.45});
+    marker.openPopup();
+    const picked = stations.find(s => stationKey(s) === selectedStationId);
+    if(picked) drawRouteToStation(instRef.current, picked);
+  },[selectedStationId, stations, stationKey, drawRouteToStation]);
+
+  return <div ref={mapRef} style={{width:"100%",height:560,borderRadius:18,overflow:"hidden",border:"1px solid var(--border)",boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}/>;
 }
 
 
@@ -5780,8 +5826,7 @@ function EssencePage() {
   const [locating,   setLocating]   = useState(false);
   const [navStation, setNavStation] = useState(null);
   const [simSelectedStationId, setSimSelectedStationId] = useState("__best__");
-  const [simSelectedFuel, setSimSelectedFuel] = useState("sp95");
-  const [sortMode, setSortMode] = useState("smart");
+  const stationKey = useCallback((s)=>s?.id || [s?.adresse||"",s?.ville||"",s?.cp||"",s?.lat||"",s?.lng||""].join("|"), []);
   const simRef = useRef(null);
   const intervalRef  = useRef(null);
 
@@ -5983,26 +6028,10 @@ function EssencePage() {
   };
 
   const stationsWithDist=useMemo(()=>{
-    const base = deduplicatedStations.map(s=>({
-      ...s,
-      _dist:(userLat&&userLng&&s.lat&&s.lng)?haversineKm(userLat,userLng,s.lat,s.lng):null,
-    }));
-    return base;
+    const base = deduplicatedStations;
+    if(!userLat||!userLng) return base;
+    return [...base].map(s=>({...s,_dist:(s.lat&&s.lng)?haversineKm(userLat,userLng,s.lat,s.lng):null})).sort((a,b)=>(a._dist??9999)-(b._dist??9999));
   },[deduplicatedStations,userLat,userLng]);
-
-  const visibleStations = useMemo(() => {
-    const list = [...stationsWithDist];
-    const fuelKey = simSelectedFuel;
-    const smartScore = (s) => {
-      const price = s?.[fuelKey] ?? Number.POSITIVE_INFINITY;
-      const dist = s?._dist ?? s?.distance ?? null;
-      const distPenalty = dist == null ? 0.06 : Math.min(0.28, dist * 0.018);
-      return price + distPenalty;
-    };
-    if (sortMode === "distance") return list.sort((a,b)=>(a._dist??9999)-(b._dist??9999));
-    if (sortMode === "price") return list.sort((a,b)=>(a?.[fuelKey]??999)-(b?.[fuelKey]??999) || ((a._dist??9999)-(b._dist??9999)));
-    return list.sort((a,b)=>smartScore(a)-smartScore(b) || ((a._dist??9999)-(b._dist??9999)));
-  }, [stationsWithDist, sortMode, simSelectedFuel]);
 
   const bestStation=useMemo(()=>{
     const res={};
@@ -6018,18 +6047,6 @@ function EssencePage() {
 
   const chartData=useMemo(()=>{const byTs={};history.forEach(e=>{if(!byTs[e.ts])byTs[e.ts]={ts:e.ts,tsFmt:e.tsFmt};if(e[chartFuel]!=null)byTs[e.ts][e.stationNom]=e[chartFuel];});return Object.values(byTs).sort((a,b)=>a.ts.localeCompare(b.ts)).slice(-60);},[history,chartFuel]);
   const chartLines=useMemo(()=>{const names=new Set();chartData.forEach(d=>Object.keys(d).filter(k=>k!=="ts"&&k!=="tsFmt").forEach(k=>names.add(k)));const COLORS=["#60a5fa","#f472b6","#4ade80","#fbbf24","#a78bfa","#f87171"];return[...names].map((n,i)=>({key:n,color:COLORS[i%COLORS.length]}));},[chartData]);
-  const chartStats = useMemo(()=>{
-    const rows = visibleStations.filter(s=>s[chartFuel]!=null);
-    if(!rows.length) return null;
-    const sorted = [...rows].sort((a,b)=>(a[chartFuel]??999)-(b[chartFuel]??999));
-    const min = sorted[0]?.[chartFuel] ?? null;
-    const max = sorted[sorted.length-1]?.[chartFuel] ?? null;
-    const avg = rows.reduce((sum,s)=>sum+(s[chartFuel]??0),0)/rows.length;
-    const spread = min!=null && max!=null ? max-min : null;
-    const cheapestName = sorted[0] ? resolveNom(sorted[0]).nom : null;
-    const nearest = userLat && userLng ? [...rows].sort((a,b)=>(a._dist??9999)-(b._dist??9999))[0] : null;
-    return {min,max,avg,spread,count:rows.length,cheapestName,nearest};
-  },[visibleStations, chartFuel, userLat, userLng]);
 
   const fmtUpd=d=>d?d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"})+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):null;
   const mm=String(Math.floor(countdown/60)).padStart(2,"0"),ss2=String(countdown%60).padStart(2,"0");
@@ -6054,7 +6071,7 @@ function EssencePage() {
             <div style={{fontSize:11,color:"var(--text3)",display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
               {loading?<><span style={{color:"var(--yellow)",animation:"spin .7s linear infinite",display:"inline-block"}}>⟳</span> Actualisation…</>
                 :error?<span style={{color:"var(--red)"}}>⚠️ Erreur</span>
-                :stationsWithDist.length>0?<><span style={{color:"var(--green)"}}>●</span> {visibleStations.length} station{visibleStations.length>1?"s":""} · {fmtUpd(lastUpdate)}</>
+                :stationsWithDist.length>0?<><span style={{color:"var(--green)"}}>●</span> {stationsWithDist.length} station{stationsWithDist.length>1?"s":""} · {fmtUpd(lastUpdate)}</>
                 :"En attente…"}
               {!loading&&<span>· Actu dans <strong style={{color:"var(--yellow)"}}>{mm}:{ss2}</strong></span>}
               {userLat&&<span style={{color:"var(--purple)",fontWeight:700}}>· 📍 GPS actif</span>}
@@ -6085,15 +6102,6 @@ function EssencePage() {
             <select value={radius} onChange={e=>setRadius(+e.target.value)}
               style={{background:"transparent",border:"none",color:"var(--yellow)",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,cursor:"pointer",padding:"0 4px",outline:"none"}}>
               {[2,5,10,20,30,50].map(v=><option key={v} value={v}>{v} km</option>)}
-            </select>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.04)",border:"1px solid var(--border)",borderRadius:11,padding:"0 10px",flexShrink:0,height:42}}>
-            <span style={{fontSize:12,color:"var(--text3)",fontWeight:700,whiteSpace:"nowrap"}}>🧠 Tri</span>
-            <select value={sortMode} onChange={e=>setSortMode(e.target.value)}
-              style={{background:"transparent",border:"none",color:"var(--purple)",fontFamily:"'Outfit',sans-serif",fontWeight:800,fontSize:13,cursor:"pointer",padding:"0 4px",outline:"none"}}>
-              <option value="smart">Intelligent</option>
-              <option value="price">Prix</option>
-              <option value="distance">Distance</option>
             </select>
           </div>
           <button className="btn btn-primary" onClick={handleSearch} disabled={loading||!cityInput.trim()}
@@ -6204,17 +6212,17 @@ function EssencePage() {
             {/* Header */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,padding:"0 2px"}}>
               <div>
-                <div style={{fontWeight:900,fontSize:16}}>Stations à <span style={{color:"var(--yellow)"}}>{visibleStations[0]?.ville||citySearch}</span></div>
+                <div style={{fontWeight:900,fontSize:16}}>Stations à <span style={{color:"var(--yellow)"}}>{stationsWithDist[0]?.ville||citySearch}</span></div>
                 <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Prix en €/L · Données gouvernementales</div>
               </div>
               <div style={{background:"rgba(251,191,36,0.14)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:20,padding:"5px 14px",fontSize:12,color:"var(--yellow)",fontWeight:800,flexShrink:0}}>
-                {visibleStations.length} station{visibleStations.length>1?"s":""}
+                {stationsWithDist.length} station{stationsWithDist.length>1?"s":""}
               </div>
             </div>
 
             {/* Cards */}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {visibleStations.map((s,i)=>{
+              {stationsWithDist.map((s,i)=>{
                 const brand=detectBrand(s.nom,s.enseignes,s.adresse,s.ville,s.cp);
                 const {nom:nomDisplay}=resolveNom(s);
                 const fuelsAvail=Object.entries(FUEL_META).filter(([k])=>s[k]!=null);
@@ -6228,9 +6236,9 @@ function EssencePage() {
                 return (
                   <div key={s.id||i}
                     style={{
-                      background: simSelectedStationId === s.id
+                      background: simSelectedStationId === stationKey(s)
                         ? "rgba(167,139,250,0.07)" : "rgba(255,255,255,0.03)",
-                      border: simSelectedStationId === s.id
+                      border: simSelectedStationId === stationKey(s)
                         ? "1.5px solid rgba(167,139,250,0.45)" : "1px solid rgba(255,255,255,0.08)",
                       borderRadius:16,overflow:"hidden",
                       cursor:"default",
@@ -6244,7 +6252,7 @@ function EssencePage() {
                       e.currentTarget.style.transform="translateY(-2px)";
                     }}
                     onMouseLeave={e=>{
-                      e.currentTarget.style.borderColor=simSelectedStationId===s.id?"rgba(167,139,250,0.45)":"rgba(255,255,255,0.08)";
+                      e.currentTarget.style.borderColor=simSelectedStationId===stationKey(s)?"rgba(167,139,250,0.45)":"rgba(255,255,255,0.08)";
                       e.currentTarget.style.boxShadow="";
                       e.currentTarget.style.transform="";
                     }}>
@@ -6282,16 +6290,16 @@ function EssencePage() {
                       <div style={{display:"flex",gap:6,flexShrink:0}}>
                         {/* Bouton Simuler */}
                         <button
-                          onClick={e=>{e.stopPropagation(); setSimSelectedStationId(s.id); setTimeout(()=>simRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);}}
+                          onClick={e=>{e.stopPropagation(); setSimSelectedStationId(stationKey(s)); setTimeout(()=>simRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),50);}}
                           style={{
                             width:44,height:44,borderRadius:13,flexShrink:0,
-                            background:simSelectedStationId===s.id
+                            background:simSelectedStationId===stationKey(s)
                               ?"linear-gradient(135deg,rgba(167,139,250,0.45),rgba(244,114,182,0.35))"
                               :"linear-gradient(135deg,rgba(167,139,250,0.1),rgba(244,114,182,0.1))",
-                            border:`1px solid ${simSelectedStationId===s.id?"rgba(167,139,250,0.7)":"rgba(167,139,250,0.25)"}`,
+                            border:`1px solid ${simSelectedStationId===stationKey(s)?"rgba(167,139,250,0.7)":"rgba(167,139,250,0.25)"}`,
                             display:"flex",alignItems:"center",justifyContent:"center",
                             fontSize:18,cursor:"pointer",
-                            boxShadow:simSelectedStationId===s.id?"0 2px 12px rgba(167,139,250,0.5)":"none",
+                            boxShadow:simSelectedStationId===stationKey(s)?"0 2px 12px rgba(167,139,250,0.5)":"none",
                             transition:"all .18s",
                           }}
                           title="Simuler le coût du plein">
@@ -6380,7 +6388,7 @@ function EssencePage() {
             </div>
           </div>
           <div ref={simRef}>
-          <FuelSimulator stations={visibleStations} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch} preselectedStationId={simSelectedStationId} onStationChange={setSimSelectedStationId} onFuelChange={setSimSelectedFuel}/>
+          <FuelSimulator stations={stationsWithDist} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch} preselectedStationId={simSelectedStationId} onStationChange={setSimSelectedStationId}/>
           </div>
         </div>
       )}
@@ -6413,7 +6421,21 @@ function EssencePage() {
               <div style={{fontSize:34,animation:"spin .8s linear infinite",display:"inline-block",marginBottom:14}}>⟳</div>
             </div>
           ):stationsWithDist.length>0?(
-            <FuelMapLeaflet stations={stationsWithDist} userLat={userLat} userLng={userLng}/>
+            <>
+              <div className="card" style={{marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,flexWrap:"wrap",background:"linear-gradient(145deg,rgba(96,165,250,0.08),rgba(167,139,250,0.05))"}}>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:40,height:40,borderRadius:12,background:"rgba(96,165,250,0.14)",border:"1px solid rgba(96,165,250,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🗺️</div>
+                  <div>
+                    <div style={{fontWeight:900,fontSize:14}}>Carte interactive améliorée</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Touchez un marqueur pour le sélectionner dans le simulateur puis lancez l’itinéraire directement.</div>
+                  </div>
+                </div>
+                {stationsWithDist[0]?.lat && stationsWithDist[0]?.lng && (
+                  <button className="btn btn-primary" onClick={()=>setNavStation(stationsWithDist[0])}>🧭 Aller à la plus proche</button>
+                )}
+              </div>
+              <FuelMapLeaflet stations={stationsWithDist} userLat={userLat} userLng={userLng} selectedStationId={simSelectedStationId} onPickStation={setSimSelectedStationId}/>
+            </>
           ):(
             <div className="card" style={{textAlign:"center",padding:60}}>
               <div style={{fontSize:44,marginBottom:12}}>🗺️</div>
@@ -6434,22 +6456,6 @@ function EssencePage() {
               </button>
             ))}
           </div>
-          {chartStats&&(
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,marginBottom:14}}>
-              {[
-                {label:"Prix moyen", val:`${chartStats.avg.toFixed(3)} €/L`, sub:`${chartStats.count} stations`, color:FUEL_META[chartFuel]?.color},
-                {label:"Moins chère", val:chartStats.min!=null?`${chartStats.min.toFixed(3)} €/L`:"—", sub:chartStats.cheapestName||"—", color:"#4ade80"},
-                {label:"Écart zone", val:chartStats.spread!=null?`${(chartStats.spread*100).toFixed(1)} c€/L`:"—", sub:chartStats.max!=null?`max ${chartStats.max.toFixed(3)} €/L`:"—", color:"#f472b6"},
-                {label:"Plus proche", val:chartStats.nearest?fmtKm(chartStats.nearest._dist):"GPS requis", sub:chartStats.nearest?resolveNom(chartStats.nearest).nom:"Active la localisation", color:"#60a5fa"},
-              ].map((kpi,i)=>(
-                <div key={i} className="card-sm" style={{padding:"14px 12px",background:"rgba(255,255,255,0.04)"}}>
-                  <div style={{fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>{kpi.label}</div>
-                  <div style={{fontFamily:"'Fraunces',serif",fontSize:24,fontWeight:900,color:kpi.color||"var(--text)",lineHeight:1.1}}>{kpi.val}</div>
-                  <div style={{fontSize:10,color:"var(--text3)",marginTop:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{kpi.sub}</div>
-                </div>
-              ))}
-            </div>
-          )}
           <div className="card" style={{marginBottom:14,background:"linear-gradient(145deg,rgba(255,255,255,0.03),rgba(0,0,0,0.1))"}}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,gap:10,flexWrap:"wrap"}}>
               <div>
@@ -6555,7 +6561,8 @@ function EssencePage() {
     </div>
   );
 }
-function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselectedStationId, onStationChange, onFuelChange }) {
+function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselectedStationId, onStationChange }) {
+  const stationKey = useCallback((s)=>s?.id || [s?.adresse||"",s?.ville||"",s?.cp||"",s?.lat||"",s?.lng||""].join("|"), []);
   const VEHICLES = {
     "Renault": {
       "Clio 1.0 TCe 90": { conso:5.4, fuel:"sp95" }, "Clio 1.5 dCi 85": { conso:3.9, fuel:"gazole" },
@@ -6613,9 +6620,6 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
   const availableFuels = Object.keys(FUEL_META).filter(k => avgPrices[k] != null || stations.some(s => s[k] != null));
   const [fuel, setFuel]           = useState(availableFuels[0] || "gazole");
   const [liters, setLiters]       = useState(50);
-  const [tankSize, setTankSize]   = useState(55);
-  const [currentFuel, setCurrentFuel] = useState(12);
-  const [reserveLiters, setReserveLiters] = useState(5);
   const [stationId, setStationIdLocal] = useState(preselectedStationId || "__best__");
   const setStationId = (id) => { setStationIdLocal(id); onStationChange && onStationChange(id); };
   // Sync when parent changes selection (from station card click)
@@ -6626,62 +6630,51 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
       setStationIdLocal(preselectedStationId || "__best__");
     }
   }, [preselectedStationId]);
-  useEffect(() => { onFuelChange && onFuelChange(fuel); }, [fuel, onFuelChange]);
   const [selMake, setSelMake]     = useState("");
   const [selModel, setSelModel]   = useState("");
   const [manualConso, setManualConso] = useState(7);
+  const [tankCapacity, setTankCapacity] = useState(55);
+  const [currentFuel, setCurrentFuel] = useState(15);
+  const [reserveFuel, setReserveFuel] = useState(5);
 
   const vehicleData    = selMake && selModel ? VEHICLES[selMake]?.[selModel] : null;
   const vehicleConso   = vehicleData?.conso ?? null;
   const effectiveConso = vehicleConso ?? manualConso;
 
-  const getStationKey = useCallback((s) => {
-    if(!s) return "";
-    return s.id || [s.nom, s.adresse, s.ville, s.cp, s.lat, s.lng].filter(Boolean).join("|");
-  }, []);
   const eligibleStations = stations.filter(s => s[fuel] != null);
-  const smartScore = useCallback((s) => {
-    const price = s?.[fuel] ?? Number.POSITIVE_INFINITY;
-    const dist = s?._dist ?? s?.distance ?? null;
-    const distPenalty = dist == null ? 0.06 : Math.min(0.28, dist * 0.018);
-    return price + distPenalty;
-  }, [fuel]);
   const sortedStations = [...eligibleStations].sort((a,b) => {
-    const sa = smartScore(a), sb = smartScore(b);
-    if (sa !== sb) return sa - sb;
     const pa = a[fuel] ?? Number.POSITIVE_INFINITY;
     const pb = b[fuel] ?? Number.POSITIVE_INFINITY;
     if (pa !== pb) return pa - pb;
     return (a._dist ?? a.distance ?? 999) - (b._dist ?? b.distance ?? 999);
   });
-  const cheapestStations = [...eligibleStations].sort((a,b) => {
-    const pa = a[fuel] ?? Number.POSITIVE_INFINITY;
-    const pb = b[fuel] ?? Number.POSITIVE_INFINITY;
-    if (pa !== pb) return pa - pb;
-    return (a._dist ?? a.distance ?? 999) - (b._dist ?? b.distance ?? 999);
-  });
-  const bestS  = cheapestStations[0] || null;
-  const secondBestS = cheapestStations[1] || null;
-  const selectedStation  = stationId === "__best__"
+  const bestS  = sortedStations[0] || null;
+  const secondBestS = sortedStations[1] || null;
+  const selectedStation = stationId === "__best__"
     ? bestS
-    : (eligibleStations.find(s => getStationKey(s) === stationId || s.id === stationId) ?? null);
-  const effectiveSelectedStation = selectedStation || bestS;
-  const price  = effectiveSelectedStation ? effectiveSelectedStation[fuel] : null;
+    : (eligibleStations.find(s => stationKey(s) === stationId) || null);
+  const comparisonTarget = stationId !== "__best__"
+    ? (selectedStation && bestS && stationKey(selectedStation) !== stationKey(bestS) ? selectedStation : (secondBestS || null))
+    : (secondBestS || null);
+  const pricedStation = selectedStation || bestS;
+  const price  = pricedStation ? pricedStation[fuel] : null;
   const total  = price != null ? price * liters : null;
   const per100 = price != null ? price * effectiveConso : null;
-  const saving = bestS && effectiveSelectedStation && getStationKey(bestS) !== getStationKey(effectiveSelectedStation)
-    ? (effectiveSelectedStation[fuel] - bestS[fuel]) * liters : null;
+  const saving = bestS && pricedStation && stationKey(bestS) !== stationKey(pricedStation)
+    ? ((pricedStation[fuel] ?? 0) - (bestS[fuel] ?? 0)) * liters : null;
   const m = FUEL_META[fuel] || {};
   const totalCost = total;
-  const fuelAfterFill = Math.min(tankSize, Math.max(0, currentFuel) + liters);
-  const usableFuel = Math.max(0, fuelAfterFill - reserveLiters);
-  const distancePossible = effectiveConso > 0 ? Math.round((usableFuel / effectiveConso) * 100) : null;
+  const remainingAfterReserve = Math.max(0, currentFuel - reserveFuel);
+  const currentAutonomy = effectiveConso > 0 ? Math.round((remainingAfterReserve / effectiveConso) * 100) : null;
+  const afterFillLiters = Math.min(tankCapacity, currentFuel + liters);
+  const afterFillUsable = Math.max(0, afterFillLiters - reserveFuel);
+  const distancePossible = effectiveConso > 0 ? Math.round((afterFillUsable / effectiveConso) * 100) : null;
 
   // Calculs supplémentaires
-  const worstS   = cheapestStations.length > 0 ? cheapestStations[cheapestStations.length - 1] : null;
-  const avgPrice = cheapestStations.length ? cheapestStations.reduce((sum, s) => sum + (s[fuel] ?? 0), 0) / cheapestStations.length : null;
-  const savings_vs_worst = worstS && effectiveSelectedStation && getStationKey(worstS) !== getStationKey(effectiveSelectedStation)
-    ? (worstS[fuel] - (effectiveSelectedStation?.[fuel]??0)) * liters : null;
+  const worstS   = sortedStations.length > 0 ? sortedStations[sortedStations.length - 1] : null;
+  const avgPrice = sortedStations.length ? sortedStations.reduce((sum, s) => sum + (s[fuel] ?? 0), 0) / sortedStations.length : null;
+  const savings_vs_worst = worstS && pricedStation && stationKey(worstS) !== stationKey(pricedStation)
+    ? ((worstS[fuel] ?? 0) - (pricedStation?.[fuel]??0)) * liters : null;
   const savings_vs_avg = avgPrice != null && price != null ? (avgPrice - price) * liters : null;
   const annualKm = 15000; // km/an moyen
   const annualCost = price != null ? (annualKm / 100) * effectiveConso * price : null;
@@ -6689,11 +6682,11 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
     ? (annualKm / 100) * effectiveConso * (worstS[fuel] - price) : null;
   const annualSavingVsAvg = avgPrice != null && price != null
     ? (annualKm / 100) * effectiveConso * (avgPrice - price) : null;
-  const comparisonOther = effectiveSelectedStation && bestS && getStationKey(effectiveSelectedStation) !== getStationKey(bestS) ? effectiveSelectedStation : secondBestS;
+  const comparisonOther = comparisonTarget;
   const comparisonGapPerLiter = bestS && comparisonOther ? Math.max(0, (comparisonOther[fuel] ?? 0) - (bestS[fuel] ?? 0)) : null;
   const comparisonGapOnFill = comparisonGapPerLiter != null ? comparisonGapPerLiter * liters : null;
-  const comparisonLabel = effectiveSelectedStation && bestS && getStationKey(effectiveSelectedStation) !== getStationKey(bestS) ? "station sélectionnée" : "2e moins chère";
-  const distanceToStation = effectiveSelectedStation?._dist ?? effectiveSelectedStation?.distance ?? null;
+  const comparisonLabel = stationId !== "__best__" ? "station sélectionnée" : "2e moins chère";
+  const comparisonDistance = comparisonOther? (comparisonOther._dist != null ? fmtKm(comparisonOther._dist) : null) : null;
 
   return (
     <div style={{ borderRadius:20,overflow:"hidden",border:`1.5px solid ${m.color||"#a78bfa"}22`,marginBottom:14,
@@ -6713,7 +6706,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
           </div>
         </div>
         {/* Badge station sélectionnée ou meilleure station */}
-        {effectiveSelectedStation && (
+        {selectedStation && (
           <div style={{
             fontSize:10,fontWeight:800,
             color:stationId==="__best__"?"#4ade80":m.color||"#a78bfa",
@@ -6721,7 +6714,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
             border:`1px solid ${stationId==="__best__"?"rgba(74,222,128,0.25)":`${m.color||"#a78bfa"}40`}`,
             borderRadius:20,padding:"3px 10px",flexShrink:0,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"
           }}>
-            {stationId==="__best__"?"⭐ ":""}{(()=>{const {nom}=resolveNom(effectiveSelectedStation);return nom;})().slice(0,20)} · {effectiveSelectedStation[fuel]?.toFixed(3)} €/L
+            {stationId==="__best__"?"⭐ ":""}{(()=>{const {nom}=resolveNom(pricedStation);return nom;})().slice(0,20)} · {pricedStation[fuel]?.toFixed(3)} €/L
           </div>
         )}
       </div>
@@ -6761,7 +6754,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
               <option value="__best__">⭐ {bestS ? (() => { const {nom} = resolveNom(bestS); return `${nom} · ${bestS[fuel]?.toFixed(3)}€/L (moins chère)`; })() : "Meilleure station"}</option>
               {eligibleStations.map(s => {
                 const {nom:n}=resolveNom(s);
-                return <option key={getStationKey(s)} value={getStationKey(s)}>{n} · {s[fuel]?.toFixed(3)}€</option>;
+                return <option key={stationKey(s)} value={stationKey(s)}>{n} · {s[fuel]?.toFixed(3)}€</option>;
               })}
             </select>
             {bestS && (
@@ -6792,25 +6785,6 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
                   {v}L
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Réservoir */}
-          <div style={{ marginBottom:16 }}>
-            <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,letterSpacing:1.5,textTransform:"uppercase",marginBottom:8 }}>Réservoir</div>
-            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8 }}>
-              <div>
-                <label style={{fontSize:10,marginBottom:4}}>Capacité</label>
-                <input type="number" min={20} max={120} step={1} value={tankSize} onChange={e=>setTankSize(Math.max(20,+e.target.value||20))}/>
-              </div>
-              <div>
-                <label style={{fontSize:10,marginBottom:4}}>Niveau actuel</label>
-                <input type="number" min={0} max={tankSize} step={1} value={currentFuel} onChange={e=>setCurrentFuel(Math.max(0,Math.min(tankSize,+e.target.value||0)))}/>
-              </div>
-              <div>
-                <label style={{fontSize:10,marginBottom:4}}>Réserve</label>
-                <input type="number" min={0} max={15} step={1} value={reserveLiters} onChange={e=>setReserveLiters(Math.max(0,+e.target.value||0))}/>
-              </div>
             </div>
           </div>
 
@@ -6883,11 +6857,10 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
                 {[
                   { icon:"⛽", label:"Prix / L", val:`${price.toFixed(3)}€`,
-                    sub:stationId==="__best__"?"moins chère":(resolveNom(effectiveSelectedStation).nom||"Station").slice(0,16),
+                    sub:stationId==="__best__"?"moins chère":(resolveNom(pricedStation).nom||"Station").slice(0,16),
                     color:m.color, highlight:true },
                   { icon:"🛣️", label:"/ 100 km", val:`${per100?.toFixed(2)}€`, sub:`conso ${effectiveConso}L/100`, color:m.color },
-                  ...(distancePossible?[{ icon:"📍", label:"Autonomie", val:`≈${distancePossible}km`, sub:`${fuelAfterFill.toFixed(0)}L après plein · réserve ${reserveLiters}L`, color:"#60a5fa" }]:[]),
-                  ...(distanceToStation!=null?[{ icon:"🧭", label:"Distance", val:fmtKm(distanceToStation), sub:`depuis votre position`, color:"#2dd4bf" }]:[]),
+                  ...(distancePossible?[{ icon:"📍", label:"Autonomie", val:`≈${distancePossible}km`, sub:`avec ${liters}L`, color:"#60a5fa" }]:[]),
                   ...(annualCost?[{ icon:"📅", label:"Coût / an", val:`${Math.round(annualCost)}€`, sub:`base ${annualKm.toLocaleString("fr")} km`, color:"#f472b6" }]:[]),
                 ].map((s,i)=>(
                   <div key={i} style={{ textAlign:"center",padding:"12px 8px",borderRadius:14,
@@ -6903,7 +6876,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
               </div>
 
               {/* Comparaison entre la moins chère et la station sélectionnée */}
-              {bestS && comparisonOther && bestS.id !== comparisonOther.id && (
+              {bestS && comparisonOther && stationKey(bestS) !== stationKey(comparisonOther) && (
                 <div style={{ borderRadius:12,padding:"10px 14px",background:"rgba(74,222,128,0.05)",border:"1px solid rgba(74,222,128,0.18)" }}>
                   <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:8 }}>Comparaison stations</div>
                   <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,gap:8 }}>
@@ -6921,14 +6894,15 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
                   <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:8 }}>
                     <span style={{ fontSize:10,fontWeight:700,color:"var(--text3)",display:"flex",alignItems:"center",gap:6,minWidth:0 }}>
                       <BrandIcon nom={comparisonOther.nom} enseignes={comparisonOther.enseignes} adresse={comparisonOther.adresse} ville={comparisonOther.ville} cp={comparisonOther.cp} size={18}/>
-                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{effectiveSelectedStation && getStationKey(effectiveSelectedStation) !== getStationKey(bestS) ? "🎯" : "↕"} {(()=>{const {nom}=resolveNom(comparisonOther);return nom;})()}</span>
+                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selectedStation && stationKey(selectedStation) !== stationKey(bestS) ? "🎯" : "↕"} {(()=>{const {nom}=resolveNom(comparisonOther);return nom;})()}</span>
                     </span>
                     <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:14,color:"var(--text3)",flexShrink:0 }}>{comparisonOther[fuel]?.toFixed(3)}€</span>
                   </div>
+                  {comparisonDistance && <div style={{marginTop:6,fontSize:10,color:"var(--text3)",textAlign:"right"}}>📍 {comparisonDistance}</div>}
                   {(comparisonGapOnFill != null || savings_vs_avg != null) && (
                     <div style={{ marginTop:8,textAlign:"center",fontSize:11,fontWeight:800,color:"#4ade80",
                       background:"rgba(74,222,128,0.08)",borderRadius:8,padding:"4px 8px" }}>
-                      {comparisonGapOnFill != null ? `💰 ${comparisonLabel}: ${comparisonGapOnFill.toFixed(2)} € ${selectedStation && selectedStation.id !== bestS.id ? "de surcoût" : "d'écart"} sur ce plein` : ""}
+                      {comparisonGapOnFill != null ? `💰 ${comparisonLabel}: ${comparisonGapOnFill.toFixed(2)} € ${selectedStation && stationKey(selectedStation) !== stationKey(bestS) ? "de surcoût" : "d'écart"} sur ce plein` : ""}
                       {savings_vs_avg != null ? ` · ${savings_vs_avg >= 0 ? "vs moyenne +" : "vs moyenne "}${savings_vs_avg.toFixed(2)} €` : ""}
                       {annualSavingVsAvg != null ? ` · ${Math.round(annualSavingVsAvg)}€/an` : ""}
                     </div>
