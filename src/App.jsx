@@ -5012,12 +5012,9 @@ const BRAND_DATA = {
 };
 
 const STATION_ADDRESS_HINTS = [
-  { pattern:/(rue\s+des\s+loyes.*saint-?dizier|saint-?dizier.*rue\s+des\s+loyes)/i, brandKey:"leclerc", displayName:"E.Leclerc" },
-  { pattern:/(avenue\s+l[ée]on\s+blum.*saint-?dizier|saint-?dizier.*avenue\s+l[ée]on\s+blum)/i, brandKey:"intermarche", displayName:"Intermarché" },
-  { pattern:/(route\s+de\s+vitry.*saint-?dizier|saint-?dizier.*route\s+de\s+vitry)/i, brandKey:"esso", displayName:"Esso" },
-  { pattern:/(rue\s+des\s+loyes)/i, brandKey:"leclerc", displayName:"E.Leclerc" },
-  { pattern:/(avenue\s+l[ée]on\s+blum)/i, brandKey:"intermarche", displayName:"Intermarché" },
-  { pattern:/(route\s+de\s+vitry)/i, brandKey:"esso", displayName:"Esso" },
+  { pattern:/rue\s+des\s+loyes.*saint-?dizier|saint-?dizier.*rue\s+des\s+loyes/i, brandKey:"leclerc", displayName:"Leclerc Sodibrag" },
+  { pattern:/avenue\s+l[ée]on\s+blum.*saint-?dizier|saint-?dizier.*avenue\s+l[ée]on\s+blum/i, brandKey:"intermarche", displayName:"Intermarché Saint-Dizier" },
+  { pattern:/route\s+de\s+vitry.*saint-?dizier|saint-?dizier.*route\s+de\s+vitry/i, brandKey:"esso", displayName:"Esso Aerodrome" },
 ];
 
 const getAddressBrandHint = (adresse="", ville="", cp="") => {
@@ -5084,7 +5081,10 @@ const resolveNom = (r) => {
   let ens = r.enseignes;
   if(typeof ens==="string"){ try{ens=JSON.parse(ens);}catch{ens=ens?[ens]:[];} }
   const ensStr = Array.isArray(ens) ? ens.filter(Boolean).join(" ").trim() : (ens||"").trim();
-  if(ensStr) return { nom:ensStr, nomIsAdresse:false, brand:detectBrand(ensStr, ens, adresse, ville, cp) };
+  if(ensStr) {
+    const brandFromEns = detectBrand(ensStr, ens, adresse, ville, cp);
+    return { nom:brandFromEns?.displayName || brandFromEns?.label || ensStr, nomIsAdresse:false, brand:brandFromEns };
+  }
 
   // 2. Vérifier si r.nom est différent de l'adresse
   const nomApi = (r.nom||"").trim();
@@ -5813,15 +5813,12 @@ function EssencePage() {
     const geo=r.geom?.coordinates||r.coordonnees?.coordinates;
     const lat=geo?geo[1]:null, lng=geo?geo[0]:null;
     const adresse=(r.adresse||"").trim();
-    let enseignes = r.enseignes || r.enseigne || r.marque || r.brand || "";
-    const lowerAddr = adresse.toLowerCase();
-    if(!enseignes && /rue\s+des\s+loyes/.test(lowerAddr)) enseignes = "E.Leclerc";
-    if(!enseignes && /avenue\s+l[ée]on\s+blum/.test(lowerAddr)) enseignes = "Intermarché";
-    if(!enseignes && /route\s+de\s+vitry/.test(lowerAddr)) enseignes = "Esso";
-    const {nom,nomIsAdresse}=resolveNom({ ...r, enseignes, adresse, ville:r.ville||city, cp:r.cp||"" });
+    const rawEnseignes = r.enseignes || r.marque || r.enseigne || r.enseigne_nom || r.brand || "";
+    const baseRow = { ...r, enseignes: rawEnseignes };
+    const {nom,nomIsAdresse}=resolveNom(baseRow);
     return {
       id:r.id||adresse, nom, nomIsAdresse,
-      enseignes, adresse,
+      enseignes:rawEnseignes, adresse,
       ville:r.ville||city, cp:r.cp||"",
       lat,lng, ...fuels,
     };
@@ -5856,7 +5853,10 @@ function EssencePage() {
             let best=null,bestDist=300;
             osmNodes.forEach(n=>{const d=haverM(s.lat,s.lng,n.lat,n.lng);if(d<bestDist){bestDist=d;best=n;}});
             if(!best) return s;
-            return { ...s, nom: (s.nomIsAdresse || !s.nom ? best.name : s.nom), enseignes: s.enseignes || best.name, nomIsAdresse:false };
+            const alreadyResolved = resolveNom(s);
+            const alreadyBranded = detectBrand(s.nom, s.enseignes, s.adresse, s.ville, s.cp);
+            if(alreadyBranded && !alreadyResolved.nomIsAdresse) return s;
+            return {...s,nom:best.name,enseignes:s.enseignes||best.name,nomIsAdresse:false};
           });
         }
       }catch{}
@@ -6582,10 +6582,10 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
   });
   const bestS  = sortedStations[0] || null;
   const secondBestS = sortedStations[1] || null;
-  const selectedFromMenu = stationId !== "__best__"
+  const selectedStationFromMenu = stationId !== "__best__"
     ? (eligibleStations.find(s => s.id === stationId) || null)
     : null;
-  const selectedStation = selectedFromMenu || bestS;
+  const selectedStation  = selectedStationFromMenu || bestS;
   const price  = selectedStation ? selectedStation[fuel] : null;
   const total  = price != null ? price * liters : null;
   const per100 = price != null ? price * effectiveConso : null;
@@ -6607,10 +6607,12 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
     ? (annualKm / 100) * effectiveConso * (worstS[fuel] - price) : null;
   const annualSavingVsAvg = avgPrice != null && price != null
     ? (annualKm / 100) * effectiveConso * (avgPrice - price) : null;
-  const comparisonOther = selectedFromMenu ? selectedFromMenu : secondBestS;
+  const comparisonOther = stationId !== "__best__"
+    ? selectedStationFromMenu
+    : secondBestS;
   const comparisonGapPerLiter = bestS && comparisonOther ? Math.max(0, (comparisonOther[fuel] ?? 0) - (bestS[fuel] ?? 0)) : null;
   const comparisonGapOnFill = comparisonGapPerLiter != null ? comparisonGapPerLiter * liters : null;
-  const comparisonLabel = selectedFromMenu ? "station sélectionnée" : "2e moins chère";
+  const comparisonLabel = stationId !== "__best__" ? "station sélectionnée" : "2e moins chère";
 
   return (
     <div style={{ borderRadius:20,overflow:"hidden",border:`1.5px solid ${m.color||"#a78bfa"}22`,marginBottom:14,
@@ -6818,14 +6820,14 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
                   <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:8 }}>
                     <span style={{ fontSize:10,fontWeight:700,color:"var(--text3)",display:"flex",alignItems:"center",gap:6,minWidth:0 }}>
                       <BrandIcon nom={comparisonOther.nom} enseignes={comparisonOther.enseignes} adresse={comparisonOther.adresse} ville={comparisonOther.ville} cp={comparisonOther.cp} size={18}/>
-                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selectedStation && selectedStation.id !== bestS.id ? "🎯" : "↕"} {(()=>{const {nom}=resolveNom(comparisonOther);return nom;})()}</span>
+                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{stationId !== "__best__" ? "🎯" : "↕"} {(()=>{const {nom}=resolveNom(comparisonOther);return nom;})()}</span>
                     </span>
                     <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:14,color:"var(--text3)",flexShrink:0 }}>{comparisonOther[fuel]?.toFixed(3)}€</span>
                   </div>
                   {(comparisonGapOnFill != null || savings_vs_avg != null) && (
                     <div style={{ marginTop:8,textAlign:"center",fontSize:11,fontWeight:800,color:"#4ade80",
                       background:"rgba(74,222,128,0.08)",borderRadius:8,padding:"4px 8px" }}>
-                      {comparisonGapOnFill != null ? `💰 ${comparisonLabel}: ${comparisonGapOnFill.toFixed(2)} € ${selectedStation && selectedStation.id !== bestS.id ? "de surcoût" : "d'écart"} sur ce plein` : ""}
+                      {comparisonGapOnFill != null ? `💰 ${comparisonLabel}: ${comparisonGapOnFill.toFixed(2)} € ${stationId !== "__best__" ? "de surcoût" : "d\'écart"} sur ce plein` : ""}
                       {savings_vs_avg != null ? ` · ${savings_vs_avg >= 0 ? "vs moyenne +" : "vs moyenne "}${savings_vs_avg.toFixed(2)} €` : ""}
                       {annualSavingVsAvg != null ? ` · ${Math.round(annualSavingVsAvg)}€/an` : ""}
                     </div>
