@@ -1803,7 +1803,7 @@ export default function App() {
             {page==="expenses"  && <Expenses  data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal}/>}
             {page==="bills"     && <Bills     data={data} update={update} selMonth={selMonth} mdata={mdata} setModal={setModal}/>}
             {page==="stats"     && <Stats     data={data} selMonth={selMonth} mdata={mdata} allMonths={allMonths}/>}
-            {page==="essence"   && <Suspense fallback={<div style={{textAlign:"center",padding:60,color:"var(--text3)"}}>⛽ Chargement…</div>}><EssencePage data={data} update={update} selMonth={selMonth}/></Suspense>}
+            {page==="essence"   && <Suspense fallback={<div style={{textAlign:"center",padding:60,color:"var(--text3)"}}>⛽ Chargement…</div>}><EssencePage/></Suspense>}
             {page==="meteo"     && <MeteoPage/>}
             {page==="settings"  && <SettingsPage data={data} update={update} setModal={setModal} user={user} activeUID={activeUID}/>}
           </div>
@@ -5007,12 +5007,29 @@ const BRAND_DATA = {
   "elan":    { label:"Élan",    abbr:"EL", bg:"#0EA5E9", fg:"#fff", patterns:[/elan|élan/i], logo:null },
   "vito":    { label:"Vito",    abbr:"VI", bg:"#7C3AED", fg:"#fff", patterns:[/\bvito\b/i], logo:null },
   "relais":  { label:"Relais",  abbr:"RL", bg:"#F59E0B", fg:"#1a1a1a", patterns:[/\brelais\b/i], logo:null },
+  "avia":    { label:"Avia",    abbr:"AV", bg:"#E30613", fg:"#fff", patterns:[/\bavia\b/i,/s\.?a\.?r\.?l\.?\s*bmcv/i], logo:(s)=>(<svg width={s} height={s} viewBox="0 0 100 100"><rect width="100" height="100" fill="#E30613"/><text x="50" y="62" textAnchor="middle" fill="#fff" style={{fontFamily:"Arial Black,sans-serif",fontSize:34,fontWeight:900,fontStyle:"italic",letterSpacing:-1}}>AVIA</text></svg>) },
   "dyneff":  { label:"Dyneff",  abbr:"DY", bg:"#FF6600", fg:"#fff", patterns:[/dyneff/i], logo:null },
 };
 
+const STATION_ADDRESS_HINTS = [
+  { pattern:/rue\s+des\s+loyes.*saint-?dizier|saint-?dizier.*rue\s+des\s+loyes/i, brandKey:"leclerc", displayName:"Leclerc Sodibrag" },
+  { pattern:/avenue\s+l[ée]on\s+blum.*saint-?dizier|saint-?dizier.*avenue\s+l[ée]on\s+blum/i, brandKey:"intermarche", displayName:"Intermarché Saint-Dizier" },
+  { pattern:/route\s+de\s+vitry.*saint-?dizier|saint-?dizier.*route\s+de\s+vitry/i, brandKey:"esso", displayName:"Esso Aerodrome" },
+];
+
+const getAddressBrandHint = (adresse="", ville="", cp="") => {
+  const src = `${adresse} ${ville} ${cp}`.toLowerCase();
+  const hit = STATION_ADDRESS_HINTS.find(h => h.pattern.test(src));
+  if(!hit) return null;
+  const brand = BRAND_DATA[hit.brandKey];
+  return brand ? { ...brand, key:hit.brandKey, displayName:hit.displayName } : null;
+};
+
 // ── Détection marque (cherche dans nom, enseignes ET adresse) ──
-const detectBrand = (nom, enseignes, adresse) => {
-  const src = `${nom||""} ${Array.isArray(enseignes)?enseignes.join(" "):(enseignes||"")} ${adresse||""}`.toLowerCase();
+const detectBrand = (nom, enseignes, adresse, ville="", cp="") => {
+  const hinted = getAddressBrandHint(adresse, ville, cp);
+  if(hinted) return hinted;
+  const src = `${nom||""} ${Array.isArray(enseignes)?enseignes.join(" "):(enseignes||"")} ${adresse||""} ${ville||""} ${cp||""}`.toLowerCase();
   for(const [key, b] of Object.entries(BRAND_DATA)){
     if(b.patterns.some(re=>re.test(src))) return {...b, key};
   }
@@ -5020,8 +5037,8 @@ const detectBrand = (nom, enseignes, adresse) => {
 };
 
 // ── Composant icône de marque ──
-function BrandIcon({ nom, enseignes, adresse, size=44 }) {
-  const brand = detectBrand(nom, enseignes, adresse);
+function BrandIcon({ nom, enseignes, adresse, ville, cp, size=44 }) {
+  const brand = detectBrand(nom, enseignes, adresse, ville, cp);
   const r = Math.round(size * 0.26);
 
   if(brand?.logo){
@@ -5051,35 +5068,41 @@ function BrandIcon({ nom, enseignes, adresse, size=44 }) {
 }
 
 // ── Résolution du vrai nom d'établissement ──
-// Cherche dans enseignes, puis nom API, puis tente OSM plus tard
+// Cherche d'abord les correspondances marques / adresses, puis les enseignes, puis le nom API
 const resolveNom = (r) => {
   const adresse = (r.adresse||"").trim();
+  const ville = (r.ville||"").trim();
+  const cp = (r.cp||"").trim();
+
+  const hinted = getAddressBrandHint(adresse, ville, cp);
+  if(hinted?.displayName) return { nom:hinted.displayName, nomIsAdresse:false, brand:hinted };
 
   // 1. Champ enseignes officiel
   let ens = r.enseignes;
   if(typeof ens==="string"){ try{ens=JSON.parse(ens);}catch{ens=ens?[ens]:[];} }
   const ensStr = Array.isArray(ens) ? ens.filter(Boolean).join(" ").trim() : (ens||"").trim();
-  if(ensStr) return { nom:ensStr, nomIsAdresse:false };
+  if(ensStr) return { nom:ensStr, nomIsAdresse:false, brand:detectBrand(ensStr, ens, adresse, ville, cp) };
 
   // 2. Vérifier si r.nom est différent de l'adresse
   const nomApi = (r.nom||"").trim();
-  const norm = s => s.toLowerCase().replace(/[,.']/g,"").replace(/\s+/g," ").trim();
+  const norm = s => (s||"").toLowerCase().replace(/[,.']/g,"").replace(/\s+/g," ").trim();
   const nomSameAsAddr = !nomApi ||
     norm(nomApi) === norm(adresse) ||
     norm(adresse).includes(norm(nomApi).slice(0,15)) ||
     norm(nomApi).includes(norm(adresse).slice(0,15));
 
+  const brandFromAll = detectBrand(nomApi, ens, adresse, ville, cp);
+
   if(nomApi && !nomSameAsAddr){
-    return { nom:nomApi, nomIsAdresse:false };
+    return { nom:brandFromAll?.displayName || nomApi, nomIsAdresse:false, brand:brandFromAll };
   }
 
   // 3. Détection depuis adresse (stations autoroute, grandes surfaces connues)
-  const brand = detectBrand("", "", adresse);
-  if(brand) return { nom:brand.label, nomIsAdresse:false };
+  if(brandFromAll) return { nom:brandFromAll.displayName || brandFromAll.label, nomIsAdresse:false, brand:brandFromAll };
 
   // 4. Fallback → adresse courte
   const adresseComp = adresse.split(",")[0].trim() || nomApi || `Station`;
-  return { nom:adresseComp, nomIsAdresse:true };
+  return { nom:adresseComp, nomIsAdresse:true, brand:null };
 };
 
 // ── Modal navigation ──
@@ -5109,7 +5132,7 @@ function NavModal({ station, userLat, userLng, onClose }) {
       <div style={{background:"linear-gradient(145deg,#0d0b1e,#1a1635)",border:"1px solid rgba(255,255,255,0.12)",
         borderRadius:24,padding:24,width:"100%",maxWidth:400}}>
         <div style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:20}}>
-          <BrandIcon nom={station.nom} enseignes={station.enseignes} adresse={station.adresse} size={50}/>
+          <BrandIcon nom={station.nom} enseignes={station.enseignes} adresse={station.adresse} ville={station.ville} cp={station.cp} size={50}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:900,fontSize:15,color:"#fff",textTransform:"uppercase",letterSpacing:.5,marginBottom:3}}>
               {(station.nom||"Station").toUpperCase()}
@@ -5176,7 +5199,7 @@ function FuelMapLeaflet({ stations, userLat, userLng }) {
       }
       stations.forEach(s=>{
         if(!s.lat||!s.lng) return;
-        const brand=detectBrand(s.nom,s.enseignes,s.adresse)||{abbr:"⛽",bg:"#374151",fg:"#fff"};
+        const brand=detectBrand(s.nom,s.enseignes,s.adresse,s.ville,s.cp)||{abbr:"⛽",bg:"#374151",fg:"#fff"};
         const {nom:nomDisplay}=resolveNom(s);
         const dist=(userLat&&userLng)?fmtKm(haversineKm(userLat,userLng,s.lat,s.lng)):null;
         const fuels=['gazole','sp95','e10','sp98'].filter(k=>s[k]!=null);
@@ -5716,7 +5739,7 @@ function MeteoPage() {
 }
 
 // ═══════════════════════════════════════════════════════════
-function EssencePage({ data, update, selMonth }) {
+function EssencePage() {
   const FUEL_META = {
     gazole: { label:"Gazole", color:"#fbbf24",
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="13" height="18" rx="2" fill="#fbbf24" opacity=".85"/><rect x="7" y="6" width="5" height="4" rx="1" fill="#92400e"/><path d="M16 8h2a1 1 0 0 1 1 1v5a2 2 0 0 1-2 2h-1" stroke="#fbbf24" strokeWidth="1.5" strokeLinecap="round"/><rect x="5" y="14" width="9" height="4" rx="1" fill="#92400e" opacity=".5"/></svg> },
@@ -5728,7 +5751,7 @@ function EssencePage({ data, update, selMonth }) {
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="13" height="18" rx="2" fill="#a78bfa" opacity=".85"/><rect x="7" y="6" width="5" height="4" rx="1" fill="#2e1065"/><path d="M16 8h2a1 1 0 0 1 1 1v5a2 2 0 0 1-2 2h-1" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round"/><text x="5" y="20" fontSize="5" fill="#2e1065" fontWeight="900" fontFamily="sans-serif">98</text></svg> },
   };
 
-  const LS_KEY = "duobudget_fuel_v8";
+  const LS_KEY = "duobudget_fuel_v7";
 
   const [stations,   setStations]   = useState([]);
   const [loading,    setLoading]    = useState(false);
@@ -5748,59 +5771,14 @@ function EssencePage({ data, update, selMonth }) {
   const [simSelectedStationId, setSimSelectedStationId] = useState("__best__");
   const simRef = useRef(null);
   const intervalRef  = useRef(null);
-  const requestAbortRef = useRef(null);
-
-  const fuelMonthStats = useMemo(() => {
-    const tx = data?.monthsData?.[selMonth]?.transactions || [];
-    const rows = tx.filter(t => t?.meta?.kind === "fuel");
-    const totalAmount = rows.reduce((s,t) => s + (Number(t.amount) || 0), 0);
-    const totalLiters = rows.reduce((s,t) => s + (Number(t.meta?.liters) || 0), 0);
-    const avgPaid = totalLiters > 0 ? totalAmount / totalLiters : null;
-    return { rows, totalAmount, totalLiters, avgPaid };
-  }, [data, selMonth]);
-
-  const saveFuelFillup = useCallback(({ station, fuelType, liters, pricePerLiter, totalCost, vehicleLabel, conso }) => {
-    if (!update || !selMonth || !station || !fuelType || !Number.isFinite(totalCost)) return;
-    update(d => {
-      if (!d.monthsData[selMonth]) d.monthsData[selMonth] = { transactions:[], incomes:{p1:0,p2:0,common:0}, billsProcessed:{} };
-      if (!d.fuelHistory) d.fuelHistory = [];
-      const transportCat = d.categories.find(c => /transport|essence|carburant/i.test(c.name))?.id || d.categories.find(c => c.name === "Transport")?.id || d.categories[0]?.id;
-      const tx = {
-        id: mkid(),
-        label: `Carburant · ${station.nom || station.enseigne || station.adresse || "Station"}` ,
-        amount: +Number(totalCost).toFixed(2),
-        categoryId: transportCat,
-        profileId: "common",
-        timestamp: nowISO(),
-        auto: false,
-        meta: {
-          kind: "fuel",
-          fuelType,
-          liters: +Number(liters).toFixed(2),
-          pricePerLiter: +Number(pricePerLiter).toFixed(3),
-          stationId: station.id || null,
-          stationName: station.nom || station.adresse || "Station",
-          city: station.ville || citySearch || "",
-          vehicleLabel: vehicleLabel || null,
-          consumption: Number.isFinite(conso) ? conso : null,
-        }
-      };
-      d.monthsData[selMonth].transactions.unshift(tx);
-      d.fuelHistory.unshift({ id: tx.id, monthKey: selMonth, ...tx.meta, amount: tx.amount, timestamp: tx.timestamp });
-      d.fuelHistory = d.fuelHistory.slice(0, 200);
-    });
-  }, [update, selMonth, citySearch]);
 
   useEffect(()=>{
     try{
       const s=localStorage.getItem(LS_KEY);
-      if(s){const{stations:st,history:h,city,ts,radius:cachedRadius,lastQueryKey,lastQueryTs}=JSON.parse(s);
+      if(s){const{stations:st,history:h,city,ts}=JSON.parse(s);
         if(st){setStations(st);setLastUpdate(new Date(ts));}
         if(h) setHistory(h);
         if(city){setCitySearch(city);setCityInput(city);}
-        if(cachedRadius) setRadius(cachedRadius);
-        window.__fuelCache = window.__fuelCache || {};
-        if(lastQueryKey && st){ window.__fuelCache[lastQueryKey] = { ts: lastQueryTs || ts || Date.now(), stations: st }; }
       }
     }catch{}
   },[]);
@@ -5889,59 +5867,30 @@ function EssencePage({ data, update, selMonth }) {
   };
 
   const doFetchGeo=useCallback(async(lat,lng,km)=>{
-    const queryKey = `geo:${lat.toFixed(3)}:${lng.toFixed(3)}:${km}`;
-    window.__fuelCache = window.__fuelCache || {};
-    window.__lastFuelQueryKey = queryKey;
-    const cached = window.__fuelCache[queryKey];
-    if (cached && (Date.now() - cached.ts) < 5*60*1000) {
-      setStations(cached.stations);
-      setLastUpdate(new Date(cached.ts));
-      setError("");
-      setLoading(false);
-      setCountdown(600);
-      return;
-    }
-    if (requestAbortRef.current) requestAbortRef.current.abort();
-    requestAbortRef.current = new AbortController();
     setLoading(true);setError("");setCountdown(600);
     try{
       const BASE="https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
       const w=encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${Math.round(km*1000)}m)`);
-      const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`, { signal: requestAbortRef.current.signal });
+      const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
       if(!res.ok) throw new Error(`Erreur API ${res.status}`);
       const json=await res.json();
       const parsed=parseResults(json.results||[],"Ma position");
       if(!parsed.length) throw new Error("Aucune station trouvée dans ce rayon.");
-      window.__fuelCache[queryKey] = { ts: Date.now(), stations: parsed };
       await finalize(parsed,"Ma position");
-    }catch(e){ if(e.name !== "AbortError") setError(e.message||"Erreur inconnue"); }
+    }catch(e){setError(e.message||"Erreur inconnue");}
     setLoading(false);
   },[]);
 
   const doFetch=useCallback(async(city=citySearch,km=radius)=>{
-    const queryKey = `city:${city.trim().toLowerCase()}:${km}`;
-    window.__fuelCache = window.__fuelCache || {};
-    window.__lastFuelQueryKey = queryKey;
-    const cached = window.__fuelCache[queryKey];
-    if (cached && (Date.now() - cached.ts) < 5*60*1000) {
-      setStations(cached.stations);
-      setLastUpdate(new Date(cached.ts));
-      setError("");
-      setLoading(false);
-      setCountdown(600);
-      return;
-    }
-    if (requestAbortRef.current) requestAbortRef.current.abort();
-    requestAbortRef.current = new AbortController();
     setLoading(true);setError("");setCountdown(600);
     try{
       const BASE="https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records";
       const isCP=/^\d{5}$/.test(city.trim());
       let results=[];
-      const geoSearch=async(lat,lng,kmR)=>{const w=encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${Math.round(kmR*1000)}m)`);const r=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`, { signal: requestAbortRef.current.signal });if(!r.ok)return[];const j=await r.json();return j.results||[];};
+      const geoSearch=async(lat,lng,kmR)=>{const w=encodeURIComponent(`distance(geom, geom'POINT(${lng} ${lat})', ${Math.round(kmR*1000)}m)`);const r=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);if(!r.ok)return[];const j=await r.json();return j.results||[];};
       if(isCP){
         const w=encodeURIComponent(`cp="${city.trim()}"`);
-        const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`, { signal: requestAbortRef.current.signal });
+        const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
         if(!res.ok) throw new Error(`Erreur API ${res.status}`);
         const json=await res.json(); results=json.results||[];
         if(km>0&&results.length>0){
@@ -5950,25 +5899,24 @@ function EssencePage({ data, update, selMonth }) {
         }
       } else {
         let cLat=null,cLng=null;
-        try{const nr=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city.trim())}&countrycodes=fr&format=json&limit=1`,{headers:{"Accept-Language":"fr"}, signal: requestAbortRef.current.signal});if(nr.ok){const nj=await nr.json();if(nj.length){cLat=parseFloat(nj[0].lat);cLng=parseFloat(nj[0].lon);}}}catch{}
+        try{const nr=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city.trim())}&countrycodes=fr&format=json&limit=1`,{headers:{"Accept-Language":"fr"}});if(nr.ok){const nj=await nr.json();if(nj.length){cLat=parseFloat(nj[0].lat);cLng=parseFloat(nj[0].lon);}}}catch{}
         if(cLat&&cLng){results=await geoSearch(cLat,cLng,Math.max(km,5));}
         else{
           const cityN=city.trim().toUpperCase();
           const w=encodeURIComponent(`ville="${cityN}"`);
-          const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`, { signal: requestAbortRef.current.signal });
+          const res=await fetch(`${BASE}?where=${w}&limit=100&timezone=Europe%2FParis`);
           if(!res.ok)throw new Error(`Erreur API ${res.status}`);
           const json=await res.json();results=json.results||[];
-          if(!results.length){const w2=encodeURIComponent(`ville like "${cityN}%"`);const r2=await fetch(`${BASE}?where=${w2}&limit=100&timezone=Europe%2FParis`, { signal: requestAbortRef.current.signal });if(r2.ok){const j2=await r2.json();results=j2.results||[];}}
+          if(!results.length){const w2=encodeURIComponent(`ville like "${cityN}%"`);const r2=await fetch(`${BASE}?where=${w2}&limit=100&timezone=Europe%2FParis`);if(r2.ok){const j2=await r2.json();results=j2.results||[];}}
         }
       }
       if(!results.length) throw new Error(`Aucune station trouvée pour "${city}".`);
       const parsed=parseResults(results,city);
       if(!parsed.length) throw new Error(`Aucun prix disponible pour "${city}".`);
-      window.__fuelCache[queryKey] = { ts: Date.now(), stations: parsed };
       await finalize(parsed,city);
-    }catch(e){ if(e.name !== "AbortError") setError(e.message||"Erreur inconnue"); }
+    }catch(e){setError(e.message||"Erreur inconnue");}
     setLoading(false);
-  },[citySearch, radius]);
+  },[citySearch]);
 
   useEffect(()=>{
     doFetch(citySearch);
@@ -6021,39 +5969,17 @@ function EssencePage({ data, update, selMonth }) {
     return "⛽";
   };
 
-  const distancePenalty = useCallback((dist) => {
-    if (dist == null || !Number.isFinite(dist)) return 0;
-    return Math.min(dist * 0.012, 0.12);
-  }, []);
-
   const stationsWithDist=useMemo(()=>{
     const base = deduplicatedStations;
-    const withDist = [...base].map(s=>({
-      ...s,
-      _dist:(userLat&&userLng&&s.lat&&s.lng)?haversineKm(userLat,userLng,s.lat,s.lng):null
-    }));
-    return withDist.sort((a,b)=>{
-      const aVals = Object.keys(FUEL_META).map(k=>a[k]).filter(v=>v!=null);
-      const bVals = Object.keys(FUEL_META).map(k=>b[k]).filter(v=>v!=null);
-      const aMin = aVals.length ? Math.min(...aVals) : 999;
-      const bMin = bVals.length ? Math.min(...bVals) : 999;
-      const aScore = aMin + distancePenalty(a._dist);
-      const bScore = bMin + distancePenalty(b._dist);
-      if (Math.abs(aScore - bScore) > 0.0001) return aScore - bScore;
-      return (a._dist ?? 9999) - (b._dist ?? 9999);
-    });
-  },[deduplicatedStations,userLat,userLng,distancePenalty]);
+    if(!userLat||!userLng) return base;
+    return [...base].map(s=>({...s,_dist:(s.lat&&s.lng)?haversineKm(userLat,userLng,s.lat,s.lng):null})).sort((a,b)=>(a._dist??9999)-(b._dist??9999));
+  },[deduplicatedStations,userLat,userLng]);
 
   const bestStation=useMemo(()=>{
     const res={};
-    Object.keys(FUEL_META).forEach(k=>{
-      const sorted=stationsWithDist
-        .filter(s=>s[k]!=null)
-        .sort((a,b)=>((a[k] + distancePenalty(a._dist)) - (b[k] + distancePenalty(b._dist))) || ((a._dist ?? 9999) - (b._dist ?? 9999)) );
-      res[k]=sorted[0]||null;
-    });
+    Object.keys(FUEL_META).forEach(k=>{const sorted=stationsWithDist.filter(s=>s[k]!=null).sort((a,b)=>a[k]-b[k]);res[k]=sorted[0]||null;});
     return res;
-  },[stationsWithDist,distancePenalty]);
+  },[stationsWithDist]);
 
   const avgPrices=useMemo(()=>{
     const res={};
@@ -6152,7 +6078,7 @@ function EssencePage({ data, update, selMonth }) {
             {Object.entries(FUEL_META).map(([k,meta])=>{
               const best=bestStation[k];
               if(!best) return null;
-              const brand=detectBrand(best.nom,best.enseignes,best.adresse);
+              const brand=detectBrand(best.nom,best.enseignes,best.adresse,best.ville,best.cp);
               const dist=best._dist!=null?fmtKm(best._dist):null;
               return (
                 <div key={k}
@@ -6194,7 +6120,7 @@ function EssencePage({ data, update, selMonth }) {
 
                     {/* Station */}
                     <div style={{display:"flex",alignItems:"flex-start",gap:10,paddingTop:10,borderTop:`1px solid ${meta.color}18`}}>
-                      <BrandIcon nom={best.nom} enseignes={best.enseignes} adresse={best.adresse} size={36}/>
+                      <BrandIcon nom={best.nom} enseignes={best.enseignes} adresse={best.adresse} ville={best.ville} cp={best.cp} size={36}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontWeight:900,fontSize:11,color:"#fff",textTransform:"uppercase",letterSpacing:.4,lineHeight:1.3,marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                           {(best.nom||"Station").toUpperCase()}
@@ -6239,7 +6165,7 @@ function EssencePage({ data, update, selMonth }) {
             {/* Cards */}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {stationsWithDist.map((s,i)=>{
-                const brand=detectBrand(s.nom,s.enseignes,s.adresse);
+                const brand=detectBrand(s.nom,s.enseignes,s.adresse,s.ville,s.cp);
                 const {nom:nomDisplay}=resolveNom(s);
                 const fuelsAvail=Object.entries(FUEL_META).filter(([k])=>s[k]!=null);
                 // isBest[k] = vrai si cette station est la moins chère pour ce carburant
@@ -6277,7 +6203,7 @@ function EssencePage({ data, update, selMonth }) {
                     <div style={{display:"flex",alignItems:"center",padding:"12px 14px",gap:12}}>
 
                       {/* Logo marque — BrandIcon SVG */}
-                      <BrandIcon nom={s.nom} enseignes={s.enseignes} adresse={s.adresse} size={46}/>
+                      <BrandIcon nom={s.nom} enseignes={s.enseignes} adresse={s.adresse} ville={s.ville} cp={s.cp} size={46}/>
 
                       {/* Infos station */}
                       <div style={{flex:1,minWidth:0}}>
@@ -6404,7 +6330,7 @@ function EssencePage({ data, update, selMonth }) {
             </div>
           </div>
           <div ref={simRef}>
-          <FuelSimulator stations={stationsWithDist} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch} preselectedStationId={simSelectedStationId} onStationChange={setSimSelectedStationId} onSaveFillup={saveFuelFillup} monthFuelStats={fuelMonthStats}/>
+          <FuelSimulator stations={stationsWithDist} avgPrices={avgPrices} FUEL_META={FUEL_META} citySearch={citySearch} preselectedStationId={simSelectedStationId} onStationChange={setSimSelectedStationId}/>
           </div>
         </div>
       )}
@@ -6563,7 +6489,7 @@ function EssencePage({ data, update, selMonth }) {
     </div>
   );
 }
-function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselectedStationId, onStationChange, onSaveFillup, monthFuelStats }) {
+function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselectedStationId, onStationChange }) {
   const VEHICLES = {
     "Renault": {
       "Clio 1.0 TCe 90": { conso:5.4, fuel:"sp95" }, "Clio 1.5 dCi 85": { conso:3.9, fuel:"gazole" },
@@ -6639,11 +6565,16 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
   const vehicleConso   = vehicleData?.conso ?? null;
   const effectiveConso = vehicleConso ?? manualConso;
 
-  const distancePenalty = (dist) => dist == null || !Number.isFinite(dist) ? 0 : Math.min(dist * 0.012, 0.12);
-  const eligibleStations = useMemo(() => stations.filter(s => s[fuel] != null), [stations, fuel]);
-  const sortedSmartStations = useMemo(() => [...eligibleStations].sort((a,b) => ((a[fuel] + distancePenalty(a._dist)) - (b[fuel] + distancePenalty(b._dist))) || ((a._dist ?? 9999) - (b._dist ?? 9999))), [eligibleStations, fuel]);
-  const bestS  = sortedSmartStations[0] || null;
-  const selectedStation  = (stationId === "__best__" || stationId === "__avg__")
+  const eligibleStations = stations.filter(s => s[fuel] != null);
+  const sortedStations = [...eligibleStations].sort((a,b) => {
+    const pa = a[fuel] ?? Number.POSITIVE_INFINITY;
+    const pb = b[fuel] ?? Number.POSITIVE_INFINITY;
+    if (pa !== pb) return pa - pb;
+    return (a._dist ?? a.distance ?? 999) - (b._dist ?? b.distance ?? 999);
+  });
+  const bestS  = sortedStations[0] || null;
+  const secondBestS = sortedStations[1] || null;
+  const selectedStation  = stationId === "__best__"
     ? bestS
     : (eligibleStations.find(s => s.id === stationId) ?? bestS);
   const price  = selectedStation ? selectedStation[fuel] : null;
@@ -6656,11 +6587,8 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
   const distancePossible = effectiveConso > 0 ? Math.round((liters / effectiveConso) * 100) : null;
 
   // Calculs supplémentaires
-  const worstS   = eligibleStations.length > 0 ? eligibleStations.reduce((a,b)=>a[fuel]>b[fuel]?a:b) : null;
-  const avgPrice = avgPrices?.[fuel] ?? null;
-  const avgSmartPrice = eligibleStations.length ? eligibleStations.reduce((sum, s) => sum + (s[fuel] + distancePenalty(s._dist)), 0) / eligibleStations.length : null;
-  const estimatedFullTank = vehicleConso ? Math.max(liters, 45) : liters;
-  const fullTankCost = price != null ? price * estimatedFullTank : null;
+  const worstS   = sortedStations.length > 0 ? sortedStations[sortedStations.length - 1] : null;
+  const avgPrice = sortedStations.length ? sortedStations.reduce((sum, s) => sum + (s[fuel] ?? 0), 0) / sortedStations.length : null;
   const savings_vs_worst = worstS && selectedStation && worstS.id !== selectedStation.id
     ? (worstS[fuel] - (selectedStation?.[fuel]??0)) * liters : null;
   const savings_vs_avg = avgPrice != null && price != null ? (avgPrice - price) * liters : null;
@@ -6670,8 +6598,10 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
     ? (annualKm / 100) * effectiveConso * (worstS[fuel] - price) : null;
   const annualSavingVsAvg = avgPrice != null && price != null
     ? (annualKm / 100) * effectiveConso * (avgPrice - price) : null;
-  const stationDistanceLabel = selectedStation?._dist != null ? `${selectedStation._dist.toFixed(1)} km` : null;
-  const vehicleLabel = vehicleConso ? `${selMake} ${selModel}` : `Conso ${effectiveConso}L/100`;
+  const comparisonOther = selectedStation && bestS && selectedStation.id !== bestS.id ? selectedStation : secondBestS;
+  const comparisonGapPerLiter = bestS && comparisonOther ? Math.max(0, (comparisonOther[fuel] ?? 0) - (bestS[fuel] ?? 0)) : null;
+  const comparisonGapOnFill = comparisonGapPerLiter != null ? comparisonGapPerLiter * liters : null;
+  const comparisonLabel = selectedStation && bestS && selectedStation.id !== bestS.id ? "station sélectionnée" : "2e moins chère";
 
   return (
     <div style={{ borderRadius:20,overflow:"hidden",border:`1.5px solid ${m.color||"#a78bfa"}22`,marginBottom:14,
@@ -6737,7 +6667,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
               style={{ width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
                 borderRadius:11,padding:"9px 12px",color:"var(--text)",fontFamily:"'Outfit',sans-serif",fontSize:13 }}>
               <option value="__best__">⭐ {bestS ? (() => { const {nom} = resolveNom(bestS); return `${nom} · ${bestS[fuel]?.toFixed(3)}€/L (moins chère)`; })() : "Meilleure station"}</option>
-              {sortedSmartStations.map(s => {
+              {eligibleStations.map(s => {
                 const {nom:n}=resolveNom(s);
                 return <option key={s.id} value={s.id}>{n} · {s[fuel]?.toFixed(3)}€</option>;
               })}
@@ -6842,7 +6772,7 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
                 {[
                   { icon:"⛽", label:"Prix / L", val:`${price.toFixed(3)}€`,
-                    sub:(stationId==="__best__"||stationId==="__avg__")?"moins chère":(resolveNom(selectedStation).nom||"Station").slice(0,16),
+                    sub:stationId==="__best__"?"moins chère":(resolveNom(selectedStation).nom||"Station").slice(0,16),
                     color:m.color, highlight:true },
                   { icon:"🛣️", label:"/ 100 km", val:`${per100?.toFixed(2)}€`, sub:`conso ${effectiveConso}L/100`, color:m.color },
                   ...(distancePossible?[{ icon:"📍", label:"Autonomie", val:`≈${distancePossible}km`, sub:`avec ${liters}L`, color:"#60a5fa" }]:[]),
@@ -6860,30 +6790,35 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
                 ))}
               </div>
 
-              {/* Comparaison meilleure vs pire station */}
-              {bestS && worstS && bestS.id !== worstS.id && (
+              {/* Comparaison entre la moins chère et la station sélectionnée */}
+              {bestS && comparisonOther && bestS.id !== comparisonOther.id && (
                 <div style={{ borderRadius:12,padding:"10px 14px",background:"rgba(74,222,128,0.05)",border:"1px solid rgba(74,222,128,0.18)" }}>
                   <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:8 }}>Comparaison stations</div>
-                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6 }}>
-                    <span style={{ fontSize:10,fontWeight:700,color:"#4ade80" }}>⭐ {(()=>{const {nom}=resolveNom(bestS);return nom;})().slice(0,18)}</span>
-                    <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:14,color:"#4ade80" }}>{bestS[fuel]?.toFixed(3)}€</span>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,gap:8 }}>
+                    <span style={{ fontSize:10,fontWeight:700,color:"#4ade80",display:"flex",alignItems:"center",gap:6,minWidth:0 }}>
+                      <BrandIcon nom={bestS.nom} enseignes={bestS.enseignes} adresse={bestS.adresse} ville={bestS.ville} cp={bestS.cp} size={18}/>
+                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>⭐ {(()=>{const {nom}=resolveNom(bestS);return nom;})()}</span>
+                    </span>
+                    <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:14,color:"#4ade80",flexShrink:0 }}>{bestS[fuel]?.toFixed(3)}€</span>
                   </div>
-                  {/* Barre de comparaison */}
                   <div style={{ height:6,borderRadius:3,background:"rgba(255,255,255,0.06)",overflow:"hidden",marginBottom:6,position:"relative" }}>
                     <div style={{ position:"absolute",inset:0,borderRadius:3,
-                      width:`${worstS[fuel]?Math.min(100,(bestS[fuel]/worstS[fuel])*100):100}%`,
+                      width:`${comparisonOther[fuel]?Math.min(100,(bestS[fuel]/comparisonOther[fuel])*100):100}%`,
                       background:"linear-gradient(90deg,#4ade80,#22d3ee)",transition:"width .4s" }}/>
                   </div>
-                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                    <span style={{ fontSize:10,fontWeight:700,color:"var(--text3)" }}>⚠ {(()=>{const {nom}=resolveNom(worstS);return nom;})().slice(0,18)}</span>
-                    <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:14,color:"var(--text3)" }}>{worstS[fuel]?.toFixed(3)}€</span>
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:8 }}>
+                    <span style={{ fontSize:10,fontWeight:700,color:"var(--text3)",display:"flex",alignItems:"center",gap:6,minWidth:0 }}>
+                      <BrandIcon nom={comparisonOther.nom} enseignes={comparisonOther.enseignes} adresse={comparisonOther.adresse} ville={comparisonOther.ville} cp={comparisonOther.cp} size={18}/>
+                      <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selectedStation && selectedStation.id !== bestS.id ? "🎯" : "↕"} {(()=>{const {nom}=resolveNom(comparisonOther);return nom;})()}</span>
+                    </span>
+                    <span style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:14,color:"var(--text3)",flexShrink:0 }}>{comparisonOther[fuel]?.toFixed(3)}€</span>
                   </div>
-                  {(savings_vs_worst != null || savings_vs_avg != null) && (
+                  {(comparisonGapOnFill != null || savings_vs_avg != null) && (
                     <div style={{ marginTop:8,textAlign:"center",fontSize:11,fontWeight:800,color:"#4ade80",
                       background:"rgba(74,222,128,0.08)",borderRadius:8,padding:"4px 8px" }}>
-                      💰 Économie : {savings_vs_worst != null ? `${savings_vs_worst.toFixed(2)} € vs pire` : "—"}
-                      {savings_vs_avg != null ? ` · ${savings_vs_avg.toFixed(2)} € vs moyenne` : ""}
-                      {annualSavingVsAvg != null ? ` · ${Math.round(annualSavingVsAvg)}€/an` : (annualSavingVsWorst?` · ${Math.round(annualSavingVsWorst)}€/an`:"")}
+                      {comparisonGapOnFill != null ? `💰 ${comparisonLabel}: ${comparisonGapOnFill.toFixed(2)} € ${selectedStation && selectedStation.id !== bestS.id ? "de surcoût" : "d'écart"} sur ce plein` : ""}
+                      {savings_vs_avg != null ? ` · ${savings_vs_avg >= 0 ? "vs moyenne +" : "vs moyenne "}${savings_vs_avg.toFixed(2)} €` : ""}
+                      {annualSavingVsAvg != null ? ` · ${Math.round(annualSavingVsAvg)}€/an` : ""}
                     </div>
                   )}
                 </div>
@@ -6900,36 +6835,6 @@ function FuelSimulator({ stations, avgPrices, FUEL_META, citySearch, preselected
                     background:`linear-gradient(90deg,${m.color||"#a78bfa"},${m.color||"#a78bfa"}88)`,
                     transition:"width .3s" }}/>
                 </div>
-              </div>
-
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8 }}>
-                <div style={{ borderRadius:12,padding:"10px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)" }}>
-                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:6 }}>Prix moyen zone</div>
-                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:20,color:"var(--text)" }}>{avgPrice != null ? `${avgPrice.toFixed(3)}€` : "—"}</div>
-                  <div style={{ fontSize:10,color:"var(--text3)",marginTop:4 }}>{avgSmartPrice != null ? `score intelligent ${avgSmartPrice.toFixed(3)}` : stationDistanceLabel || "dans la zone"}</div>
-                </div>
-                <div style={{ borderRadius:12,padding:"10px 12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)" }}>
-                  <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:6 }}>Plein complet</div>
-                  <div style={{ fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:20,color:"var(--text)" }}>{fullTankCost != null ? `${fullTankCost.toFixed(2)}€` : "—"}</div>
-                  <div style={{ fontSize:10,color:"var(--text3)",marginTop:4 }}>{stationDistanceLabel || vehicleLabel}</div>
-                </div>
-              </div>
-
-              {monthFuelStats && (
-                <div style={{ borderRadius:12,padding:"10px 12px",background:"rgba(96,165,250,0.05)",border:"1px solid rgba(96,165,250,0.16)" }}>
-                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap" }}>
-                    <div>
-                      <div style={{ fontSize:9,color:"var(--text3)",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:6 }}>DuoBudget · ce mois</div>
-                      <div style={{ fontSize:11,color:"var(--text2)",fontWeight:700 }}>{monthFuelStats.rows.length} plein{monthFuelStats.rows.length>1?"s":""} · {monthFuelStats.totalLiters.toFixed(1)}L · {monthFuelStats.totalAmount.toFixed(2)}€</div>
-                    </div>
-                    <div style={{ fontSize:11,fontWeight:800,color:"#60a5fa" }}>{monthFuelStats.avgPaid != null ? `moy. ${monthFuelStats.avgPaid.toFixed(3)}€/L` : "aucun plein"}</div>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
-                <button className="btn btn-primary" style={{ flex:1,justifyContent:"center" }} onClick={() => onSaveFillup && selectedStation && price != null && totalCost != null && onSaveFillup({ station:selectedStation, fuelType:fuel, liters, pricePerLiter:price, totalCost, vehicleLabel, conso:effectiveConso })}>🧾 Enregistrer dans DuoBudget</button>
-                <button className="btn btn-ghost" style={{ flex:1,justifyContent:"center" }} onClick={() => setStationId("__best__")}>⭐ Revenir au meilleur choix</button>
               </div>
             </>
           ) : (
